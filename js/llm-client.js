@@ -15,7 +15,7 @@
    *                  | { ok: false, reason: string }>}
    */
   function generate(prompt, config, bank) {
-    var timeoutMs = (config && typeof config.timeoutMs === 'number') ? config.timeoutMs : 8000;
+    var timeoutMs = (config && typeof config.timeoutMs === 'number') ? config.timeoutMs : 25000;
     var proxyUrl = config && config.proxyUrl;
 
     if (!proxyUrl) {

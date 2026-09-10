@@ -10,7 +10,9 @@ The developer pays; hobby scale is fine. But any key shipped client-side is extr
 
 ## Decision
 
-A thin proxy Worker (~40 lines) holds `LLM_ENDPOINT`, `LLM_API_KEY`, and `LLM_MODEL` in environment secrets. CORS allow-list is the Pages origin only. In-memory per-IP rate limit at roughly 10 requests per hour. Eight-second upstream budget. Provider failures pass through as a structured `{error}` so the client routes to the Deterministic Fallback. No request logging that could capture prompt content.
+A thin proxy Worker (~40 lines) holds `LLM_ENDPOINT`, `LLM_API_KEY`, and `LLM_MODEL` in environment secrets. CORS allow-list is the Pages origin only, deny-until-configured by default. In-memory per-IP rate limit at roughly 10 requests per hour. Upstream budget defaults to 20 seconds (env-configurable via `UPSTREAM_TIMEOUT_MS` for slower providers). Provider failures pass through as a structured `{error}` so the client routes to the Deterministic Fallback. No request logging that could capture prompt content.
+
+_Amended 2026-09-10: upstream budget 8s → 20s default (owner decision — hosted inference latency needs headroom; local providers per ADR-0008 are slower still). Client-side timeout (config.js) sits above the upstream abort at 25s so the Worker's structured error reaches the client before the client aborts._
 
 ## Consequences
 

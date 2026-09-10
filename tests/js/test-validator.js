@@ -159,7 +159,15 @@ exports.run = function() {
   var r10 = Validator.validate(emptyNarrative, mockBank);
   check('empty narrative string: ok is false', !r10.ok, r10.error);
 
-  // ── 11. Browser + Node dual export ──
+  // ── 11. Markdown-fenced JSON → ok:true (fence tolerated) ──
+  var fencedOutput = '```json\n' + validOutput + '\n```';
+  var rFenced = Validator.validate(fencedOutput, mockBank);
+  check('fenced JSON: ok is true', rFenced.ok, rFenced.error);
+  check('fenced JSON: parsed.narrative preserved',
+    rFenced.ok && rFenced.parsed.narrative === JSON.parse(validOutput).narrative,
+    rFenced.ok ? 'preserved' : rFenced.error);
+
+  // ── 12. Browser + Node dual export ──
   check('exports: module.exports is set', typeof Validator.validate === 'function');
   check('exports: globalThis.App.ResponseValidator exists',
     typeof globalThis.App !== 'undefined' &&

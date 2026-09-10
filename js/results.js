@@ -399,7 +399,23 @@
     // --- Output Format ---
     prompt +=
       '## Output Format\n\n' +
-      'Return a JSON object matching the schema above.';
+      'Return ONLY a JSON object, no markdown fences, no commentary:\n\n' +
+      '{\n' +
+      '  "narrative": "2-4 sentence plain-language analysis of the Participant\'s blind spots,\n' +
+      '    referencing their own choices and the OWASP evidence above",\n' +
+      '  "actions": [\n' +
+      '    {\n' +
+      '      "priority": 1,\n' +
+      '      "title": "short imperative action title",\n' +
+      '      "description": "1-2 sentences: what to do and why, grounded in the source material",\n' +
+      '      "ast_source": "AST01"\n' +
+      '    }\n' +
+      '  ]\n' +
+      '}\n\n' +
+      'Rules: 3-5 actions, most important first (priority 1 = first). Each action must be\n' +
+      'grounded in the provided material: its ast_source must be an AST ID covered by the\n' +
+      'OWASP Source Material or Weakest Questions sections, and its description must trace\n' +
+      'to that material.';
 
     return prompt;
   }

@@ -1,1 +1,1 @@
-window.APP_CONFIG = { proxyUrl: '', timeoutMs: 8000, tokenBudget: 3000 };
+window.APP_CONFIG = { proxyUrl: '', timeoutMs: 25000, tokenBudget: 3000 };

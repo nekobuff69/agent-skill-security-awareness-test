@@ -10,7 +10,7 @@ Three provider-specific client code paths is scope creep for one app. The Worker
 
 ## Decision
 
-One wire format, OpenAI-compatible. The Worker environment's endpoint, key, and model selection covers OpenAI, Anthropic (compat endpoint), OpenRouter, LM Studio, and Ollama. Client config carries only the proxy URL, eight-second timeout, and token budget — the model name lives server-side.
+One wire format, OpenAI-compatible. The Worker environment's endpoint, key, and model selection covers OpenAI, Anthropic (compat endpoint), OpenRouter, LM Studio, and Ollama. Client config carries only the proxy URL, a client-side timeout (25s, kept above the Worker's 20s upstream abort), and token budget — the model name lives server-side.
 
 ## Consequences
 

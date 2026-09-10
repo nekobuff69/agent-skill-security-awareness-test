@@ -12,10 +12,14 @@
    *          | { ok: false, error: string }}
    */
   function validate(rawText, bank) {
-    // Step 1: JSON parse
+    // Step 1: JSON parse — tolerate a markdown code fence (```json … ```)
+    // since models frequently wrap JSON despite instructions.
+    var text = String(rawText == null ? '' : rawText).trim();
+    var fence = text.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
+    if (fence) text = fence[1].trim();
     var parsed;
     try {
-      parsed = JSON.parse(rawText);
+      parsed = JSON.parse(text);
     } catch (e) {
       return { ok: false, error: 'Invalid JSON: ' + e.message };
     }

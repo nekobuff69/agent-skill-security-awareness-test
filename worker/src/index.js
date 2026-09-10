@@ -4,7 +4,10 @@
 
 const RATE_LIMIT = 10;
 const WINDOW_MS = 3600000; // 1 hour
-const UPSTREAM_TIMEOUT_MS = 8000;
+// Owner decision 2026-09-10: 20s default upstream budget (was 8s per ADR-0007
+// — amended). Configurable via env for slower providers (LM Studio, Ollama on
+// local hardware) without client changes (ADR-0008).
+const UPSTREAM_TIMEOUT_MS_DEFAULT = 20000;
 
 // ---------------------------------------------------------------------------
 // Rate limiter (in-memory, resets on Worker restart — acceptable at hobby scale)
@@ -34,8 +37,11 @@ function checkRateLimit(ip) {
 // CORS helpers
 // ---------------------------------------------------------------------------
 function getCorsHeaders(env, origin) {
-  const allowed = (env.ALLOWED_ORIGIN || '*').trim();
-  const isAllowed = allowed === '*' || origin === allowed;
+  // Default-deny: unset ALLOWED_ORIGIN means no origin may use the proxy
+  // (ADR-0007: allow-list is the Pages origin only). '*' must be set
+  // explicitly by the operator (local dev only).
+  const allowed = (env.ALLOWED_ORIGIN || '').trim();
+  const isAllowed = allowed === '*' || (allowed !== '' && origin === allowed);
 
   if (!isAllowed) return null;
 
@@ -122,8 +128,15 @@ export default {
       return jsonResponse(500, { error: { message: 'Upstream not configured', status: 500 } }, cors);
     }
 
+    // ADR-0008: the model name lives server-side — override whatever the
+    // client sent so provider switching needs no client changes.
+    if (env.LLM_MODEL) {
+      body.model = env.LLM_MODEL;
+    }
+
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+    const upstreamTimeoutMs = parseInt(env.UPSTREAM_TIMEOUT_MS, 10) || UPSTREAM_TIMEOUT_MS_DEFAULT;
+    const timer = setTimeout(() => controller.abort(), upstreamTimeoutMs);
 
     try {
       const upstreamResp = await fetch(endpoint, {

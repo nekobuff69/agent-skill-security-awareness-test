@@ -5,4 +5,8 @@ compatibility_date = "2024-01-01"
 [vars]
 LLM_ENDPOINT = ""
 LLM_MODEL = ""
-# LLM_API_KEY stored as a secret, never in config
+# LLM_API_KEY stored as a secret, never in config (`npx wrangler secret put LLM_API_KEY`)
+# ALLOWED_ORIGIN = exact Pages origin (e.g. "https://agent-security-quiz.pages.dev"); unset = deny all origins (ADR-0007)
+ALLOWED_ORIGIN = ""
+# UPSTREAM_TIMEOUT_MS = upstream abort budget; default 20000 (ADR-0007 amended 2026-09-10, was 8s). Raise for slow local providers.
+UPSTREAM_TIMEOUT_MS = "20000"
