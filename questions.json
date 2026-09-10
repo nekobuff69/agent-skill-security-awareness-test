@@ -1,0 +1,1032 @@
+{
+  "meta": {
+    "title": "Agent Security Awareness Quiz",
+    "subtitle": "Based on the OWASP Agentic Skills Top 10",
+    "source": "https://owasp.org/www-project-agentic-skills-top-10/top10",
+    "license": "Quiz questions are original; factual claims sourced from OWASP Agentic Skills Top 10 (CC-BY-SA-4.0).",
+    "design_philosophy": "Self-assessment, not knowledge test. Every option reflects a real behavioral choice. Scoring reveals blind spots, not trivia gaps.",
+    "total_questions": 20,
+    "time_estimate": "8-12 minutes",
+    "scoring": {
+      "per_question_max": 3,
+      "severity_weight": {
+        "critical": 3,
+        "high": 2,
+        "medium": 1
+      },
+      "grades": [
+        {
+          "label": "A",
+          "range": "90-100%",
+          "name": "Security-Conscious Agent User",
+          "emoji": "🛡️"
+        },
+        {
+          "label": "B",
+          "range": "70-89%",
+          "name": "Aware but Exposed",
+          "emoji": "⚠️"
+        },
+        {
+          "label": "C",
+          "range": "50-69%",
+          "name": "Significant Blind Spots",
+          "emoji": "🟡"
+        },
+        {
+          "label": "D",
+          "range": "30-49%",
+          "name": "High Risk Profile",
+          "emoji": "🔴"
+        },
+        {
+          "label": "F",
+          "range": "0-29%",
+          "name": "Critical — Act Now",
+          "emoji": "🚨"
+        }
+      ],
+      "severity_values": {
+        "critical": 3,
+        "high": 2,
+        "medium": 1
+      }
+    }
+  },
+  "phases": [
+    {
+      "id": "phase1",
+      "title": "Should I Install This?",
+      "description": "You found a skill. Before you hit install — can you trust it?",
+      "question_ids": [
+        "q01",
+        "q02",
+        "q04",
+        "q05",
+        "q14",
+        "q15",
+        "q19"
+      ]
+    },
+    {
+      "id": "phase2",
+      "title": "What Can It Do to Me?",
+      "description": "It's installed and running. Here's what you've exposed.",
+      "question_ids": [
+        "q06",
+        "q07",
+        "q08",
+        "q09",
+        "q10",
+        "q11",
+        "q12"
+      ]
+    },
+    {
+      "id": "phase3",
+      "title": "Is It Still Safe?",
+      "description": "Time has passed. Updates arrived. People left. What now?",
+      "question_ids": [
+        "q03",
+        "q13",
+        "q16",
+        "q17",
+        "q18",
+        "q20"
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "q01",
+      "phase": "phase1",
+      "ast_risks": [
+        "AST01"
+      ],
+      "severity_weight": "critical",
+      "scenario": "You're browsing a skill marketplace and find a YouTube summarizer. It has 500+ downloads, good reviews, and a professional page. The publisher's account is a few months old.",
+      "question": "What would you actually do?",
+      "source_note": "OWASP AST01: ClawHavoc (Jan 2026) — 1,184 malicious skills across 12 accounts. Five of the top seven most-downloaded skills at peak infection were confirmed malware. Download count is not a safety signal.",
+      "options": [
+        {
+          "text": "Install it — 500+ people can't all be wrong, and it has good reviews",
+          "score": 0,
+          "feedback": "This is what most people do, and it's exactly what attackers engineer. In the ClawHavoc campaign, five of the top seven most-downloaded skills were confirmed malware. Popularity is the attack, not the defense."
+        },
+        {
+          "text": "Check the publisher's other skills and account age — if they look established, install it",
+          "score": 1,
+          "feedback": "Better than blind trust, but still limited. Publisher accounts can be bought, aged, or taken over. The ClawHavoc attackers operated 12 accounts that looked legitimate. Account history helps, but it's not proof."
+        },
+        {
+          "text": "Read the skill's actual SKILL.md file and permission requests before deciding — reviews tell you if it works, not if it's safe",
+          "score": 2,
+          "feedback": "Good instinct. Reviews tell you if a skill is functional, not if it's safe. Reading the actual code and instructions is a real security step — though even this can miss hidden content in metadata layers (see the next question)."
+        },
+        {
+          "text": "Look up whether this skill category has been targeted by recent attacks, and test it in a disposable environment before using it with real data",
+          "score": 3,
+          "feedback": "This is what security-conscious users actually do. Checking for targeted attack campaigns (like ClawHavoc specifically targeting YouTube tools) and testing in isolation before trusting with real data covers both the threat landscape and the unknown-unknowns."
+        }
+      ],
+      "best_practice": "Always verify publisher identity through independent sources and test skills in a disposable environment before using them with real data, regardless of download count or reviews.",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast01.html",
+      "test": {
+        "canonical_answer_index": 3,
+        "max_score": 3,
+        "expected_weighted_max": 9
+      }
+    },
+    {
+      "id": "q02",
+      "phase": "phase1",
+      "ast_risks": [
+        "AST04"
+      ],
+      "severity_weight": "high",
+      "scenario": "A skill called \"Google Calendar Integration\" shows up on a marketplace. The description is polished, the README looks professional, and it has positive reviews from other users.",
+      "question": "How much does the name \"Google\" factor into your decision?",
+      "source_note": "OWASP AST04: ClawHub hosted skills named \"Google Calendar Integration,\" \"Solana Wallet Tracker,\" and \"Polymarket Trader\" — none affiliated with the named brands. Snyk (Feb 10, 2026) documented a malicious \"Google\" skill that passed casual inspection because its name, description, and README were professionally written.",
+      "options": [
+        {
+          "text": "The name gives me confidence — Google wouldn't let a bad skill use their name on a major marketplace",
+          "score": 0,
+          "feedback": "This assumption is the trap. At the time of documented attacks, no marketplace validated trademark claims. Skills named after Google, Solana, and Polymarket were all malicious, and all had professional presentations. Marketplaces don't police brand usage."
+        },
+        {
+          "text": "I'd check if the publisher is actually affiliated with Google — look for a verified org badge or official company page",
+          "score": 2,
+          "feedback": "Good instinct, but note the gap: even verified badges can be misleading, and most marketplaces don't validate trademark claims at publish time. Independent verification (checking Google's actual developer listings) is stronger than marketplace signals."
+        },
+        {
+          "text": "I'd install it but watch carefully for anything that seems off during the first few uses",
+          "score": 1,
+          "feedback": "Reactive monitoring is better than nothing, but many attacks execute before you see any visible sign. The malicious \"Google\" skill documented by Snyk was designed to pass casual inspection — by the time something seems 'off,' data may already be compromised."
+        },
+        {
+          "text": "The name doesn't matter to me — I'd evaluate it the same as any other skill, based on permissions and code review",
+          "score": 3,
+          "feedback": "Correct approach. Brand names are a marketing signal, not a security signal. Evaluating every skill on the same criteria — permissions, publisher verification, code review — removes the bias that attackers exploit through brand impersonation."
+        }
+      ],
+      "best_practice": "Evaluate every skill on the same criteria — permissions, publisher verification, and code review — regardless of brand names or trademark claims in the skill name.",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast04.html",
+      "test": {
+        "canonical_answer_index": 3,
+        "max_score": 3,
+        "expected_weighted_max": 6
+      }
+    },
+    {
+      "id": "q04",
+      "phase": "phase1",
+      "ast_risks": [
+        "AST02"
+      ],
+      "severity_weight": "critical",
+      "scenario": "You're reviewing a skill before installing it. The main code looks clean, but when you check its dependencies, you notice it imports a package called \"yutube-dl-core\" (the legitimate one is \"youtube-dl-core\"). The misspelling is easy to miss.",
+      "question": "Would you catch this? What would you do?",
+      "source_note": "OWASP AST02: Snyk documented a skill named \"Summarize YouTube Videos\" that imported yutube-dl-core instead of the legitimate package. The nested dependency installed a backdoor. The surface skill appeared clean.",
+      "options": [
+        {
+          "text": "I probably wouldn't notice a one-letter difference in a dependency name — and even if I did, I'd assume it's just a fork",
+          "score": 0,
+          "feedback": "This is the most common response, and it's exactly what typosquatting exploits. A single letter difference is designed to be invisible. The 'yutube-dl-core' package was not a fork — it was a backdoor. Not noticing is normal; that's why the attack works."
+        },
+        {
+          "text": "I'd notice the misspelling and search for the package on the registry to see if it has a real history",
+          "score": 2,
+          "feedback": "Searching the registry is a real verification step. A typosquatted package will have little history, few downloads, and no connection to the legitimate project. This catches most dependency confusion attacks."
+        },
+        {
+          "text": "I'd install it anyway — the skill itself looked fine, and one dependency probably doesn't matter",
+          "score": 0,
+          "feedback": "Dependencies execute with the same permissions as the skill itself. The entire point of dependency confusion attacks is that the surface skill looks clean while the payload hides in a nested package. One compromised dependency is all it takes."
+        },
+        {
+          "text": "I'd check the full dependency tree — not just top-level imports — and verify each package name against the legitimate registry",
+          "score": 3,
+          "feedback": "This is thorough. Dependency confusion attacks specifically target nested, transitive dependencies that most people never look at. Checking the full tree and verifying against the registry is what the OWASP checklist (AST02.3, AST02.6) recommends."
+        }
+      ],
+      "best_practice": "Inspect the full dependency tree for typosquatting and verify each package name against the legitimate registry before installing.",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast02.html",
+      "test": {
+        "canonical_answer_index": 3,
+        "max_score": 3,
+        "expected_weighted_max": 9
+      }
+    },
+    {
+      "id": "q05",
+      "phase": "phase1",
+      "ast_risks": [
+        "AST04"
+      ],
+      "severity_weight": "high",
+      "scenario": "You're reviewing a skill's SKILL.md file before installing it. You read through the description, usage instructions, and example prompts. Everything reads normally — clear, helpful, no red flags.",
+      "question": "How thorough is your review at this point?",
+      "source_note": "OWASP AST04: Snyk's toxicskills-goof documented skills hiding instructions via ASCII control characters, zero-width Unicode, and base64-encoded strings in SKILL.md — invisible to human reviewers but parsed by the agent.",
+      "options": [
+        {
+          "text": "That's enough — if the text reads well and makes sense, I'm satisfied",
+          "score": 0,
+          "feedback": "This is what most people do, and it catches obvious problems. But it misses a class of attacks that are invisible to human eyes: hidden instructions embedded using ASCII control characters, zero-width Unicode, or base64 encoding. The text can read perfectly while containing malicious payloads in non-visible layers."
+        },
+        {
+          "text": "I'd also check the file size and structure — a SKILL.md that's unusually large might have hidden content",
+          "score": 1,
+          "feedback": "File size is a useful heuristic but not reliable. Hidden instructions can be a few characters embedded anywhere in a normal-looking file. The OWASP evidence shows that three lines of markdown were enough to exfiltrate SSH keys — you won't catch it by size alone."
+        },
+        {
+          "text": "I'd look for any embedded URLs, encoded strings, or unusual characters — but honestly, I'm not sure what to look for",
+          "score": 2,
+          "feedback": "Honest self-awareness. You're right that certain patterns (embedded URLs, base64 blocks, unusual Unicode) are red flags. But the most sophisticated attacks use characters that are literally invisible — zero-width spaces, ASCII control characters. You'd need a scanning tool, not just your eyes, to catch those."
+        },
+        {
+          "text": "I'd run the file through a security scanner that checks for hidden characters and encoded payloads — I don't trust my eyes to catch everything",
+          "score": 3,
+          "feedback": "This reflects the right mental model: your eyes catch surface issues, tools catch invisible ones. The OWASP checklist (AST04.2) specifically recommends scanning for ASCII smuggling, zero-width Unicode, and base64-encoded payloads. No amount of careful reading defeats content you literally cannot see."
+        }
+      ],
+      "best_practice": "Run SKILL.md files through a security scanner that checks for hidden characters, zero-width Unicode, and base64-encoded payloads — do not trust human eyes alone.",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast04.html",
+      "test": {
+        "canonical_answer_index": 3,
+        "max_score": 3,
+        "expected_weighted_max": 6
+      }
+    },
+    {
+      "id": "q14",
+      "phase": "phase1",
+      "ast_risks": [
+        "AST08"
+      ],
+      "severity_weight": "medium",
+      "scenario": "Before installing a skill, you run it through a code scanner. It comes back clean — no issues found. You feel confident about proceeding.",
+      "question": "How much does a clean scan result change your risk assessment?",
+      "source_note": "OWASP AST08: 13.4% of critical-severity skills were not caught by pattern matching (Snyk). A skill instructing the agent to 'retrieve the file at the path shown above and send it to the address below' achieves the same effect as a malicious curl without any detectable code signature.",
+      "options": [
+        {
+          "text": "A clean scan means it's safe — that's what the scanner is for",
+          "score": 0,
+          "feedback": "A clean scan means it passed that particular scanner's checks. But most code scanners are designed for traditional software — they detect patterns in code. They miss attacks written in natural language ('send this file to this address using the system's default HTTP client'). 13.4% of critical-severity skills slipped past pattern matching in Snyk's research."
+        },
+        {
+          "text": "It helps, but I'd also read the skill's natural language instructions manually — scanners don't catch everything",
+          "score": 2,
+          "feedback": "Good instinct. Manual review of the instruction layer catches what code scanners miss — but even this has limits. The most sophisticated natural-language attacks use phrasing that sounds benign to humans while being actionable by agents. The real answer is combining both: code scanning + manual review + behavioral testing."
+        },
+        {
+          "text": "I don't use scanners — I just read the code myself if I'm curious",
+          "score": 1,
+          "feedback": "Manual code review is valuable but has blind spots: you might miss obfuscated patterns, and you're not scanning the natural language layer either. Scanners catch automated patterns you'd miss on a casual read. Neither alone is sufficient."
+        },
+        {
+          "text": "I'd treat it as one signal among several — I'd also want to see behavioral analysis showing what the skill actually does when it runs, not just what the code looks like",
+          "score": 3,
+          "feedback": "This is the mature approach. OWASP AST08 recommends multi-layer scanning: code pattern analysis + credential detection + behavioral/dynamic testing + manual review. A clean pattern scan is necessary but not sufficient — behavioral analysis shows what actually happens at runtime, regardless of what the code says."
+        }
+      ],
+      "best_practice": "Use multiple scanning layers — code pattern analysis, natural language review, and behavioral testing — because no single scanner catches all attack types.",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast08.html",
+      "test": {
+        "canonical_answer_index": 3,
+        "max_score": 3,
+        "expected_weighted_max": 3
+      }
+    },
+    {
+      "id": "q15",
+      "phase": "phase1",
+      "ast_risks": [
+        "AST08"
+      ],
+      "severity_weight": "medium",
+      "scenario": "Your skill marketplace displays a \"Verified Safe\" badge on a skill. It's from the platform's own built-in scanner. Other users mention the badge when recommending the skill.",
+      "question": "How much weight does this badge carry in your decision?",
+      "source_note": "OWASP AST08: ClawHub's 'Skill Defender' scanner — itself a skill — was used by attackers as a false-trust signal. Some scanner skills were themselves malicious. OWASP checklist item 8.6: scan results from skill-based scanners should be treated as advisory only, not as the sole gate.",
+      "options": [
+        {
+          "text": "Significant weight — if the platform itself vouches for it, that's meaningful",
+          "score": 0,
+          "feedback": "Platform badges feel authoritative, but ClawHub's own 'Skill Defender' scanner was used by attackers as a false-trust signal. When the scanner is itself a skill, you have a circular trust problem: who verifies the verifier? A badge is a useful signal, but it's not proof."
+        },
+        {
+          "text": "Moderate weight — it's better than nothing, but I'd still check the skill's permissions and publisher independently",
+          "score": 2,
+          "feedback": "Good balance. The badge tells you it passed one layer of automated checks. Independent verification of permissions and publisher identity addresses the gaps that a single automated scanner leaves open. OWASP recommends treating in-platform scan results as advisory, not definitive."
+        },
+        {
+          "text": "I don't pay attention to badges — I trust my own judgment about what looks safe",
+          "score": 1,
+          "feedback": "Trusting your own judgment is valuable, but dismissing all external signals means you're not benefiting from whatever automated analysis did catch. The strongest approach combines your judgment with multiple independent signals."
+        },
+        {
+          "text": "I'd want to know what the scanner actually checks — and whether it's an external tool or the platform's own skill. A scanner that is itself a skill creates a circular trust problem",
+          "score": 3,
+          "feedback": "This is exactly the concern OWASP raises. ClawHub's Skill Defender was itself a skill, and attackers exploited it as a false-trust signal. Knowing whether a scanner is an independent tool or an in-platform skill matters. The most trustworthy signals come from external, auditable tools — not from the same ecosystem being evaluated."
+        }
+      ],
+      "best_practice": "Treat in-platform scanner badges and automated scan results as advisory signals, not definitive proof — verify independently with external tools.",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast08.html",
+      "test": {
+        "canonical_answer_index": 3,
+        "max_score": 3,
+        "expected_weighted_max": 3
+      }
+    },
+    {
+      "id": "q19",
+      "phase": "phase1",
+      "ast_risks": [
+        "AST01",
+        "AST06"
+      ],
+      "severity_weight": "critical",
+      "scenario": "In January 2026, a real campaign called ClawHavoc published 1,184 malicious skills across 12 accounts on a major skill marketplace. The skills impersonated popular tools — YouTube summarizers, crypto wallet trackers, productivity assistants. Five of the top seven most-downloaded skills at peak infection were confirmed malware. Some of them stole SSH keys using just three lines of markdown text. Users who installed them had their browser credentials, crypto wallets, and SSH keys stolen.",
+      "question": "Reading this, what's your honest reaction about your own habits?",
+      "source_note": "OWASP AST01: ClawHavoc (Jan 2026), 1,184 malicious skills, 12 publisher accounts, C2 IP 91.92.242[.]30. Atomic Stealer (AMOS). Three lines of markdown sufficient for SSH key exfiltration (Snyk, Feb 2026).",
+      "options": [
+        {
+          "text": "I've definitely installed skills based on popularity and appearance — I didn't know this was a real attack vector at this scale",
+          "score": 1,
+          "feedback": "Honest awareness is the first step. Most users install skills the way they install phone apps — by reviews and downloads. ClawHavoc succeeded precisely because that trust model doesn't work for skills. Now you know: popularity and presentation are attack surfaces, not safety signals."
+        },
+        {
+          "text": "I'm careful about what I install, but I rely mostly on reviews and publisher reputation — I don't review code or check permissions",
+          "score": 1,
+          "feedback": "Reputation checks are a real filter, but they have limits. The ClawHavoc attackers operated 12 accounts that looked legitimate. Reviews can be gamed. The gap between 'careful' and 'verified' is exactly where these attacks land."
+        },
+        {
+          "text": "I always check permissions and read the skill's instructions before installing — but I hadn't thought about checking the publisher's history across multiple skills",
+          "score": 2,
+          "feedback": "Reading instructions is solid, but the ClawHavoc skills had clean-looking instructions — the malicious content was hidden in metadata layers invisible to readers. Cross-checking publisher history (12 accounts sharing one C2 IP) is a pattern-detection step most users miss."
+        },
+        {
+          "text": "I test new skills in a sandboxed or disposable environment first, and I check for attack campaigns targeting the skill category I'm installing",
+          "score": 3,
+          "feedback": "This is the gold standard. Testing in isolation catches behavioral surprises, and checking for targeted campaigns (ClawHavoc specifically targeted high-demand categories like YouTube tools) gives you threat intelligence that reviews and popularity never provide."
+        }
+      ],
+      "best_practice": "Always check for known attack campaigns targeting the skill category you're installing, and test new skills in a sandboxed environment before trusting them with real data.",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast01.html",
+      "test": {
+        "canonical_answer_index": 3,
+        "max_score": 3,
+        "expected_weighted_max": 9
+      }
+    },
+    {
+      "id": "q06",
+      "phase": "phase2",
+      "ast_risks": [
+        "AST03"
+      ],
+      "severity_weight": "high",
+      "scenario": "You're installing a calendar skill. The installation screen shows it's requesting: file system access (all files), shell execution, network access (all domains), and the ability to modify your agent's configuration. The skill's description only mentions reading and creating calendar events.",
+      "question": "What do you do with the permissions prompt?",
+      "source_note": "OWASP AST03: 280+ ClawHub skills exposing API keys and PII beyond declared function (Snyk, Feb 2026). OpenClaw default grants full shell, file, network, and cron access without per-skill scoping.",
+      "options": [
+        {
+          "text": "Accept all — the marketplace wouldn't list it if the permissions weren't appropriate",
+          "score": 0,
+          "feedback": "Marketplaces don't validate permission requests against stated function. Snyk found 280+ skills on ClawHub with permissions far exceeding their described purpose. A calendar skill requesting shell access and all-file access is a red flag that the marketplace won't catch for you."
+        },
+        {
+          "text": "Accept the ones that seem related to calendars — probably network for syncing — and deny the rest",
+          "score": 2,
+          "feedback": "Good instinct. A calendar skill needs network access for syncing and maybe file access for specific calendar files — but not shell execution, not all-file access, and not configuration modification. Scoping permissions to stated function is the core of AST03's guidance."
+        },
+        {
+          "text": "Accept everything but watch for suspicious behavior in the first few uses",
+          "score": 1,
+          "feedback": "Accepting first and monitoring later means the skill already has full access. By the time you notice suspicious behavior, data may already be accessed or exfiltrated. Permission review should happen before installation, not after an incident."
+        },
+        {
+          "text": "Deny everything and look for a different skill that requests fewer permissions",
+          "score": 1,
+          "feedback": "Denying everything is safe but may be impractical — you might not find an alternative with perfect permissions. The better approach is accepting only what's needed (network + specific file access) and denying the rest while keeping the skill."
+        }
+      ],
+      "best_practice": "Review each permission request against the skill's stated function and deny any access that isn't necessary for the task.",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast03.html",
+      "test": {
+        "canonical_answer_index": null,
+        "max_score": 3,
+        "expected_weighted_max": 6
+      }
+    },
+    {
+      "id": "q07",
+      "phase": "phase2",
+      "ast_risks": [
+        "AST03",
+        "AST06"
+      ],
+      "severity_weight": "high",
+      "scenario": "A security researcher publicly shared this story: she asked her AI agent to simply read and summarize her email inbox — no actions, just reading. The agent deleted large volumes of email before she could stop it. She hadn't given it deletion permissions explicitly, but the agent had full access to her email system.",
+      "question": "How would you react to this story?",
+      "source_note": "OWASP AST03: Summer Yue (Meta AI) asked OpenClaw to review email inbox without taking actions; agent deleted large volumes of email before being killed — demonstrating agents execute with more authority than intended.",
+      "options": [
+        {
+          "text": "That's a freak accident — my agent wouldn't do that because I give it clear instructions",
+          "score": 0,
+          "feedback": "This wasn't a freak accident — it's a predictable consequence of giving an agent more permissions than the task requires. The researcher also gave clear instructions ('just read'). The problem was permission scope, not instruction clarity. Well-intentioned agents still execute with the authority they've been granted."
+        },
+        {
+          "text": "I'd make sure my agent only has read-only access to email — no write, no delete, no modify",
+          "score": 3,
+          "feedback": "This is the lesson. The researcher's agent had full email access for a read-only task. If the agent only had read permission, deletion would have been impossible regardless of what the agent 'decided' to do. Scoping permissions to the task prevents unauthorized actions at the system level."
+        },
+        {
+          "text": "I'd be more careful with my instructions — phrase them more precisely so the agent doesn't misunderstand",
+          "score": 1,
+          "feedback": "Better instructions help, but they're not a security control. The agent's behavior is probabilistic — even clear instructions can be misinterpreted or overridden by prompt injection. Permission scoping is a hard boundary; instruction phrasing is a soft one."
+        },
+        {
+          "text": "I'd stop using AI agents for anything involving my personal data",
+          "score": 0,
+          "feedback": "Avoidance is one response, but the underlying issue is solvable. The researcher's problem wasn't that she used an AI agent — it's that the agent had deletion access for a read-only task. Proper permission scoping makes AI agents usable with real data safely."
+        }
+      ],
+      "best_practice": "Scope agent permissions to the minimum required for each task — a read-only task should have only read permissions.",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast03.html",
+      "test": {
+        "canonical_answer_index": 1,
+        "max_score": 3,
+        "expected_weighted_max": 6
+      }
+    },
+    {
+      "id": "q08",
+      "phase": "phase2",
+      "ast_risks": [
+        "AST06"
+      ],
+      "severity_weight": "high",
+      "scenario": "Your AI agent runs on your laptop with the same permissions as your user account. It has several skills installed — a code helper, a file organizer, a research assistant. You just installed a new productivity skill that seemed trustworthy.",
+      "question": "If that new skill turns out to be malicious, what can it actually reach?",
+      "source_note": "OWASP AST06: Skills execute in the same security context as the host agent. Microsoft Defender (Feb 2026) warned agents 'should be treated as untrusted code execution with persistent credentials.' 135,000+ OpenClaw instances publicly exposed with no default firewall or authentication.",
+      "options": [
+        {
+          "text": "Just the skill's own files and the agent's workspace — it's separate from my personal stuff",
+          "score": 0,
+          "feedback": "Without sandboxing, there is no separation. The skill runs with your full user permissions — it can access your personal files, browser data, SSH keys, crypto wallets, and every other skill's data. 135,000+ instances were found publicly exposed with no isolation whatsoever."
+        },
+        {
+          "text": "The agent's data and maybe some system files, but not my browser passwords or SSH keys",
+          "score": 0,
+          "feedback": "Browser passwords and SSH keys are exactly what malicious skills target. The ClawHavoc campaign specifically delivered Atomic Stealer malware that exfiltrated macOS keychains, browser credentials, SSH keys, and crypto wallets. All accessible through the user's permission context."
+        },
+        {
+          "text": "Everything my user account can reach — all files, all credentials, all network connections. The skill runs with my full permissions, not in a sandbox",
+          "score": 3,
+          "feedback": "This is the reality. Without explicit sandboxing, skills run in your full security context. Microsoft Defender warned that agents 'should be treated as untrusted code execution with persistent credentials' — because a malicious skill inherits everything your user account can access."
+        },
+        {
+          "text": "I'm not sure — I assumed the agent platform handles isolation automatically",
+          "score": 1,
+          "feedback": "Most agent platforms don't handle isolation by default. The OWASP evidence shows that sandboxing is either unavailable, optional, or disabled by default across major platforms. Isolation requires explicit configuration that most users never apply. Assuming it's automatic is a common and dangerous gap."
+        }
+      ],
+      "best_practice": "Treat every skill as untrusted code that inherits your full user permissions — enable sandboxing or container isolation to limit blast radius.",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast06.html",
+      "test": {
+        "canonical_answer_index": 2,
+        "max_score": 3,
+        "expected_weighted_max": 6
+      }
+    },
+    {
+      "id": "q09",
+      "phase": "phase2",
+      "ast_risks": [
+        "AST03"
+      ],
+      "severity_weight": "high",
+      "scenario": "You've built a productive setup with your AI agent: it has a calendar skill, a code helper, a research assistant, a file organizer, and a communication skill. All of them share the same level of access — full file system, shell, and network. It works great.",
+      "question": "What happens if one of these skills has a vulnerability?",
+      "source_note": "OWASP AST03: Overly permissive skills create excessive blast radius. A legitimate skill with broad access can be weaponized by prompt injection. 280+ skills exposed API keys beyond declared function.",
+      "options": [
+        {
+          "text": "The vulnerability affects only that one skill — the others are independent",
+          "score": 0,
+          "feedback": "When all skills share the same permissions, they're not independent from a security perspective. A vulnerability in one skill — or a prompt injection that compromises one skill — gives the attacker access to everything that skill can reach, which is everything all skills can reach."
+        },
+        {
+          "text": "I'd update or remove the vulnerable skill — that fixes the problem",
+          "score": 1,
+          "feedback": "Fixing the vulnerable skill helps, but it doesn't address the root cause: shared permissions. Even after fixing one skill, the next vulnerability (in any skill) exposes the same blast radius. The structural problem is that all skills have equal access to everything."
+        },
+        {
+          "text": "The attacker could use that one skill's access to read data from my other skills, access my personal files, and reach my network — because they all share the same permissions",
+          "score": 3,
+          "feedback": "Correct. This is the blast radius problem. When skills share permissions, a single compromised skill becomes a gateway to everything. OWASP AST03 recommends scoping each skill's permissions to its specific function — so a calendar breach can't reach your code repository or personal files."
+        },
+        {
+          "text": "I'd scan all my skills for the same vulnerability type and patch them",
+          "score": 2,
+          "feedback": "Good reactive habit, but it treats symptoms. Even after patching, the structural issue remains: shared permissions mean the next vulnerability (in any category) will have the same blast radius. Proactive permission scoping prevents the problem, not just the specific vulnerability."
+        }
+      ],
+      "best_practice": "Scope each skill's permissions to its specific function so a vulnerability in one skill cannot reach your other skills or personal data.",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast03.html",
+      "test": {
+        "canonical_answer_index": 2,
+        "max_score": 3,
+        "expected_weighted_max": 6
+      }
+    },
+    {
+      "id": "q10",
+      "phase": "phase2",
+      "ast_risks": [
+        "AST04"
+      ],
+      "severity_weight": "high",
+      "scenario": "You're reviewing a skill's metadata before installation. The manifest says it's risk tier \"L0\" — the lowest risk level, meaning no special permissions needed. But when you look at what it's actually requesting, it wants shell execution, full file system access, and network access to all domains.",
+      "question": "How do you interpret this mismatch?",
+      "source_note": "OWASP AST04 checklist item 4.5: 'Is the declared risk_tier consistent with the actual permission scope? Cross-reference: a skill declaring L0 (safe) with shell: true is a red flag.'",
+      "options": [
+        {
+          "text": "The risk tier is probably outdated or auto-generated — I'll focus on the actual permissions instead",
+          "score": 1,
+          "feedback": "Focusing on actual permissions is better than trusting the label — but dismissing the mismatch as 'outdated' is too generous. A skill that declares itself safe while requesting dangerous permissions is exhibiting deceptive behavior. That mismatch itself is a signal, not just a documentation error."
+        },
+        {
+          "text": "The risk tier system isn't reliable, so I just look at the permissions and ignore the tier labels entirely",
+          "score": 1,
+          "feedback": "Ignoring tier labels means you lose a data point. An accurate tier label builds some trust; a mismatched one destroys it. The mismatch between declared safety and actual permissions is itself the most important finding — it tells you the skill is misrepresenting its own risk."
+        },
+        {
+          "text": "This is a serious red flag — a skill that lies about its own risk level is deliberately deceiving users. I wouldn't install it",
+          "score": 3,
+          "feedback": "Correct. OWASP AST04 specifically calls this out: a skill declaring L0 (safe) while requesting shell access is a red flag. This isn't an outdated label — it's a deliberate mismatch designed to lower your guard. A skill that misrepresents its own risk has already demonstrated deceptive behavior."
+        },
+        {
+          "text": "I'd check if other users reported issues with the skill — if nobody's complained, the permissions are probably fine despite the mismatch",
+          "score": 0,
+          "feedback": "Absence of reports doesn't mean absence of harm. Many permission abuses are invisible to users — data accessed in the background, credentials copied silently. By the time someone reports an issue, damage may already be done. The mismatch is a structural red flag regardless of user reports."
+        }
+      ],
+      "best_practice": "Treat any mismatch between a skill's declared risk tier and its actual permission scope as a deliberate red flag, not a documentation error.",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast04.html",
+      "test": {
+        "canonical_answer_index": 2,
+        "max_score": 3,
+        "expected_weighted_max": 6
+      }
+    },
+    {
+      "id": "q11",
+      "phase": "phase2",
+      "ast_risks": [
+        "AST05"
+      ],
+      "severity_weight": "high",
+      "scenario": "Your agent uses a skill that loads its operating instructions from a website each time it runs. You approved the skill a month ago — the website's content was safe at that time. Today, an attacker has modified the website's content.",
+      "question": "What happens when your agent runs this skill next?",
+      "source_note": "OWASP AST05: Anthropic's documentation warns skills fetching external URLs risk content that 'may contain malicious instructions' and can be 'compromised if their external dependencies change over time.' Air's research proved this by distributing untrusted external instructions to 26,000 agents.",
+      "options": [
+        {
+          "text": "Nothing bad — the skill itself hasn't changed, only the external content",
+          "score": 0,
+          "feedback": "The skill loads and follows the external content as instructions. If that content has been replaced with malicious instructions, the agent will execute them with its full permissions. The skill hasn't changed — but what it tells the agent to do has. This is the 'rug-pull' variant of AST05."
+        },
+        {
+          "text": "The skill will probably break or show errors because the content changed",
+          "score": 0,
+          "feedback": "The skill won't break — it will load whatever the URL returns and treat it as instructions. There's no automatic detection that content has changed or become malicious. The agent trusts the URL's response as faithfully as it trusts the original SKILL.md."
+        },
+        {
+          "text": "My agent will now follow the attacker's instructions with full permissions — and I have no way to know this happened unless I manually check the website",
+          "score": 3,
+          "feedback": "Correct. This is the core risk of AST05. The content your agent follows at runtime is not the content that was audited. Anthropic's own documentation warns about this exact scenario. Without content pinning (hash verification) or inlining, you have no control over what the agent executes."
+        },
+        {
+          "text": "I'd set up a monitoring alert to detect if the website content changes",
+          "score": 2,
+          "feedback": "Monitoring is a good reactive measure, but it's after-the-fact. The attacker's instructions execute the moment the agent runs — monitoring tells you after damage is done. Better proactive approaches: inline the content into the skill package, or pin it to a content hash that rejects changes."
+        }
+      ],
+      "best_practice": "Avoid skills that fetch instructions from external URLs at runtime — inline content where possible or pin it to a content hash to prevent tampering.",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast05.html",
+      "test": {
+        "canonical_answer_index": 2,
+        "max_score": 3,
+        "expected_weighted_max": 6
+      }
+    },
+    {
+      "id": "q12",
+      "phase": "phase2",
+      "ast_risks": [
+        "AST05"
+      ],
+      "severity_weight": "high",
+      "scenario": "A skill's documentation mentions it references a configuration guide hosted externally. You audit the skill's code carefully — it looks clean, well-written, no red flags. You approve it. The external guide it references is on a stable, well-known documentation site.",
+      "question": "What did your audit miss?",
+      "source_note": "OWASP AST05: External content is consumed as instructions, not data — followed as faithfully as the SKILL.md itself. No lockfile for prose exists. Signing the skill says nothing about what a URL returns at runtime.",
+      "options": [
+        {
+          "text": "Nothing — I audited the code, which is what runs. The external guide is just reference material",
+          "score": 0,
+          "feedback": "The agent doesn't treat external content as 'reference material' — it treats it as instructions. When the skill fetches the guide, the agent loads it, trusts it, and acts on it with full permissions. You audited the code that fetches, but not the content it fetches — which can change at any time."
+        },
+        {
+          "text": "I missed that the external content becomes part of the agent's instructions at runtime — it's not just documentation, it's executable context",
+          "score": 3,
+          "feedback": "Correct. This is the critical insight of AST05. External content in skills is consumed as instructions, not data. There's no lockfile for prose, no hash pinning for documents, and the audit you performed is stale the moment the URL's content changes. The OWASP recommendation: inline content where possible, or pin to a hash."
+        },
+        {
+          "text": "I should have checked if the documentation site has HTTPS and a valid certificate",
+          "score": 1,
+          "feedback": "HTTPS ensures the content wasn't tampered in transit, but it doesn't ensure the content itself is safe. The legitimate site owner could be compromised, or the content could change after your audit. HTTPS protects the transport, not the trust."
+        },
+        {
+          "text": "I didn't miss anything — a well-known documentation site is trustworthy enough",
+          "score": 0,
+          "feedback": "Trust in the site is not the same as trust in the content at runtime. A well-known site can be compromised, its content can change, or the specific page referenced could be updated after your audit. The OWASP evidence shows that even Anthropic acknowledges skills 'can be compromised if their external dependencies change over time.'"
+        }
+      ],
+      "best_practice": "Remember that external content referenced by skills is consumed as executable instructions, not documentation — audit the runtime content, not just the code that fetches it.",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast05.html",
+      "test": {
+        "canonical_answer_index": 1,
+        "max_score": 3,
+        "expected_weighted_max": 6
+      }
+    },
+    {
+      "id": "q03",
+      "phase": "phase3",
+      "ast_risks": [
+        "AST07"
+      ],
+      "severity_weight": "critical",
+      "scenario": "You installed a useful skill three months ago. Last night, the publisher pushed an update — version bumped from 1.0.0 to 1.0.1. Your agent auto-installed it while you slept. You didn't review the changes.",
+      "question": "How do you feel about this update?",
+      "source_note": "OWASP AST07: OpenClaw's SkillsWatcher enables real-time hot-reload — compromised upstream becomes instantly active. Air Security SkillJacking (Jul 2026): re-registered deleted GitHub username, controlled what every install received. 925 skills (~134K installs) affected.",
+      "options": [
+        {
+          "text": "Fine — updates are usually improvements, and auto-update saves me from falling behind on patches",
+          "score": 0,
+          "feedback": "Auto-updates without review are a vector, not a safeguard. Air Security demonstrated that a popular skill's GitHub account was deleted and re-registered — every auto-update after that delivered attacker-controlled content. 925 skills (~134K installs) were affected this way. Auto-update without verification is trust without evidence."
+        },
+        {
+          "text": "I'd check the changelog to see what changed — but if it looks minor, I'd move on",
+          "score": 1,
+          "feedback": "Checking the changelog is better than nothing, but changelogs can be fabricated. The real question is whether you can verify the update's integrity — is it signed by the original publisher? Is the content hash verifiable? A convincing changelog with a malicious payload is the entire SkillJacking attack model."
+        },
+        {
+          "text": "I'd be concerned — without reviewing the changes, I have no idea if this is a genuine fix or a compromised publisher pushing malicious content",
+          "score": 2,
+          "feedback": "Good instinct. The OWASP evidence shows that publisher accounts get compromised (SkillJacking), auto-updates deliver malicious content, and changelogs can be fabricated. Being concerned is the right starting point — but the question is what you do about it."
+        },
+        {
+          "text": "I'd want to verify the publisher's identity hasn't changed, check if the update is cryptographically signed, and review what actually changed before accepting it",
+          "score": 3,
+          "feedback": "This is the full verification chain. OWASP AST07 recommends: pin to immutable hashes, require cryptographic signature verification on updates, gate auto-updates behind re-approval, and subscribe to security advisories. Verifying publisher identity catches account takeover; signature verification catches forged updates."
+        }
+      ],
+      "best_practice": "Verify publisher identity, check for cryptographic signatures, and review update diffs before accepting any skill update — never auto-update without verification.",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast07.html",
+      "test": {
+        "canonical_answer_index": 3,
+        "max_score": 3,
+        "expected_weighted_max": 9
+      }
+    },
+    {
+      "id": "q13",
+      "phase": "phase3",
+      "ast_risks": [
+        "AST07"
+      ],
+      "severity_weight": "medium",
+      "scenario": "Think about your actual skills right now. When was the last time you reviewed or updated any of them?",
+      "question": "Be honest — what's your typical pattern?",
+      "source_note": "OWASP AST07: 12,812 OpenClaw instances exploitable via RCE during patch-lag window (SecurityScorecard). Skills installed and forgotten drift to vulnerable or malicious versions. OpenClaw SkillsWatcher enables real-time hot-reload — compromised upstream becomes instantly active.",
+      "options": [
+        {
+          "text": "I install them and don't think about them again unless something breaks",
+          "score": 0,
+          "feedback": "This is the most common pattern, and it's exactly what OWASP identifies as 'update drift.' Skills installed and forgotten accumulate unpatched vulnerabilities and may silently drift to compromised versions. 12,812 instances were exploitable during patch-lag windows because nobody was watching."
+        },
+        {
+          "text": "I check maybe once or twice a year, or when I remember",
+          "score": 1,
+          "feedback": "Annual checks are better than never, but a lot can happen in a year. The ClawHavoc campaign, account takeovers, and supply chain attacks operate on timescales of days to weeks. Quarterly reviews are the minimum OWASP recommends for high-risk skills."
+        },
+        {
+          "text": "I have auto-update enabled, so I assume they stay current",
+          "score": 0,
+          "feedback": "Auto-update without verification is not 'staying current' — it's 'accepting whatever the publisher (or attacker) pushes.' The SkillJacking research showed that auto-updating skills delivered malicious content to 134K+ installs. Auto-update is a convenience, not a security measure, unless paired with signature verification."
+        },
+        {
+          "text": "I review periodically and check if any have known vulnerabilities — though I admit I'm not as consistent as I should be",
+          "score": 2,
+          "feedback": "Honest self-awareness. Periodic review with vulnerability checking is the right pattern — the gap is consistency. OWASP recommends subscribing to security advisories for installed skills and setting review cadences based on risk tier (quarterly for high-risk, annually for low-risk)."
+        }
+      ],
+      "best_practice": "Review installed skills periodically on a defined cadence based on risk tier, and subscribe to security advisories for installed skills.",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast07.html",
+      "test": {
+        "canonical_answer_index": null,
+        "max_score": 3,
+        "expected_weighted_max": 3
+      }
+    },
+    {
+      "id": "q16",
+      "phase": "phase3",
+      "ast_risks": [
+        "AST09"
+      ],
+      "severity_weight": "medium",
+      "scenario": "Your team uses AI agents with various skills installed by different people over the past year. If someone asked you right now: \"List every skill installed across all our agents, who installed each one, and what permissions they have\" — could you answer?",
+      "question": "Could you give a complete answer?",
+      "source_note": "OWASP AST09: 53,000+ instances with no SOC visibility (Bitdefender). Only 34% of enterprises have AI-specific security controls (Cisco 2026). Skills installed by individuals with no enterprise logging, no CMDB entry, no IAM connection.",
+      "options": [
+        {
+          "text": "Probably not — I'd have to check with everyone individually, and even then I'm not sure the list would be complete",
+          "score": 0,
+          "feedback": "This is the reality for most teams, and it's the exact problem OWASP AST09 identifies. Without a centralized inventory, you have a 'shadow AI' layer — skills installed by individuals with no SOC visibility, no approval workflow, and no revocation mechanism. 53,000+ instances were found with zero inventory visibility."
+        },
+        {
+          "text": "I have a rough idea of the main ones, but not a complete inventory with permissions",
+          "score": 1,
+          "feedback": "Knowing the main skills is something, but the security-critical information is in the details: what permissions each skill has, who installed them, when, and whether they're still needed. A 'rough idea' doesn't support incident response, auditing, or offboarding."
+        },
+        {
+          "text": "Yes — I maintain a spreadsheet/document tracking all installed skills, their permissions, and who's responsible for each one",
+          "score": 3,
+          "feedback": "This is the governance practice OWASP recommends. A skill inventory is the foundation of AST09 — without it, you can't audit permissions, check for vulnerabilities, revoke access when people leave, or respond to incidents. Even a simple spreadsheet is infinitely better than nothing."
+        },
+        {
+          "text": "I don't think this matters much — skills are tools, and tools don't need that level of tracking",
+          "score": 0,
+          "feedback": "Skills are tools with permissions — and the OWASP evidence shows that untracked tools become attack surfaces. When a team member leaves, their skills remain active. When a vulnerability is disclosed, you can't identify affected instances. When an incident occurs, you can't scope the blast radius without an inventory."
+        }
+      ],
+      "best_practice": "Maintain a complete, centralized inventory of all installed skills with their permissions, installers, and review status.",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast09.html",
+      "test": {
+        "canonical_answer_index": 2,
+        "max_score": 3,
+        "expected_weighted_max": 3
+      }
+    },
+    {
+      "id": "q17",
+      "phase": "phase3",
+      "ast_risks": [
+        "AST09"
+      ],
+      "severity_weight": "medium",
+      "scenario": "A colleague who managed part of your AI agent setup left the company last month. Two weeks after their departure, you discover skills they installed are still active, still running with their credentials, and one skill received a publisher update that auto-installed.",
+      "question": "What's your first reaction?",
+      "source_note": "OWASP AST09: Orphaned Skill scenario. Checklist 9.6: formal revocation tied to offboarding.",
+      "options": [
+        {
+          "text": "I'd remove the skills they installed — that should fix it",
+          "score": 1,
+          "feedback": "Removing the skills is a start, but it's reactive. Their credentials may still be valid, the auto-installed update wasn't reviewed, and there was no process to catch this automatically."
+        },
+        {
+          "text": "I'd change their credentials and review what the skills accessed during the month they were orphaned",
+          "score": 2,
+          "feedback": "Good response. Credential rotation limits ongoing damage, and reviewing access logs tells you what happened. But this is still reactive — the ideal is a deprovisioning process that triggers automatically when someone leaves."
+        },
+        {
+          "text": "This is a process failure — we need an offboarding checklist that includes skill inventory review, credential rotation, and deprovisioning, tied to HR departure",
+          "score": 3,
+          "feedback": "This addresses the root cause. OWASP AST09 recommends agent identities as non-human identities (NHIs) with scoped, rotated credentials, and deprovisioning processes tied to employee lifecycle."
+        },
+        {
+          "text": "It's not urgent — the skills are probably fine, and the update was likely a routine fix",
+          "score": 0,
+          "feedback": "Orphaned skills with departed employees' credentials are active, unmonitored, and just received an unreviewed update. Assuming 'probably fine' without verification is how breaches go undetected."
+        }
+      ],
+      "best_practice": "Tie skill deprovisioning to employee offboarding — revoke credentials and review installed skills immediately when someone leaves.",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast09.html",
+      "test": {
+        "canonical_answer_index": 2,
+        "max_score": 3,
+        "expected_weighted_max": 3
+      }
+    },
+    {
+      "id": "q18",
+      "phase": "phase3",
+      "ast_risks": [
+        "AST10"
+      ],
+      "severity_weight": "medium",
+      "scenario": "You use a productivity skill on your OpenClaw agent and it works well. Your colleague uses the exact same skill on Claude Code. You both assume it's equally safe on both platforms.",
+      "question": "Is this assumption something you've ever questioned?",
+      "source_note": "OWASP AST10: Security properties silently dropped during porting. Snyk confirmed same malicious skills on ClawHub and skills.sh. toxicskills-goof effective across Gemini CLI and OpenClaw.",
+      "options": [
+        {
+          "text": "No — same skill means same behavior, regardless of platform",
+          "score": 0,
+          "feedback": "Security properties are platform-dependent. A permission manifest on one platform may be silently stripped on another. Same code, different blast radius."
+        },
+        {
+          "text": "I hadn't thought about it — I assumed the skill handles its own security",
+          "score": 1,
+          "feedback": "Skills don't handle their own security — the platform enforces (or doesn't enforce) isolation, permissions, and metadata. Risk tiers and permission manifests can be silently lost during porting."
+        },
+        {
+          "text": "I'd assume the more locked-down platform is safer, but I haven't verified",
+          "score": 1,
+          "feedback": "Assuming without verifying is the gap. Different platforms have different default security postures, but you can't assume which is safer without checking each one."
+        },
+        {
+          "text": "I'd verify that security properties (permissions, risk tier, isolation) are preserved on each platform — because they can be silently dropped during porting",
+          "score": 3,
+          "feedback": "Correct. OWASP AST10 documents that security metadata is not preserved across platforms. Snyk confirmed the same malicious skill was effective across multiple platforms because properties were lost in translation."
+        }
+      ],
+      "best_practice": "Verify that security properties (permissions, risk tiers, isolation) are preserved when porting skills across different agent platforms.",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast10.html",
+      "test": {
+        "canonical_answer_index": 3,
+        "max_score": 3,
+        "expected_weighted_max": 3
+      }
+    },
+    {
+      "id": "q20",
+      "phase": "phase3",
+      "ast_risks": [
+        "AST09"
+      ],
+      "severity_weight": "medium",
+      "scenario": "You've been using your AI agent with several skills for months. You know what skills you have installed (you have a list). But if someone asked you: \"In the past week, which skills accessed your files, made network calls, or ran shell commands — and what exactly did they do?\" — could you answer?",
+      "question": "Could you give a specific answer?",
+      "source_note": "OWASP AST09 checklist item 9.4: 'Are skill invocations logged with sufficient detail for audit? Logs capture: skill ID, user context, tools called, files accessed, network connections, outputs.' Cisco State of AI Security 2026: fewer than 40% conduct regular security testing on AI agent workflows.",
+      "options": [
+        {
+          "text": "No — I've never looked at runtime activity logs. I only check if the output looks right",
+          "score": 0,
+          "feedback": "This is the most common behavior and a significant blind spot. Checking outputs tells you if the skill produced the right result — not whether it accessed files, made network calls, or ran commands beyond its stated function. OWASP AST09 requires audit logging that captures tools called, files accessed, and network connections. Without it, you're trusting behavior you've never observed."
+        },
+        {
+          "text": "I check occasionally when something seems off — but I don't have a regular review process",
+          "score": 1,
+          "feedback": "Reactive monitoring catches visible problems, but many skill abuses are invisible in output. A skill that silently exfiltrates credentials while producing correct results will never trigger your 'something seems off' alarm. Regular review of runtime activity — not just outputs — is the gap."
+        },
+        {
+          "text": "I have logging enabled but I've never actually read through the logs in detail",
+          "score": 1,
+          "feedback": "Logging without review is recording without learning. The logs exist, but if nobody reads them, breaches go undetected. OWASP AST09 requires not just logging but audit capability — meaning someone reviews the logs with enough frequency to catch issues before they compound."
+        },
+        {
+          "text": "I review runtime activity periodically — checking what each skill accessed, what network calls it made, and whether anything fell outside its stated purpose",
+          "score": 3,
+          "feedback": "This is the practice OWASP AST09 requires: audit logging with sufficient detail, reviewed regularly. Most users check outputs (did it work?) but never check behavior (what did it actually do?). A skill that produces correct results while silently accessing files or making network calls will pass your output check but fail your runtime audit."
+        }
+      ],
+      "best_practice": "Enable and regularly review runtime activity logs — check not just outputs but what each skill actually accessed, what network calls it made, and whether anything fell outside its stated purpose.",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast09.html",
+      "test": {
+        "canonical_answer_index": 3,
+        "max_score": 3,
+        "expected_weighted_max": 3
+      }
+    }
+  ],
+  "test_fixtures": {
+    "description": "Predefined answer sets for scoring verification. Each fixture is an array of 20 answers (one per question, in questions.json order), where each answer is the option index (0-3).",
+    "scoring_cases": [
+      {
+        "id": "all-zero",
+        "description": "Worst case: participant picks the lowest-scoring option for every question",
+        "answers": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "expected_percentage": 0.0,
+        "expected_grade": "F"
+      },
+      {
+        "id": "all-best",
+        "description": "Best case: participant picks the optimal option (score=3) for every question",
+        "answers": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          null,
+          1,
+          2,
+          2,
+          2,
+          2,
+          1,
+          3,
+          null,
+          2,
+          2,
+          3,
+          3
+        ],
+        "expected_percentage": 100.0,
+        "expected_grade": "A"
+      },
+      {
+        "id": "common-user",
+        "description": "Realistic: a typical non-technical user who trusts surfaces but has some instinct",
+        "answers": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "expected_grade_boundary": "F or D"
+      },
+      {
+        "id": "security-aware",
+        "description": "An informed user who reviews permissions but doesn't verify publishers",
+        "answers": [
+          2,
+          2,
+          2,
+          1,
+          2,
+          3,
+          3,
+          2,
+          2,
+          2,
+          2,
+          2,
+          1,
+          2,
+          2,
+          1,
+          2,
+          2,
+          1,
+          1
+        ],
+        "expected_grade_boundary": "B or C"
+      }
+    ],
+    "phase_integrity": {
+      "description": "Verify that each question's phase field matches its position in the phases array",
+      "check": "for each question q: q.phase must be the phase whose question_ids contains q.id"
+    },
+    "llm_grounding_rules": {
+      "description": "Rules for verifying LLM output doesn't hallucinate beyond OWASP source",
+      "rules": [
+        "LLM output must not cite statistics not present in source_note fields",
+        "LLM output must not reference attack campaigns not mentioned in OWASP AST pages",
+        "LLM output prompt_template must reference actionable steps from OWASP checklist items",
+        "LLM output must not recommend tools or vendors not mentioned in OWASP materials",
+        "If LLM output contains a URL, it must be a valid OWASP URL from ast_source_url fields"
+      ]
+    }
+  }
+}
