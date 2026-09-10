@@ -201,12 +201,14 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 ├── index.html
 ├── config.js
 ├── styles.css
+├── design-dna-surya.json   # extracted Design DNA of the Surya reference site
 ├── questions.json
 ├── AGENTS.md
 ├── UBIQUITOUS_LANGUAGE.md
 ├── css/
 │   ├── quiz.css
-│   └── results.css
+│   ├── results.css
+│   └── theme-surya.css   # editorial skin, linked last as override layer
 ├── js/
 │   ├── analytics.js      # analytics helpers
 │   ├── ast.js            # AST Risk registry — canonical ids, names, severities (ADR-0013)

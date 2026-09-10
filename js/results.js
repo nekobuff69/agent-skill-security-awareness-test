@@ -10,9 +10,9 @@
   /* ── helpers ── */
 
   function scoreColor(pct) {
-    if (pct < 50) return '#d32f2f';
-    if (pct < 70) return '#f57c00';
-    return '#388e3c';
+    if (pct < 50) return '#F44336';
+    if (pct < 70) return '#FFC107';
+    return '#4CAF50';
   }
 
   function scoreClass(pct) {
@@ -185,8 +185,8 @@
     var polyPts = points.map(function(p) { return p.x + ',' + p.y; }).join(' ');
     var poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
     poly.setAttribute('points', polyPts);
-    poly.setAttribute('fill', 'rgba(25, 118, 210, 0.15)');
-    poly.setAttribute('stroke', '#1976d2');
+    poly.setAttribute('fill', 'rgba(237, 104, 43, 0.15)');
+    poly.setAttribute('stroke', '#ED682B');
     poly.setAttribute('stroke-width', '2');
     svg.appendChild(poly);
 
