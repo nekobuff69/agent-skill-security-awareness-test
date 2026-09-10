@@ -16,21 +16,21 @@ exports.run = function() {
     results.push({ pass: !!pass, message: msg });
   }
 
-  // ── 1. all-zero fixture ──
-  var allZero = new Array(20).fill(0);
-  var r0 = Scoring.computeScores(bank, allZero);
+  // ── 1. all-zero fixture (from bank, incl. expected values) ──
+  var allZeroCase = bank.test_fixtures.scoring_cases.find(function(c) { return c.id === 'all-zero'; });
+  var r0 = Scoring.computeScores(bank, allZeroCase.answers);
   check('all-zero: ok is true', r0.ok, r0.error);
   check('all-zero: totalPossible is 108', r0.ok && r0.report.totalPossible === 108);
-  check('all-zero: title is Uncharted',
-    r0.ok && r0.report.title.name === 'Uncharted',
+  check('all-zero: title matches bank expected_title',
+    r0.ok && r0.report.title.name === allZeroCase.expected_title,
     'got ' + (r0.ok ? r0.report.title.name : r0.error));
-  check('all-zero: totalEarned > 0 (realistic minimum)',
-    r0.ok && r0.report.totalEarned >= 0 && r0.report.totalEarned < 20,
-    'earned=' + (r0.ok ? r0.report.totalEarned : 'N/A'));
+  check('all-zero: percentage matches bank expected_percentage',
+    r0.ok && Math.abs(r0.report.percentage - allZeroCase.expected_percentage) < 0.05,
+    'got ' + (r0.ok ? r0.report.percentage : r0.error) + ', expected ' + allZeroCase.expected_percentage);
 
-  // ── 2. all-best fixture ──
-  var allBest = [3,3,3,3,3,3,3,null,1,2,2,2,2,1,3,null,2,2,3,3];
-  var r1 = Scoring.computeScores(bank, allBest);
+  // ── 2. all-best fixture (from bank; nulls resolve to highest-scoring option) ──
+  var allBestCase = bank.test_fixtures.scoring_cases.find(function(c) { return c.id === 'all-best'; });
+  var r1 = Scoring.computeScores(bank, allBestCase.answers);
   check('all-best: ok is true', r1.ok, r1.error);
   check('all-best: totalEarned equals totalPossible (100%)',
     r1.ok && r1.report.totalEarned === r1.report.totalPossible,
@@ -135,11 +135,11 @@ exports.run = function() {
     var swCurr = bank.meta.scoring.severity_values[qCurr.severity_weight];
     var prevIdx = bank.questions.indexOf(qPrev);
     var currIdx = bank.questions.indexOf(qCurr);
-    var prevEarned = allZero[prevIdx] !== null
-      ? qPrev.options[allZero[prevIdx]].score * swPrev
+    var prevEarned = allZeroCase.answers[prevIdx] !== null
+      ? qPrev.options[allZeroCase.answers[prevIdx]].score * swPrev
       : 0;
-    var currEarned = allZero[currIdx] !== null
-      ? qCurr.options[allZero[currIdx]].score * swCurr
+    var currEarned = allZeroCase.answers[currIdx] !== null
+      ? qCurr.options[allZeroCase.answers[currIdx]].score * swCurr
       : 0;
     if (currEarned < prevEarned) sortedCorrectly = false;
   }

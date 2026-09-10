@@ -310,13 +310,14 @@ def validate_scoring(bank):
                 earned, possible = result
                 pct = (earned / possible * 100) if possible else 0
                 title = resolve_title(bank, pct)
+                expected_pct = case.get("expected_percentage")
                 results.append((
-                    f"Fixture '{cid}': percentage == 0",
-                    pct == 0.0,
+                    f"Fixture '{cid}': percentage == {expected_pct} (from bank)",
+                    expected_pct is not None and round(pct, 1) == round(float(expected_pct), 1),
                 ))
                 results.append((
                     f"Fixture '{cid}': title == Uncharted",
-                    title == "Uncharted",
+                    title == case.get("expected_title", "Uncharted"),
                 ))
 
         elif cid == "all-best":

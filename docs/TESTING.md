@@ -95,7 +95,7 @@ For each entry in `test_fixtures.scoring_cases`:
 
 | Case | Expected | How to verify |
 |---|---|---|
-| `all-zero` | 0%, title Uncharted | All answers index 0 |
+| `all-zero` | 2.8%, title Uncharted | All answers select the lowest-scoring option per question (ties → lowest index). q19 has no score-0 option, so the floor is 3 weighted points (1 × critical weight 3), not zero |
 | `all-best` | 100%, title Sentinel | Answers select highest-scoring option per question. `null` answers resolve to the index of the highest-scoring option |
 | `common-user` | Title in {Uncharted, Newcomer} | Compute percentage, check title falls in boundary |
 | `security-aware` | Title in {Aware, Practitioner} | Compute percentage, check title falls in boundary |

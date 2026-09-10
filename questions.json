@@ -900,7 +900,7 @@
     "scoring_cases": [
       {
         "id": "all-zero",
-        "description": "Worst case: participant picks the lowest-scoring option for every question",
+        "description": "Worst case: participant picks the lowest-scoring option for every question (ties resolve to the lowest index). q19 has no score-0 option, so the floor is 3 weighted points (1 x critical weight 3), not zero.",
         "answers": [
           0,
           0,
@@ -913,17 +913,17 @@
           0,
           0,
           0,
+          3,
           0,
           0,
           0,
           0,
           0,
-          0,
-          0,
+          3,
           0,
           0
         ],
-        "expected_percentage": 0.0,
+        "expected_percentage": 2.8,
         "expected_title": "Uncharted"
       },
       {
