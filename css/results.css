@@ -150,34 +150,6 @@
   background: #388e3c;
 }
 
-/* ── Severity chip ── */
-.results-severity {
-  display: inline-block;
-  font-size: 0.625rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 0.1em 0.4em;
-  border-radius: 3px;
-  line-height: 1;
-  vertical-align: middle;
-}
-
-.results-sev-critical {
-  background: #fdecea;
-  color: #b71c1c;
-}
-
-.results-sev-high {
-  background: #fff3e0;
-  color: #e65100;
-}
-
-.results-sev-medium {
-  background: #e8f5e9;
-  color: #2e7d32;
-}
-
 /* ── Action Plan ── */
 .results-action-plan {
   display: flex;
@@ -249,11 +221,50 @@
   margin: 0;
 }
 
+/* ── Narrative Expander ── */
+.results-narrative-details {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.results-narrative-summary {
+  cursor: pointer;
+  padding: 0.75rem 1rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: #1976d2;
+  background: #f5f9ff;
+  user-select: none;
+}
+
+.results-narrative-summary:hover {
+  background: #e3f2fd;
+}
+
+.results-narrative-details[open] .results-narrative-summary {
+  border-bottom: 1px solid #e0e0e0;
+}
+
 /* ── Deep-Dive Prompt ── */
 .results-deep-dive {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+.results-deep-dive-heading {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.results-deep-dive-sub {
+  font-size: 0.9375rem;
+  color: #555;
+  line-height: 1.5;
+  margin: 0;
 }
 
 .results-prompt-details {
@@ -449,7 +460,7 @@
   text-decoration: underline;
 }
 
-/* ── Retake ── */
+/* ── Retake (standalone, legacy) ── */
 .results-retake-wrap {
   display: flex;
   justify-content: center;
@@ -469,6 +480,58 @@
 
 .results-retake-btn:hover {
   background: #fdecea;
+}
+
+/* ── Action Button Row (Review + Retake) ── */
+.results-action-btn-row {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  padding-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.results-review-btn {
+  font-size: 0.9375rem;
+  padding: 0.65rem 1.5rem;
+  border: 1px solid #1976d2;
+  border-radius: 8px;
+  background: #fff;
+  color: #1976d2;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.results-review-btn:hover {
+  background: #f5f9ff;
+}
+
+/* ── Review Screen ── */
+#review-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.results-review-header {
+  display: flex;
+  align-items: center;
+}
+
+.results-review-back-btn {
+  font-size: 0.9375rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: #fff;
+  color: #1976d2;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.results-review-back-btn:hover {
+  background: #f5f9ff;
 }
 
 /* ── Mobile-first responsive ── */
@@ -522,5 +585,16 @@
   .results-download-btn,
   .results-share-btn {
     width: 100%;
+  }
+
+  .results-action-btn-row {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .results-review-btn,
+  .results-retake-btn {
+    width: 100%;
+    text-align: center;
   }
 }

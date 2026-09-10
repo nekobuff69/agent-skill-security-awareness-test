@@ -23,38 +23,44 @@
   var answers    = [];   // length = questions.length, null | 0-3
   var currentIdx = 0;
   var activeBtns = [];   // DOM refs for current question's option buttons
-  var lastPhase  = '';   // tracks last-rendered phase header id
   var currentCard = null; // current visible question card DOM element
   var advancing   = false; // true during the 180ms post-answer delay
+  var backBtnEl   = null; // current back button DOM ref (null on first card)
 
-  /* ── Progress indicator ──────────────────────────────────────────── */
+  // Chrome bar DOM refs (built once in renderQuiz)
+  var chromeFill    = null;
+  var chromeCounter = null;
+  var chromeChip    = null;
 
-  function updateProgress() {
-    var prog = byId('quiz-progress');
-    if (!prog) return;
-    var n = 0;
+  /* ── Chrome bar: progress + counter + phase chip ─────────────────── */
+
+  function updateChrome() {
+    if (!chromeFill || !chromeCounter || !chromeChip) return;
+
+    // Fill: answered / total
+    var answered = 0;
     for (var i = 0; i < answers.length; i++) {
-      if (answers[i] !== null) n++;
+      if (answers[i] !== null) answered++;
     }
-    prog.textContent = n + ' / ' + questions.length;
-  }
+    var pct = (answered / questions.length) * 100;
+    chromeFill.style.width = pct + '%';
 
-  /* ── Phase header ────────────────────────────────────────────────── */
+    // Counter: 1-indexed question currently being viewed
+    chromeCounter.textContent = (currentIdx + 1) + ' / ' + questions.length;
 
-  function ensurePhaseHeader(phaseId, container) {
-    if (phaseId === lastPhase) return;
-    lastPhase = phaseId;
-
+    // Phase chip: swap text in place — never append
+    var q = questions[currentIdx];
     var data = null;
-    for (var i = 0; i < phases.length; i++) {
-      if (phases[i].id === phaseId) { data = phases[i]; break; }
+    for (var p = 0; p < phases.length; p++) {
+      if (phases[p].id === q.phase) { data = phases[p]; break; }
     }
-    if (!data) return;
-
-    var hdr = makeEl('div', 'quiz-phase-header');
-    hdr.appendChild(makeEl('h2', 'quiz-phase-title', data.title));
-    hdr.appendChild(makeEl('p',  'quiz-phase-desc',  data.description));
-    container.appendChild(hdr);
+    var chipNum = '?';
+    for (var c = 0; c < phases.length; c++) {
+      if (phases[c].id === q.phase) { chipNum = c + 1; break; }
+    }
+    if (data) {
+      chromeChip.textContent = 'Phase ' + chipNum + ' \u00b7 ' + data.title;
+    }
   }
 
   /* ── Render one question card ────────────────────────────────────── */
@@ -72,10 +78,9 @@
     var view = byId('quiz-view');
     if (!view) return;
 
-    updateProgress();
-    ensurePhaseHeader(q.phase, view);
+    updateChrome();
 
-    // Remove previous card (keep phase headers and progress bar)
+    // Remove previous card
     if (currentCard && currentCard.parentNode) {
       currentCard.parentNode.removeChild(currentCard);
     }
@@ -84,24 +89,38 @@
     var card = makeEl('div', 'quiz-card');
     card.setAttribute('data-qid', q.id);
 
-    // Scenario text
+    // ── Card header: question-number chip ──
+    var cardHeader = makeEl('div', 'quiz-card-header');
+    var numChip = makeEl('span', 'quiz-number-chip', 'Q' + (idx + 1));
+    cardHeader.appendChild(numChip);
+    card.appendChild(cardHeader);
+
+    // ── Scenario block with micro-label ──
     if (q.scenario) {
+      card.appendChild(makeEl('span', 'quiz-label', 'Scenario'));
       card.appendChild(makeEl('p', 'quiz-scenario', q.scenario));
     }
 
-    // Question prompt
+    // ── Question block with micro-label ──
+    card.appendChild(makeEl('span', 'quiz-label', 'Question'));
     card.appendChild(makeEl('p', 'quiz-question', q.question));
 
-    // Option buttons
+    // ── Option buttons with letter badges ──
     var optsWrap = makeEl('div', 'quiz-options');
     activeBtns = [];
+    var LETTERS = 'ABCD';
 
     for (var i = 0; i < q.options.length; i++) {
       /* jshint loopfunc:true */
       (function(optIdx) {
-        var btn = makeEl('button', 'quiz-option-btn', q.options[optIdx].text);
+        var btn = makeEl('button', 'quiz-option-btn');
         btn.setAttribute('data-qid', q.id);
         btn.setAttribute('data-opt', String(optIdx));
+
+        var badge = makeEl('span', 'quiz-letter-badge', LETTERS[optIdx]);
+        var label = makeEl('span', 'quiz-option-text', q.options[optIdx].text);
+        btn.appendChild(badge);
+        btn.appendChild(label);
 
         if (answers[idx] === optIdx) {
           btn.classList.add('selected');
@@ -117,8 +136,34 @@
     }
 
     card.appendChild(optsWrap);
+
+    // ── Back button (hidden on first card) ──
+    if (idx > 0) {
+      var backBtn = makeEl('button', 'quiz-back-btn', '\u2190 Previous');
+      backBtn.addEventListener('click', function() {
+        renderQuestion(idx - 1);
+      });
+      card.appendChild(backBtn);
+      backBtnEl = backBtn;
+    } else {
+      backBtnEl = null;
+    }
+
     view.appendChild(card);
     currentCard = card;
+
+    // Enter animation: slide-up + fade
+    var reducedMotion = window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (!reducedMotion) {
+      card.classList.add('card-enter');
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+          card.classList.remove('card-enter');
+        });
+      });
+    }
 
     // Smooth scroll so the card is visible
     card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -127,12 +172,17 @@
   /* ── Option click → save + auto-advance ──────────────────────────── */
 
   function onOptionClick(qIdx, optIdx) {
-    // Ignore clicks while advancing or on an already-answered question
-    if (advancing || answers[qIdx] !== null) return;
-    advancing = true;
+    // Ignore clicks while advancing
+    if (advancing) return;
 
+    // If already answered with the same option, no-op
+    if (answers[qIdx] === optIdx) return;
+
+    // Allow re-answer: update answer and re-advance
     answers[qIdx] = optIdx;
     persist();
+    advancing = true;
+    updateChrome();
 
     // Highlight selection, de-highlight others
     for (var i = 0; i < activeBtns.length; i++) {
@@ -143,10 +193,27 @@
       }
     }
 
-    // Brief pause so the tap registers visually, then advance
-    setTimeout(function() {
-      renderQuestion(qIdx + 1);
-    }, 180);
+    // Exit animation: fade + slide up
+    var reducedMotion = window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    var card = currentCard;
+    var nextIdx = qIdx + 1;
+    var delay = (nextIdx >= questions.length) ? 400 : 200;
+
+    function doAdvance() {
+      renderQuestion(nextIdx);
+    }
+
+    if (reducedMotion || !card) {
+      doAdvance();
+    } else {
+      card.classList.add('card-exit');
+      setTimeout(function() {
+        card.classList.remove('card-exit');
+        doAdvance();
+      }, delay);
+    }
   }
 
   /* ── Persistence wrapper ─────────────────────────────────────────── */
@@ -190,19 +257,36 @@
     questions = bank.questions;
     phases    = bank.phases;
     answers   = [];
-    lastPhase = '';
     activeBtns = [];
     currentCard = null;
     advancing   = false;
+    backBtnEl   = null;
+    chromeFill = null;
+    chromeCounter = null;
+    chromeChip = null;
 
     var view = byId('quiz-view');
     if (!view) return;
     view.innerHTML = '';
 
-    // Progress bar at top
-    var prog = makeEl('div', 'quiz-progress', '');
-    prog.id = 'quiz-progress';
-    view.appendChild(prog);
+    // ── Sticky chrome bar: progress + counter + phase chip ──
+    var chrome = makeEl('div', 'quiz-chrome');
+
+    // Progress track + fill
+    var track = makeEl('div', 'quiz-chrome-track');
+    chromeFill = makeEl('div', 'quiz-chrome-fill');
+    track.appendChild(chromeFill);
+    chrome.appendChild(track);
+
+    // Counter: "N / 20"
+    chromeCounter = makeEl('span', 'quiz-chrome-counter');
+    chrome.appendChild(chromeCounter);
+
+    // Phase chip: "Phase 1 · Should I Install This?"
+    chromeChip = makeEl('span', 'quiz-chrome-chip');
+    chrome.appendChild(chromeChip);
+
+    view.appendChild(chrome);
 
     // Session resume
     var session = app.SessionStore.load(bank);
@@ -215,8 +299,6 @@
         app.SessionStore.clear();
       }
     }
-
-    updateProgress();
 
     // Find first unanswered question
     var startIdx = 0;

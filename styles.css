@@ -23,6 +23,11 @@ body {
   min-height: 100vh;
 }
 
+/* View switching: author display rules must not defeat the hidden attribute */
+#app > section[hidden] {
+  display: none !important;
+}
+
 /* Error state */
 .error {
   color: #d32f2f;

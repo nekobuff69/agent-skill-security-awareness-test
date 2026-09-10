@@ -7,38 +7,60 @@
   padding-bottom: 3rem;
 }
 
-/* ── Progress indicator ─────────────────────────────────────────────── */
+/* ── Sticky chrome bar ──────────────────────────────────────────────── */
 
-.quiz-progress {
+.quiz-chrome {
   position: sticky;
   top: 0;
   z-index: 10;
-  text-align: right;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.25rem;
+  background: #fafafa;
+  border-bottom: 1px solid #eee;
+}
+
+/* Progress track + fill ──────────────────────────────────────────────── */
+
+.quiz-chrome-track {
+  flex: 1 1 auto;
+  height: 4px;
+  background: #e0e0e0;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.quiz-chrome-fill {
+  height: 100%;
+  width: 0;
+  background: #1976d2;
+  border-radius: 2px;
+  transition: width 0.35s ease;
+}
+
+/* Counter: "1 / 20" ──────────────────────────────────────────────────── */
+
+.quiz-chrome-counter {
+  flex: 0 0 auto;
   font-size: 0.8125rem;
   font-weight: 600;
   color: #666;
-  padding: 0.5rem 0.25rem;
-  background: #fafafa;
+  white-space: nowrap;
   letter-spacing: 0.02em;
 }
 
-/* ── Phase header ───────────────────────────────────────────────────── */
+/* Phase chip ─────────────────────────────────────────────────────────── */
 
-.quiz-phase-header {
-  padding: 1rem 0 0.25rem;
-}
-
-.quiz-phase-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: #111;
-  margin-bottom: 0.25rem;
-}
-
-.quiz-phase-desc {
-  font-size: 0.9375rem;
-  color: #555;
-  line-height: 1.45;
+.quiz-chrome-chip {
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #1976d2;
+  background: #e8f0fe;
+  border-radius: 100px;
+  padding: 0.2rem 0.65rem;
+  white-space: nowrap;
 }
 
 /* ── Scenario card ──────────────────────────────────────────────────── */
@@ -133,18 +155,149 @@
     padding-bottom: 2rem;
   }
 
+  .quiz-chrome {
+    gap: 0.5rem;
+    padding: 0.5rem 0.25rem;
+  }
+
+  .quiz-chrome-chip {
+    font-size: 0.6875rem;
+    padding: 0.15rem 0.5rem;
+  }
+
   .quiz-card {
     padding: 1rem 0.85rem;
     border-radius: 8px;
-  }
-
-  .quiz-phase-title {
-    font-size: 1.125rem;
   }
 
   .quiz-option-btn {
     font-size: 0.875rem;
     padding: 0.65rem 0.85rem;
     min-height: 44px;
+  }
+
+  .quiz-letter-badge {
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 0.6875rem;
+  }
+}
+
+/* ── Card header: question-number chip ──────────────────────────────── */
+
+.quiz-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.quiz-number-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #1976d2;
+  background: #e8f0fe;
+  border-radius: 100px;
+  padding: 0.2rem 0.6rem;
+  min-width: 2rem;
+  letter-spacing: 0.03em;
+}
+
+/* ── Micro-labels: Scenario / Question ──────────────────────────────── */
+
+.quiz-label {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #999;
+  margin-bottom: -0.5rem;
+}
+
+/* ── Option letter badges ──────────────────────────────────────────── */
+
+.quiz-option-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: left;
+}
+
+.quiz-letter-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #555;
+  background: #f0f0f0;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.quiz-option-text {
+  flex: 1;
+}
+
+/* ── Back button ───────────────────────────────────────────────────── */
+
+.quiz-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #555;
+  background: none;
+  border: 1px solid #d0d0d0;
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+  min-height: 44px;               /* touch target ≥ 44 px */
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  align-self: flex-start;
+}
+
+.quiz-back-btn:hover {
+  background: #f5f5f5;
+  border-color: #bbb;
+}
+
+.quiz-back-btn:active {
+  background: #eee;
+}
+
+/* ── Card transitions ──────────────────────────────────────────────── */
+
+.quiz-card.card-enter {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.quiz-card.card-exit {
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+/* ── Reduced motion: disable card transitions ──────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .quiz-card.card-enter,
+  .quiz-card.card-exit {
+    transition: none !important;
+    opacity: 1;
+    transform: none;
+  }
+
+  .quiz-option-btn {
+    transition: none;
   }
 }

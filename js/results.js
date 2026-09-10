@@ -70,12 +70,6 @@
     return node;
   }
 
-  /* ── severity chip ── */
-  function severityChip(astId) {
-    var sev = AST_SEVERITY[astId] || 'medium';
-    return el('span', { className: 'results-severity results-sev-' + sev }, [sev]);
-  }
-
   /* ── build phase lookup for review ── */
   function phaseLookup(bank) {
     var map = {};
@@ -170,8 +164,13 @@
       dot.setAttribute('stroke-width', '1');
       svg.appendChild(dot);
 
-      // axis label — staggered around polygon
-      var labelR = maxR + 28;
+      // axis label — two lines: AST ID + percentage (no severity)
+      // labelR=125 keeps all text inside 0..400 viewBox
+      // At worst case (angle=18deg, cos=0.951): start-anchored right edge = 125*0.951+200+42 = 358.9 < 400
+      // At left (cos=-0.951): end-anchored left edge = 125*(-0.951)+200-42 = 60.9 > 0
+      // At top (sin=-0.951): y = 125*(-0.951)+200-18 = 83.1 > 10
+      // At bottom (sin=0.951): y = 125*0.951+200+8 = 318.9 < 400
+      var labelR = 125;
       var lx = cx + labelR * Math.cos(angle);
       var ly = cy + labelR * Math.sin(angle);
       var anchor = 'middle';
@@ -184,8 +183,9 @@
       tspan.setAttribute('text-anchor', anchor);
       tspan.setAttribute('font-size', '9');
       tspan.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, sans-serif');
+      tspan.setAttribute('font-weight', '600');
       tspan.setAttribute('fill', '#333');
-      tspan.textContent = AST_NAMES[astId] || astId;
+      tspan.textContent = astId;
 
       var tspan2 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
       tspan2.setAttribute('x', lx);
@@ -193,8 +193,8 @@
       tspan2.setAttribute('text-anchor', anchor);
       tspan2.setAttribute('font-size', '8');
       tspan2.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, sans-serif');
-      tspan2.setAttribute('fill', '#888');
-      tspan2.textContent = AST_SEVERITY[astId] || '';
+      tspan2.setAttribute('fill', scoreColor(pct));
+      tspan2.textContent = pct + '%';
 
       var lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       lbl.appendChild(tspan);
@@ -241,8 +241,7 @@
       var pct = report.astScores[astId].percentage || 0;
       var row = el('div', { className: 'results-bar-row' }, [
         el('div', { className: 'results-bar-label' }, [
-          document.createTextNode(AST_NAMES[astId] + ' '),
-          severityChip(astId)
+          document.createTextNode(AST_NAMES[astId])
         ]),
         el('div', { className: 'results-bar-track' }, [
           el('div', {
@@ -284,15 +283,7 @@
   function renderPlanContent(wrap, narrative, actions) {
     wrap.innerHTML = '';
 
-    if (narrative) {
-      var paras = narrative.split(/\n\n+/);
-      for (var i = 0; i < paras.length; i++) {
-        if (paras[i].trim()) {
-          wrap.appendChild(el('p', { className: 'results-action-narrative', textContent: paras[i].trim() }));
-        }
-      }
-    }
-
+    // Action cards are the always-visible content
     if (actions && actions.length > 0) {
       var list = el('div', { className: 'results-action-list' });
       for (var i = 0; i < actions.length; i++) {
@@ -308,6 +299,21 @@
         list.appendChild(item);
       }
       wrap.appendChild(list);
+    }
+
+    // Narrative prose in a collapsed expander after the action cards
+    if (narrative) {
+      var narrativeDetails = el('details', { className: 'results-narrative-details' });
+      narrativeDetails.appendChild(el('summary', { className: 'results-narrative-summary' }, [
+        document.createTextNode('Why these actions? Read the analysis')
+      ]));
+      var paras = narrative.split(/\n\n+/);
+      for (var i = 0; i < paras.length; i++) {
+        if (paras[i].trim()) {
+          narrativeDetails.appendChild(el('p', { className: 'results-action-narrative', textContent: paras[i].trim() }));
+        }
+      }
+      wrap.appendChild(narrativeDetails);
     }
   }
 
@@ -445,9 +451,13 @@
     var promptText = App.PromptBuilder.build(report);
     var wrap = el('div', { className: 'results-deep-dive' });
 
+    // Engaging heading + supporting line
+    wrap.appendChild(el('h3', { className: 'results-deep-dive-heading', textContent: 'Want to go deeper?' }));
+    wrap.appendChild(el('p', { className: 'results-deep-dive-sub', textContent: 'Copy this into your agent chat \u2014 it turns your agent into a private security tutor for your exact blind spots.' }));
+
     var details = el('details', { className: 'results-prompt-details' });
     var summary = el('summary', { className: 'results-prompt-summary' }, [
-      document.createTextNode('Copy Deep-Dive Prompt')
+      document.createTextNode('Show Deep-Dive Prompt')
     ]);
     details.appendChild(summary);
 
@@ -648,10 +658,50 @@
    * @param {object} bank    - Parsed questions.json
    * @param {object} report  - Inner report from App.Scoring.computeScores()
    */
+  /* ── Review Screen ── */
+  var _lastBank = null;
+  var _lastReport = null;
+
+  function populateReview() {
+    var reviewView = document.getElementById('review-view');
+    if (!reviewView || !_lastBank) return;
+    reviewView.innerHTML = '';
+
+    // Back control
+    var header = el('div', { className: 'results-review-header' }, [
+      el('button', { className: 'results-review-back-btn', textContent: '\u2190 Back to results' })
+    ]);
+    header.querySelector('.results-review-back-btn').addEventListener('click', function() {
+      if (app.showView) app.showView('results-view');
+    });
+    reviewView.appendChild(header);
+
+    // Heading
+    reviewView.appendChild(el('h2', { className: 'results-section-title', textContent: 'Review Your Answers' }));
+
+    // Review accordion
+    var stored = App.SessionStore.load(_lastBank);
+    var selections = stored.ok ? stored.answers : [];
+    reviewView.appendChild(buildReview(_lastBank, selections));
+  }
+
+  function buildReviewBtn() {
+    var btn = el('button', { className: 'results-review-btn', textContent: 'Review your answers \u2192' });
+    btn.addEventListener('click', function() {
+      populateReview();
+      if (app.showView) app.showView('review-view');
+    });
+    return btn;
+  }
+
   function renderResults(bank, report) {
     var view = document.getElementById('results-view');
     if (!view) return;
     view.innerHTML = '';
+
+    // Cache for review screen
+    _lastBank = bank;
+    _lastReport = report;
 
     // Title Card
     view.appendChild(buildTitleCard(report));
@@ -690,18 +740,11 @@
     ddSection.appendChild(buildDeepDive(report));
     view.appendChild(ddSection);
 
-    // Review Accordion — selections from session store
-    var reviewSection = el('div', { className: 'results-section' });
-    reviewSection.appendChild(el('h2', { className: 'results-section-title', textContent: 'Review Your Answers' }));
-    var stored = App.SessionStore.load(bank);
-    var selections = stored.ok ? stored.answers : [];
-    reviewSection.appendChild(buildReview(bank, selections));
-    view.appendChild(reviewSection);
-
-    // Retake
-    var retakeWrap = el('div', { className: 'results-retake-wrap' });
-    retakeWrap.appendChild(buildRetake());
-    view.appendChild(retakeWrap);
+    // Button row: Review + Retake
+    var actionBtnRow = el('div', { className: 'results-action-btn-row' });
+    actionBtnRow.appendChild(buildReviewBtn());
+    actionBtnRow.appendChild(buildRetake());
+    view.appendChild(actionBtnRow);
 
     // Switch views (hide quiz/landing, show results)
     if (app.showView) app.showView('results-view');
