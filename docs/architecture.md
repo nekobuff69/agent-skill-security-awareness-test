@@ -181,29 +181,55 @@ Static site + one proxy Worker.
 ```
 ├── index.html
 ├── config.js
+├── styles.css
 ├── questions.json
 ├── owasp-ast-full.md
 ├── css/
-│   └── style.css
+│   ├── quiz.css
+│   └── results.css
 ├── js/
-│   ├── quiz.js          # rendering, option collection, localStorage
-│   ├── scoring.js       # deterministic scoring + title lookup
-│   ├── results.js       # Title Card, SVG radar + PNG share, Blind-Spot bars
-│   ├── template.js      # Deep-Dive Prompt assembly
-│   ├── llm.js           # Worker call, validation, retry, fallback routing
-│   └── review.js        # answer review accordion
+│   ├── analytics.js      # analytics helpers
+│   ├── main.js           # app bootstrap
+│   ├── quiz.js           # rendering, option collection, localStorage
+│   ├── scoring.js        # deterministic scoring + title lookup
+│   ├── session-store.js  # versioned localStorage session
+│   ├── prompt-builder.js # Deep-Dive Prompt assembly
+│   ├── fallback.js       # deterministic fallback from bank
+│   ├── extractor.js      # OWASP excerpt extraction
+│   ├── validator.js      # LLM response validation
+│   ├── llm-client.js     # Worker call, validation, retry, fallback routing
+│   └── results.js        # Title Card, SVG radar + PNG share, Blind-Spot bars
+├── tests/
+│   ├── mock_llm_output.json
+│   └── js/
+│       ├── run-tests.js
+│       ├── test-scoring.js
+│       ├── test-session-store.js
+│       ├── test-prompt-builder.js
+│       ├── test-fallback.js
+│       ├── test-extractor.js
+│       └── test-validator.js
+├── scripts/
+│   ├── preflight.sh
+│   └── deploy.sh
 ├── worker/
 │   ├── src/index.js
 │   └── wrangler.toml
 ├── run_tests.py
-└── mock_llm_output.json
+├── package.json
+└── docs/
+    └── architecture.md
 ```
 
 ```bash
-python3 run_tests.py                                # gate: before every deploy
-python3 run_tests.py --llm mock_llm_output.json
-npx wrangler pages deploy ./ --project-name=agent-security-quiz
+./scripts/preflight.sh                                # gate: before every deploy
+./scripts/deploy.sh                                   # preflight + worker + pages in one
+# or individually:
+python3 run_tests.py
+python3 run_tests.py --llm tests/mock_llm_output.json
+node tests/js/run-tests.js
 npx wrangler deploy worker/ --name quiz-llm
+npx wrangler pages deploy ./ --project-name=agent-security-quiz
 ```
 
 ---

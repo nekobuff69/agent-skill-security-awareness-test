@@ -1,0 +1,23 @@
+{
+  "narrative": "Your results reveal significant blind spots in three critical areas of agent skill security. Most concerning is your pattern around skill installation trust — you scored lowest on questions about verifying publishers before installing skills. The ClawHavoc campaign in January 2026 exploited exactly this trust gap, publishing 1,184 malicious skills across 12 accounts on a major marketplace. Five of the top seven most-downloaded skills at peak infection were confirmed malware.\n\nYour second area of concern is permission management. You tended to accept broad permissions without scoping them to the skill's actual function. OWASP research found 280+ skills exposing API keys and PII beyond their declared function. A calendar skill requesting shell execution and full file system access should raise an immediate red flag.\n\nYour third gap is metadata hygiene — you rarely inspected SKILL.md files for hidden instructions. OWASP's AST04 checklist shows that invisible payloads in skill metadata (ASCII control characters, zero-width Unicode, base64 encoding) can evade human review. Running every skill through a scanner is the only reliable defense.",
+  "actions": [
+    {
+      "priority": 1,
+      "title": "Verify publisher identity before every skill install",
+      "description": "Check the publisher's account history, other published skills, and cross-reference with known attack campaigns. In the ClawHavoc campaign, 12 accounts that looked legitimate published malware. Don't trust download counts or reviews as safety signals.",
+      "ast_source": "AST01 — Malicious Skills"
+    },
+    {
+      "priority": 2,
+      "title": "Scope permissions to match the skill's stated function",
+      "description": "Review each permission request against what the skill actually needs. A calendar skill needs network access for syncing — it doesn't need shell execution or full file system access. Deny permissions that exceed the skill's purpose.",
+      "ast_source": "AST03 — Over-Privileged Skills"
+    },
+    {
+      "priority": 3,
+      "title": "Run SKILL.md through a security scanner",
+      "description": "Human eyes can't see hidden instructions embedded via ASCII control characters, zero-width Unicode, or base64 encoding. Use a scanning tool that checks for these patterns — OWASP specifically recommends this in the AST04 checklist.",
+      "ast_source": "AST04 — Insecure Metadata"
+    }
+  ]
+}

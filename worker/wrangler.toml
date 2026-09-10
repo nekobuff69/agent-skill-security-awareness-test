@@ -1,0 +1,8 @@
+name = "llm-proxy"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+[vars]
+LLM_ENDPOINT = ""
+LLM_MODEL = ""
+# LLM_API_KEY stored as a secret, never in config

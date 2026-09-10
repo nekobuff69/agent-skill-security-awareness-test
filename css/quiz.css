@@ -1,0 +1,150 @@
+/* ── Quiz view ──────────────────────────────────────────────────────── */
+
+#quiz-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding-bottom: 3rem;
+}
+
+/* ── Progress indicator ─────────────────────────────────────────────── */
+
+.quiz-progress {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  text-align: right;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #666;
+  padding: 0.5rem 0.25rem;
+  background: #fafafa;
+  letter-spacing: 0.02em;
+}
+
+/* ── Phase header ───────────────────────────────────────────────────── */
+
+.quiz-phase-header {
+  padding: 1rem 0 0.25rem;
+}
+
+.quiz-phase-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111;
+  margin-bottom: 0.25rem;
+}
+
+.quiz-phase-desc {
+  font-size: 0.9375rem;
+  color: #555;
+  line-height: 1.45;
+}
+
+/* ── Scenario card ──────────────────────────────────────────────────── */
+
+.quiz-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 1.25rem 1rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.quiz-scenario {
+  font-size: 0.9375rem;
+  color: #444;
+  line-height: 1.55;
+  border-left: 3px solid #ddd;
+  padding-left: 0.85rem;
+}
+
+.quiz-question {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111;
+  line-height: 1.4;
+}
+
+/* ── Option buttons ─────────────────────────────────────────────────── */
+
+.quiz-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.quiz-option-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  padding: 0.75rem 1rem;
+  min-height: 44px;               /* touch target ≥ 44 px */
+  border: 1px solid #d0d0d0;
+  border-radius: 8px;
+  background: #fff;
+  color: #222;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.quiz-option-btn:hover {
+  background: #f0f4ff;
+  border-color: #b0c4de;
+}
+
+.quiz-option-btn:active {
+  background: #e4ecfb;
+}
+
+.quiz-option-btn.selected {
+  background: #e8f0fe;
+  border-color: #1976d2;
+  font-weight: 500;
+}
+
+/* ── Notice banner ──────────────────────────────────────────────────── */
+
+.quiz-notice {
+  background: #fff3e0;
+  border: 1px solid #ffcc80;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: #5d4037;
+  text-align: center;
+  animation: quiz-notice-in 0.25s ease-out;
+}
+
+@keyframes quiz-notice-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Mobile (≤ 400 px) ─────────────────────────────────────────────── */
+
+@media (max-width: 400px) {
+  #quiz-view {
+    gap: 1rem;
+    padding-bottom: 2rem;
+  }
+
+  .quiz-card {
+    padding: 1rem 0.85rem;
+    border-radius: 8px;
+  }
+
+  .quiz-phase-title {
+    font-size: 1.125rem;
+  }
+
+  .quiz-option-btn {
+    font-size: 0.875rem;
+    padding: 0.65rem 0.85rem;
+    min-height: 44px;
+  }
+}
