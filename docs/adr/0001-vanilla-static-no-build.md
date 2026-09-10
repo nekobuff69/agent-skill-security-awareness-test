@@ -14,6 +14,10 @@ Vanilla HTML, CSS, and JavaScript — zero package dependencies, no build step. 
 
 Analytics is Plausible, privacy-friendly, emitting exactly four events: `quiz_completed`, `llm_success`, `llm_fallback`, `template_copied`. No PII is collected.
 
+_Amended 2026-09-10: five events — `quiz_started` added on quiz Start (drop-off signal). The "exactly four" contract is superseded; the PRD's story 34 needs the same amendment._
+
+Note: the gate suite is now two runners — `run_tests.py` (stdlib Python, bank + grounding) and `tests/js/run-tests.js` (zero-dependency Node, JS module contracts) — executed together by `scripts/preflight.sh`.
+
 ## Consequences
 
 - Any text editor deploys the app; no node_modules, no bundler config, no transpiler.

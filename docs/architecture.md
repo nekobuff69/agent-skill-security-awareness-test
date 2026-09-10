@@ -13,7 +13,7 @@ A single-page web app delivering a self-assessment quiz on AI agent skill securi
 | File                | Role                                                                                           | Updated by     |
 | ------------------- | ---------------------------------------------------------------------------------------------- | -------------- |
 | `questions.json`    | Question Bank — source of truth for scenarios, Options, scoring, Feedback, Best Practices, OWASP sources | Content author |
-| `owasp-ast-full.md` | Full extracted OWASP AST content (~53 KB) — Grounding Corpus                                  | Content author |
+| `docs/owasp-ast-full.md` | Full extracted OWASP AST content (~53 KB) — Grounding Corpus               | Content author |
 | `docs/architecture.md` | Overview, journey, deployment + ADR index; decisions live in `docs/adr/` | Developer      |
 | `docs/TESTING.md`   | Testing spec: schema validation, scoring fixtures, grounding rules                             | Developer      |
 | `run_tests.py`      | Stdlib-only Python runner implementing the testing spec                                        | Developer      |
@@ -22,48 +22,54 @@ A single-page web app delivering a self-assessment quiz on AI agent skill securi
 
 ### Runtime Data Flow
 
-One `fetch()` on page load, parse once, use everywhere:
+Two `fetch()`es on page load — the Question Bank and the Grounding Corpus — parsed once, used everywhere:
 
 ```
-questions.json (loaded once)
-     │
-     ├─→ Quiz Renderer
-     │     reads: meta, phases[], questions[]
-     │     renders: landing stats (meta.total_questions + meta.time_estimate),
-     │              phase headers, scenario cards, option buttons
-     │     collects: option selections → {question_id: option_index}
-     │     stores: localStorage {v: bank-content-hash, answers} (survives refresh)
-     │
-     ├─→ Scoring Engine
-     │     reads: questions[].options[].score, questions[].severity_weight,
-     │            meta.scoring.severity_values
-     │     computes: per-AST aggregates, overall %, title lookup
-     │
-     ├─→ Results Renderer
-     │     reads: meta.scoring.titles
-     │     renders: Progression Title card, SVG radar (shareable hero), Blind-Spot bars
-     │
-     ├─→ Deep-Dive Prompt Builder (deterministic)
-     │     reads: title, weak ASTs, weakest questions (choice + best_practice)
-     │     emits: deep-dive kickoff prompt (≤ 3000 chars)
-     │
-     ├─→ LLM Recommendation (via Worker proxy)
-     │     reads: title, per-AST aggregates, weakest questions
-     │     reads: weak-AST excerpts from owasp-ast-full.md
-     │     sends: participant profile + Grounding Excerpts
-     │     renders: narrative + action plan  (validates before render)
-     │
-     ├─→ Deterministic Fallback
-     │     reads: same bank fields as the template builder
-     │     renders: action plan when the LLM Path is unavailable
-     │
-     └─→ Review Panel
-           reads: questions[], Participant's saved answers
-           renders: per-question accordion
-                    ├ scenario, question, selected option (highlighted)
-                    ├ that option's Feedback (why this choice is risky/sound)
-                    ├ Best Practice text
-                    └ ast_source_url (clickable OWASP link)
+questions.json + docs/owasp-ast-full.md (each loaded once)
+    │
+    ├─→ Quiz Renderer
+    │     reads: meta, phases[], questions[]
+    │     renders: landing stats (meta.total_questions + meta.time_estimate),
+    │              quiz chrome (Progress Fill + Question Counter + Phase Chip,
+    │              all updating in place), question cards (Q-number chip,
+    │              labeled Scenario/Question blocks, A–D-lettered Options),
+    │              Back Navigation (← Previous, re-answer overwrites)
+    │     collects: option selections → {question_id: option_index}
+    │     stores: localStorage {v: bank-content-hash, answers} (survives refresh)
+    │
+    ├─→ Scoring Engine
+    │     reads: questions[].options[].score, questions[].severity_weight,
+    │            meta.scoring.severity_values
+    │     computes: per-AST aggregates, overall %, title lookup
+    │
+    ├─→ Results Renderer
+    │     reads: meta.scoring.titles
+    │     renders: Progression Title card, SVG radar (shareable hero, AST-ID +
+    │              percentage axis labels), Blind-Spot bars (name + percentage),
+    │              Action Plan (cards + collapsed Narrative Expander),
+    │              Deep-Dive Prompt, Review/Retake buttons
+    │
+    ├─→ Deep-Dive Prompt Builder (deterministic)
+    │     reads: title, weak ASTs, weakest questions (choice + best_practice)
+    │     emits: deep-dive kickoff prompt (≤ 3000 chars)
+    │
+    ├─→ LLM Recommendation (via Proxy Worker)
+    │     reads: title, per-AST aggregates, weakest questions
+    │     reads: weak-AST excerpts from docs/owasp-ast-full.md
+    │     sends: participant profile + Grounding Excerpts
+    │     renders: action cards + Narrative in the expander  (validates before render)
+    │
+    ├─→ Deterministic Fallback
+    │     reads: same bank fields as the Deep-Dive Prompt Builder
+    │     renders: action cards + Narrative in the expander when the LLM Path is unavailable
+    │
+    └─→ Review Screen (own view, reached from the results page)
+          reads: questions[], Participant's saved answers
+          renders: per-question accordion
+                   ├ scenario, question, selected option (highlighted)
+                   ├ that option's Feedback (why this choice is risky/sound)
+                   ├ Best Practice text
+                   └ ast_source_url (clickable OWASP link)
 ```
 
 **Key:** `questions.json` serves every consumer — rendering, scoring, results, the Deep-Dive Prompt, LLM grounding, Deterministic Fallback, and Review. No secondary content source at runtime.
@@ -85,10 +91,15 @@ questions.json (loaded once)
 │  Phase 1: "Should I Install This?"                      │
 │  7 questions — trust, verification, pre-install checks  │
 │                                                         │
-│  [Scenario text]  [Question]                            │
-│  ○ Option A   ○ Option B   ○ Option C   ○ Option D      │
-│  [Saved ✓] → auto-advance after selection               │
-│  [Progress: 3/20]                                       │
+│  ┌─ Quiz Chrome (sticky) ─────────────┐                  │
+│  │  [▓▓░░ fill]  Question 3 / 20      │                  │
+│  │  [Phase 1 · Should I Install This?]│                  │
+│  └────────────────────────────────────┘                  │
+│  Q3 ┌ [Scenario] ──────────────┐                         │
+│     └ [Question]               ┘                         │
+│  [A] Option  [B] Option  [C] Option  [D] Option          │
+│  select → silent save → slide+fade advance               │
+│  [← Previous]  (from Q2 onward)                          │
 └─────────────────────┬───────────────────────────────────┘
                       ↓
 ┌─────────────────────────────────────────────────────────┐
@@ -105,28 +116,25 @@ questions.json (loaded once)
                       ↓
 ┌─────────────────────────────────────────────────────────┐
 │  Results Page                                           │
-│                                                         │
-│  ┌─ Title Card ─────────────────────┐                   │
-│  │  🛡️ Sentinel — 87%               │                   │
-│  └──────────────────────────────────┘                   │
-│                                                         │
 │  ┌─ Your Risk Radar (hero, shareable) ──────┐           │
-│  │        AST01                             │           │
-│  │   AST10 ╱      ╲ AST02                   │           │
-│  │     …    ✦    …     [Download PNG]       │           │
+│  │      AST01 33%                           │           │
+│  │  AST10 ╱      ╲ AST02  [Download PNG]    │           │
+│  │     …    ✦    …     (ID + % labels)      │           │
 │  └──────────────────────────────────────────┘           │
 │                                                         │
 │  ┌─ Your Blind Spots (detail) ──────┐                   │
-│  │  AST03 █████░░░░░░░ 38% [critical]│                  │
-│  │  AST02 ███████░░░░░ 62% [high]    │                  │
-│  │  …  (weakest first)              │                   │
+│  │  Malicious Skills █████░░░░░░░ 33%│                  │
+│  │  Cross-Platform      ██░░░░░░░ 33%│                  │
+│  │  …  (weakest first, name + %)    │                   │
 │  └──────────────────────────────────┘                   │
 │                                                         │
 │  ┌─ Your Action Plan ───────────────┐                   │
 │  │  (LLM-generated or deterministic │                   │
 │  │   fallback, OWASP-grounded)      │                   │
-│  │  1. [Prioritized action]         │                   │
-│  │  2. [Prioritized action]         │                   │
+│  │  1. [Prioritized action card]    │                   │
+│  │  2. [Prioritized action card]    │                   │
+│  │  ▸ Why these actions? Read the   │                   │
+│  │    analysis (collapsed)          │                   │
 │  └──────────────────────────────────┘                   │
 │                                                         │
 │  ┌─ Your Deep-Dive Prompt ──────────┐                   │
@@ -136,8 +144,14 @@ questions.json (loaded once)
 │  └──────────────────────────────────┘                   │
 │                                                         │
 │  ┌─ Review Your Answers ────────────┐                   │
-│  │  ▶ Q01: You chose… (expandable)  │                   │
+│  │  [Review your answers →]         │                   │
 │  └──────────────────────────────────┘                   │
+│        ↓ (separate Review screen)                       │
+│  ┌─ Review Screen ──────────────────┐                   │
+│  │  [← Back to results]             │                   │
+│  │  ▸ Q01: You chose… (expandable)  │                   │
+│  └──────────────────────────────────┘                   │
+│                                                         │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -145,11 +159,13 @@ questions.json (loaded once)
 
 **Key UX decisions:**
 
+- **Three real screens.** Landing, quiz, and results are separate views — the `hidden` attribute actually hides (styles.css enforces it over author display rules).
 - **No per-question Feedback during the quiz.** Option saved silently. Momentum preserved.
-- **Auto-advance on selection.** Select → save → transition. No "Next" button.
-- **Review is voluntary and at the end.** Expand what you want; skip to the Deep-Dive Prompt otherwise.
+- **Auto-advance on selection.** Select → save → slide+fade transition. No "Next" button; **Back Navigation** only (← Previous from Q2; re-answering overwrites).
+- **The Quiz Chrome never stacks.** One sticky bar: Progress Fill + Question Counter (the question being *viewed*) + Phase Chip updating in place. No phase header cards near the Question.
+- **Review is voluntary, on its own screen.** Reached from the results page; navigate back freely; skip it entirely if you want.
 - **The Deep-Dive Prompt is the hero artifact.** The thing the Participant takes away and uses.
-- **The radar is the shareable moment.** PNG download + Web Share API — results travel without a backend.
+- **The radar is the shareable moment.** PNG download + Web Share API — results travel without a backend. Severity never renders on the charts; score-band colors alone encode performance.
 
 ---
 
@@ -176,29 +192,27 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 
 ## 5. Deployment
 
-Static site + one proxy Worker.
-
-```
 ├── index.html
 ├── config.js
 ├── styles.css
 ├── questions.json
-├── owasp-ast-full.md
+├── AGENTS.md
+├── UBIQUITOUS_LANGUAGE.md
 ├── css/
 │   ├── quiz.css
 │   └── results.css
 ├── js/
 │   ├── analytics.js      # analytics helpers
-│   ├── main.js           # app bootstrap
-│   ├── quiz.js           # rendering, option collection, localStorage
+│   ├── main.js           # app bootstrap, view router
+│   ├── quiz.js           # quiz chrome, question cards, back nav, localStorage
 │   ├── scoring.js        # deterministic scoring + title lookup
 │   ├── session-store.js  # versioned localStorage session
 │   ├── prompt-builder.js # Deep-Dive Prompt assembly
 │   ├── fallback.js       # deterministic fallback from bank
 │   ├── extractor.js      # OWASP excerpt extraction
-│   ├── validator.js      # LLM response validation
+│   ├── validator.js      # LLM response validation (fence-tolerant)
 │   ├── llm-client.js     # Worker call, validation, retry, fallback routing
-│   └── results.js        # Title Card, SVG radar + PNG share, Blind-Spot bars
+│   └── results.js        # Title Card, radar + bars, Action Plan, Deep-Dive, Review
 ├── tests/
 │   ├── mock_llm_output.json
 │   └── js/
@@ -208,7 +222,8 @@ Static site + one proxy Worker.
 │       ├── test-prompt-builder.js
 │       ├── test-fallback.js
 │       ├── test-extractor.js
-│       └── test-validator.js
+│       ├── test-validator.js
+│       └── test-grounding.js   # gates the shipped Grounding Corpus itself
 ├── scripts/
 │   ├── preflight.sh
 │   └── deploy.sh
@@ -218,7 +233,11 @@ Static site + one proxy Worker.
 ├── run_tests.py
 ├── package.json
 └── docs/
-    └── architecture.md
+    ├── architecture.md
+    ├── TESTING.md
+    ├── owasp-ast-full.md       # Grounding Corpus
+    ├── adr/                    # 0001–0012, one decision per note
+    └── agents/                 # issue-tracker, triage-labels, domain consumer rules
 ```
 
 ```bash

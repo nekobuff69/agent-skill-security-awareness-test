@@ -6,16 +6,18 @@ Rule-based validation only. No LLM-as-judge, no external API calls, no network r
 
 ## 1. Overview
 
-**Purpose:** Validate `questions.json` integrity, scoring math, and LLM output grounding before deployment.
+**Purpose:** Validate `questions.json` integrity, scoring math, LLM output grounding, and the JS module contracts before deployment.
 
-**Approach:** Every check is deterministic. A single Python script reads `questions.json` and a mock LLM output, runs all checks, and exits 0 (all pass) or 1 (any fail).
+**Approach:** Every check is deterministic. The Python runner (`run_tests.py`) reads `questions.json` and a mock LLM output and validates schema, scoring fixtures, and grounding rules. The Node runner (`tests/js/run-tests.js`) executes the JS module tests (pure functions, no browser) — including a gate on the shipped Grounding Corpus itself. Both must pass; `scripts/preflight.sh` runs both as the single pre-deploy gate and exits 0 (all pass) or 1 (any fail).
 
-**Script:** `run_tests.py` (stdlib only — `json`, `re`, `sys`, `os`)
+**Scripts:** `run_tests.py` (stdlib only — `json`, `re`, `sys`, `os`, `argparse`) and `tests/js/run-tests.js` (Node, zero dependencies)
 
 **Usage:**
 ```bash
-python run_tests.py                          # validates questions.json
-python run_tests.py --llm mock_llm_output.json  # also validates LLM grounding
+python3 run_tests.py                          # validates questions.json
+python3 run_tests.py --llm tests/mock_llm_output.json  # also validates LLM grounding
+node tests/js/run-tests.js                    # JS module contracts + grounding corpus gate
+./scripts/preflight.sh                        # both suites, the pre-deploy gate
 ```
 
 ---
@@ -173,14 +175,34 @@ Weakest Questions (lowest performance):
   Scenario: {scenario}
   Best Practice: {best_practice}
   OWASP Source: {ast_source_url}
-
 ## OWASP Source Material
 
-{full content for the Participant's weakest 3-5 AST risks — Grounding Excerpts, ADR-0009's corpus strategy}
+{Description + Real-World Evidence + Preventive Mitigations for the
+Participant's weakest 3-5 AST risks — Grounding Excerpts, ADR-0009's corpus
+strategy}
 
 ## Output Format
 
-Return a JSON object matching the schema above.
+Return ONLY a JSON object, no markdown fences, no commentary:
+
+{
+  "narrative": "2-4 sentence plain-language analysis of the Participant's
+    blind spots, referencing their own choices and the OWASP evidence above",
+  "actions": [
+    {
+      "priority": 1,
+      "title": "short imperative action title",
+      "description": "1-2 sentences: what to do and why, grounded in the
+        source material",
+      "ast_source": "AST01"
+    }
+  ]
+}
+
+Rules: 3-5 actions, most important first (priority 1 = first). Each action
+must be grounded in the provided material: its ast_source must be an AST ID
+covered by the OWASP Source Material or Weakest Questions sections, and its
+description must trace to that material.
 ```
 
 ### Rules
@@ -264,12 +286,29 @@ has five grounding rules.
 - **Exit code:** 0 = all pass, 1 = any failure
 - **Output format:** One line per check with `[PASS]` or `[FAIL]`, then summary
 
-### Expected Check Count (approximate)
+### Expected Check Count (current bank, drifts with content)
 
-- Section 2: ~40 checks (20 questions × ~2 field checks each, plus ~10 global checks)
-- Section 3: ~8 checks (4 fixture cases + 4 edge cases)
-- Section 4: ~5 checks (one per grounding rule)
-- **Total: ~53 checks**
+- Section 2: ~656 checks (per-field expansion across 20 Questions and their 80 Options, plus global checks)
+- Section 3: 14 checks (4 fixture cases + 4 edge cases + sub-assertions)
+- Section 4: 7 checks (the five grounding rules)
+- **Total: 677 checks** (as printed by `run_tests.py --llm`)
+
+
+---
+
+## 6. Node Module Gate — `tests/js/run-tests.js`
+
+Zero-dependency runner over the JS modules (pure functions, no browser). Discovers `tests/js/test-*.js`; each file exports `name` + `run()` returning `[{pass, message}]`. Exit 0/1. Covered:
+
+| Module test | Asserts |
+|---|---|
+| `test-scoring.js` | Fixtures (all-zero 2.8%/Uncharted, all-best 100%/Sentinel, common-user, security-aware), 108 Total Possible, Multi-Mapping aggregation, graceful error states, weakest questions |
+| `test-session-store.js` | Save/load roundtrip, stale-hash soft reset, corrupt/empty storage |
+| `test-prompt-builder.js` | Four sections in order, ≤ 3000 chars, Weakest Questions carried |
+| `test-fallback.js` | Schema parity with LLM output, weakest-first ordering, valid AST attribution |
+| `test-extractor.js` | Per-AST slicing (description / evidence / mitigations) |
+| `test-validator.js` | Accepts valid output; rejects malformed JSON, unknown AST refs, short narrative; tolerates one markdown fence |
+| `test-grounding.js` | The shipped `docs/owasp-ast-full.md` yields all 10 AST Risks with non-empty Description/Evidence/Mitigations — a corpus edit that breaks extraction fails the gate |
 
 ---
 

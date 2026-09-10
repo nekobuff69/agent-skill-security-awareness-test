@@ -16,6 +16,8 @@ Sharing: Download PNG (SVG → canvas → blob) and Web Share API where supporte
 
 Blind-Spot Bars are the detail readout: horizontal bars, weakest first, same score-based coloring and Severity Chips as the radar.
 
+_Amended 2026-09-11 (owner decision): Severity Chips removed from BOTH visuals — they described the threat's severity, not the Participant's performance, and still invited the exact misreading this ADR warns against. Radar axis labels are now short `AST01…AST10` + the Participant's percentage (which also fixed label clipping at phone width); Blind-Spot Bars carry the full AST name + percentage. Score-band colors alone encode performance._
+
 ## Consequences
 
 - Severity remains visible without distorting the score message.
