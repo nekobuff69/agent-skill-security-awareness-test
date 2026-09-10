@@ -47,8 +47,8 @@ For every object in `questions[]`:
 | Check | Rule |
 |---|---|
 | meta.scoring.severity_values | `{critical: 3, high: 2, medium: 1}` |
-| meta.scoring.grades length | Exactly 5 entries |
-| Grade labels | `["A", "B", "C", "D", "F"]` in order |
+| meta.scoring.titles length | Exactly 5 entries |
+| Title thresholds | Strictly descending numeric values, unique (90, 70, 50, 30, 0); each entry has numeric `threshold`, non-empty `name`, `emoji` |
 | meta.total_questions | Equals `len(questions)` |
 | phases length | Exactly 3 entries |
 | Phase structure | Each phase has `id`, `title`, `description`, `question_ids` (array) |
@@ -77,15 +77,15 @@ For each question q with selected option index i:
 total_earned    = Σ weighted_score across all questions
 total_possible  = Σ max_possible across all questions
 percentage      = (total_earned / total_possible) × 100
-grade           = first grade where percentage ≥ grade.threshold
+title = first title where percentage ≥ title.threshold
 ```
 
-Grade thresholds (from `meta.scoring.grades`):
-- A: ≥ 90%
-- B: ≥ 70%
-- C: ≥ 50%
-- D: ≥ 30%
-- F: < 30%
+Title thresholds (from `meta.scoring.titles`):
+- Sentinel: ≥ 90%
+- Practitioner: ≥ 70%
+- Aware: ≥ 50%
+- Newcomer: ≥ 30%
+- Uncharted: < 30%
 
 **Critical detail:** `max_possible` uses the actual maximum option score per question, not a fixed `3`. Two questions (q06, q13) have no score=3 option — their max is 2. This keeps total_possible = 108.
 
@@ -95,10 +95,10 @@ For each entry in `test_fixtures.scoring_cases`:
 
 | Case | Expected | How to verify |
 |---|---|---|
-| `all-zero` | 0%, grade F | All answers index 0 |
-| `all-best` | 100%, grade A | Answers select highest-scoring option per question. `null` answers resolve to the index of the highest-scoring option |
-| `common-user` | Grade in {F, D} | Compute percentage, check grade falls in boundary |
-| `security-aware` | Grade in {B, C} | Compute percentage, check grade falls in boundary |
+| `all-zero` | 0%, title Uncharted | All answers index 0 |
+| `all-best` | 100%, title Sentinel | Answers select highest-scoring option per question. `null` answers resolve to the index of the highest-scoring option |
+| `common-user` | Title in {Uncharted, Newcomer} | Compute percentage, check title falls in boundary |
+| `security-aware` | Title in {Aware, Practitioner} | Compute percentage, check title falls in boundary |
 
 **Null answer resolution:** When an answer is `null`, find the option with the highest `score` and use that. If multiple options tie for highest, use the lowest index.
 
@@ -121,7 +121,7 @@ Validate a mock LLM output JSON against rule-based constraints. This ensures the
 
 ### Input Format
 
-The mock LLM output (`mock_llm_output.json`) matches the structure from `architecture.md §5a`:
+The mock LLM output (`mock_llm_output.json`) matches the structure the app validates against (ADR-0010, runtime layer):
 
 ```json
 {
@@ -133,9 +133,54 @@ The mock LLM output (`mock_llm_output.json`) matches the structure from `archite
       "description": "string",
       "ast_source": "AST0X — Risk Name"
     }
-  ],
-  "prompt_template": "string — composite prompt the user copies"
+  ]
 }
+```
+
+### The prompt the Worker sends
+
+The Worker assembles this prompt (contract, not copy — the app builds it from bank data):
+
+```markdown
+## System Instruction
+
+You are a security advisor analyzing a user's self-assessment results
+on AI agent skill security, based on the OWASP Agentic Skills Top 10.
+
+Your task: generate a personalized risk assessment and action plan.
+
+RULES:
+
+- Every factual claim MUST trace to the provided OWASP source material
+- Do NOT invent attack scenarios or statistics not in the source
+- Do NOT fabricate OWASP recommendations — use only what's provided
+- If the source material doesn't cover a specific situation, say so
+- Write for a non-technical audience — plain language, no jargon
+- Tone: helpful advisor, not alarmist or condescending
+
+## Participant Data
+
+Title: {title_name} ({emoji})
+Overall: {percentage}%
+
+Per-AST Scores:
+{for each AST risk:}
+- {risk_id} ({risk_name}, {severity}): {earned}/{possible} ({percentage}%)
+
+Weakest Questions (lowest performance):
+{for each weak question:}
+- {question_id}: Chose "{selected_option_text}" (score: {score}/3)
+  Scenario: {scenario}
+  Best Practice: {best_practice}
+  OWASP Source: {ast_source_url}
+
+## OWASP Source Material
+
+{full content for the Participant's weakest 3-5 AST risks — Grounding Excerpts, ADR-0009's corpus strategy}
+
+## Output Format
+
+Return a JSON object matching the schema above.
 ```
 
 ### Rules
@@ -148,7 +193,7 @@ Extract all numbers from the LLM output (regex: `\b\d[\d,\.]*\b`). For each numb
 - If a number is a common structural value (year like `2026`, single digit, percentage format `%`), allow it without source verification
 - Flag any statistic (e.g., `1,184`, `13.4%`, `280+`, `135,000`) not traceable to a `source_note`
 
-**Numbers to allow without source check:** 2, 3, 4, 5, 10, 20 (quiz structural numbers); years `2026`, `2025`; any number followed by `%` if it appears in a grade range string.
+**Numbers to allow without source check:** 2, 3, 4, 5, 10, 20 (quiz structural numbers); years `2026`, `2025`; any number followed by `%` if it appears in a title range string.
 
 #### Rule 2 — No Phantom Campaigns
 
@@ -192,69 +237,24 @@ For each item in `actions[]`:
 - Must match pattern `AST\d{2}` (e.g., `AST01`, `AST10`)
 - Must be a valid AST ID that exists in the question bank's `ast_risks` fields
 
-#### Rule 6 — Prompt Template Length
+#### Rule 6 (moved) — Deep-Dive Prompt Budget
 
-- `prompt_template` must be a string
-- Length must be between 200 and 3000 characters (inclusive)
-- Below 200 → likely under-specified (FAIL)
-- Above 3000 → likely hallucinated bloat (FAIL)
+`prompt_template` is no longer LLM output. The app assembles the deep-dive prompt
+deterministically (ADR-0006), so the 200-3000 character budget is now a
+**builder invariant** covered by fixture tests, not an LLM-output rule. Section 4
+has five grounding rules.
 
 ---
 
 ## 5. Test Runner — `run_tests.py`
 
-### Structure
+### Runner contract
 
-```python
-#!/usr/bin/env python3
-"""Agent Security Quiz — rule-based test pipeline."""
-
-import json
-import re
-import sys
-import os
-
-QUESTIONS_FILE = "questions.json"
-LLM_OUTPUT_FILE = "mock_llm_output.json"  # optional, via --llm flag
-
-class TestResult:
-    def __init__(self, name, passed, detail=""):
-        self.name = name
-        self.passed = passed
-        self.detail = detail
-
-results: list[TestResult] = []
-
-def check(name, condition, detail=""):
-    """Register a check. condition=True → PASS, condition=False → FAIL."""
-    results.append(TestResult(name, bool(condition), detail))
-
-# --- Load data ---
-# Load questions.json, parse, run all checks from sections 2-4
-
-# --- Section 2: Schema Validation ---
-# (implement all checks from §2a and §2b)
-
-# --- Section 3: Scoring Verification ---
-# (implement scoring formula and fixture tests from §3)
-
-# --- Section 4: LLM Grounding ---
-# (if --llm flag provided, load and validate mock output)
-
-# --- Output ---
-passed = sum(1 for r in results if r.passed)
-failed = sum(1 for r in results if not r.passed)
-
-for r in results:
-    status = "PASS" if r.passed else "FAIL"
-    line = f"  [{status}] {r.name}"
-    if r.detail:
-        line += f" — {r.detail}"
-    print(line)
-
-print(f"\n{passed}/{len(results)} checks passed")
-sys.exit(0 if failed == 0 else 1)
-```
+- **CLI:** `python run_tests.py` validates the bank; `--llm mock_llm_output.json` additionally validates grounding.
+- **Stdlib only** (`json`, `re`, `sys`, `os`, `argparse`); single file in the project root alongside the bank.
+- **Exit code:** 0 = all pass, 1 = any failure.
+- **Output:** one line per check (`[PASS]` / `[FAIL]`), then a summary line.
+- The implementation in `run_tests.py` is the source of truth for mechanics — this spec catalogs the checks, not the code.
 
 ### Constraints
 
@@ -268,8 +268,8 @@ sys.exit(0 if failed == 0 else 1)
 
 - Section 2: ~40 checks (20 questions × ~2 field checks each, plus ~10 global checks)
 - Section 3: ~8 checks (4 fixture cases + 4 edge cases)
-- Section 4: ~6 checks (one per grounding rule)
-- **Total: ~54 checks**
+- Section 4: ~5 checks (one per grounding rule)
+- **Total: ~53 checks**
 
 ---
 
@@ -285,28 +285,27 @@ A valid mock output for testing Section 4. Every claim traces to `source_note` f
       "priority": 1,
       "title": "Verify publisher identity before every skill install",
       "description": "Check the publisher's account history, other published skills, and cross-reference with known attack campaigns. In the ClawHavoc campaign, 12 accounts that looked legitimate published malware. Don't trust download counts or reviews as safety signals.",
-      "ast_source": "AST01 — Malicious Skill Distribution"
+      "ast_source": "AST01 — Malicious Skills"
     },
     {
       "priority": 2,
       "title": "Scope permissions to match the skill's stated function",
       "description": "Review each permission request against what the skill actually needs. A calendar skill needs network access for syncing — it doesn't need shell execution or full file system access. Deny permissions that exceed the skill's purpose.",
-      "ast_source": "AST03 — Excessive Permission Requests"
+      "ast_source": "AST03 — Over-Privileged Skills"
     },
     {
       "priority": 3,
       "title": "Run SKILL.md through a security scanner",
       "description": "Human eyes can't see hidden instructions embedded via ASCII control characters, zero-width Unicode, or base64 encoding. Use a scanning tool that checks for these patterns — OWASP specifically recommends this in the AST04 checklist.",
-      "ast_source": "AST04 — Instruction Smuggling"
+      "ast_source": "AST04 — Insecure Metadata"
     },
     {
       "priority": 4,
       "title": "Enable sandboxing for all installed skills",
       "description": "Skills execute in your full user permission context by default. Microsoft Defender warned that agents should be treated as untrusted code execution with persistent credentials. Enable sandboxing to limit what any single skill can reach.",
-      "ast_source": "AST06 — Insufficient Sandboxing"
+      "ast_source": "AST06 — Weak Isolation"
     }
-  ],
-  "prompt_template": "You are my AI agent security advisor. Based on my self-assessment results, I need help improving my agent skill security practices. Here's my context:\n\nMy weakest areas are:\n1. Pre-installation verification — I tend to trust skills based on reviews and download counts rather than verifying the publisher independently\n2. Permission scoping — I accept broad permissions without questioning whether they match the skill's function\n3. Hidden content detection — I don't currently scan SKILL.md files for invisible malicious instructions\n\nMy strongest area is post-installation monitoring.\n\nPlease help me create:\n1. A pre-installation checklist I can run through before installing any new skill (publisher verification, permission audit, dependency check, hidden content scan)\n2. A permission matrix template I can use to evaluate whether a skill's requested permissions match its stated function\n3. A quarterly review schedule for my installed skills, prioritized by risk tier\n4. Specific actions I can take this week to address my three weakest areas\n\nFor each recommendation, cite the specific OWASP Agentic Skills Top 10 risk it addresses (AST01 through AST10). Use plain language — I'm a practitioner, not a security researcher."
+  ]
 }
 ```
 

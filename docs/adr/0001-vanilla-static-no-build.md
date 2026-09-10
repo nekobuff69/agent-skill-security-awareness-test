@@ -1,0 +1,26 @@
+# 0001 — Vanilla Static, No Build
+
+## Status
+
+Accepted — 2026-09-10
+
+## Context
+
+The app targets instant load and hobby-tier deployment. A build step adds latency to every edit cycle and introduces a dependency graph that must be maintained. The site delivers a single quiz — no SSR, no routing, no component tree. The hosting target (Cloudflare Pages) serves static files natively.
+
+## Decision
+
+Vanilla HTML, CSS, and JavaScript — zero package dependencies, no build step. The stylesheet is handwritten (~200 lines). All runtime state lives in localStorage, versioned by the Question Bank's content hash. Hosting is Cloudflare Pages with a companion Worker for the LLM proxy.
+
+Analytics is Plausible, privacy-friendly, emitting exactly four events: `quiz_completed`, `llm_success`, `llm_fallback`, `template_copied`. No PII is collected.
+
+## Consequences
+
+- Any text editor deploys the app; no node_modules, no bundler config, no transpiler.
+- The zero-dependency constraint is load-bearing: every dependency must justify its weight against the simplicity budget.
+- A bank content change triggers a fresh parse on next page load — no rebuild required.
+- `run_tests.py` (stdlib Python) is the deploy gate, not a build artifact.
+
+## Alternatives considered
+
+**Tailwind Play CDN.** Runtime JIT adds ~100 KB, causes FOUC, and is officially not recommended for production. Contradicts the zero-dependency promise and introduces a runtime external to the author's control. Rejected.

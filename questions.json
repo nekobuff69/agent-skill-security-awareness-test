@@ -9,41 +9,36 @@
     "time_estimate": "8-12 minutes",
     "scoring": {
       "per_question_max": 3,
-      "severity_weight": {
-        "critical": 3,
-        "high": 2,
-        "medium": 1
-      },
-      "grades": [
+      "titles": [
         {
-          "label": "A",
+          "threshold": 90,
           "range": "90-100%",
-          "name": "Security-Conscious Agent User",
+          "name": "Sentinel",
           "emoji": "🛡️"
         },
         {
-          "label": "B",
+          "threshold": 70,
           "range": "70-89%",
-          "name": "Aware but Exposed",
-          "emoji": "⚠️"
+          "name": "Practitioner",
+          "emoji": "🛠️"
         },
         {
-          "label": "C",
+          "threshold": 50,
           "range": "50-69%",
-          "name": "Significant Blind Spots",
-          "emoji": "🟡"
+          "name": "Aware",
+          "emoji": "🔍"
         },
         {
-          "label": "D",
+          "threshold": 30,
           "range": "30-49%",
-          "name": "High Risk Profile",
-          "emoji": "🔴"
+          "name": "Newcomer",
+          "emoji": "🌱"
         },
         {
-          "label": "F",
+          "threshold": 0,
           "range": "0-29%",
-          "name": "Critical — Act Now",
-          "emoji": "🚨"
+          "name": "Uncharted",
+          "emoji": "🧭"
         }
       ],
       "severity_values": {
@@ -929,7 +924,7 @@
           0
         ],
         "expected_percentage": 0.0,
-        "expected_grade": "F"
+        "expected_title": "Uncharted"
       },
       {
         "id": "all-best",
@@ -957,7 +952,7 @@
           3
         ],
         "expected_percentage": 100.0,
-        "expected_grade": "A"
+        "expected_title": "Sentinel"
       },
       {
         "id": "common-user",
@@ -984,7 +979,7 @@
           0,
           0
         ],
-        "expected_grade_boundary": "F or D"
+        "expected_title_boundary": "Uncharted or Newcomer"
       },
       {
         "id": "security-aware",
@@ -1011,7 +1006,7 @@
           1,
           1
         ],
-        "expected_grade_boundary": "B or C"
+        "expected_title_boundary": "Aware or Practitioner"
       }
     ],
     "phase_integrity": {
