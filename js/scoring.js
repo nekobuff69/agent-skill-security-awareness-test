@@ -167,6 +167,31 @@
       });
     }
 
+    // --- Ranked views ---
+    // Weakest-first, deterministic tie-break by AST ID ascending.
+    // The report owns the Blind Spot order so consumers never re-sort.
+    var astRanked = [];
+    for (var k2 = 0; k2 < astKeys.length; k2++) {
+      var rankedId = astKeys[k2];
+      var rankedAgg = astAggregates[rankedId];
+      astRanked.push({
+        id: rankedId,
+        earned: rankedAgg.earned,
+        possible: rankedAgg.possible,
+        percentage: Math.round((rankedAgg.earned / rankedAgg.possible) * 1000) / 10
+      });
+    }
+    astRanked.sort(function(a, b) {
+      return (a.percentage - b.percentage) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    });
+
+    // --- Blind Spots ---
+    // The <70% boundary defines a Blind Spot (a low AST Score).
+    var blindSpotIds = [];
+    for (var k3 = 0; k3 < astRanked.length; k3++) {
+      if (astRanked[k3].percentage < 70) blindSpotIds.push(astRanked[k3].id);
+    }
+
     // --- Build report ---
     var report = {
       percentage: percentage,
@@ -176,6 +201,8 @@
         threshold: title.threshold
       },
       astScores: astScores,
+      astRanked: astRanked,
+      blindSpotIds: blindSpotIds,
       weakestQuestions: weakestQuestions,
       totalEarned: totalEarned,
       totalPossible: totalPossible

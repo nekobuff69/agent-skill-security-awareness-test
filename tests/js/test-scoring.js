@@ -189,6 +189,71 @@ exports.run = function() {
     r8.ok && q13MaxScore === 2,
     'q13 max=' + q13MaxScore);
 
+  // ── 12b. Ranked views on the report (C1 deepening) ──
+  // astRanked: weakest-first array of {id, earned, possible, percentage},
+  // deterministic tie-break by AST ID ascending.
+  var rankedBest = r1.ok && r1.report.astRanked || null;
+  check('ranked: astRanked present with 10 entries',
+    Array.isArray(rankedBest) && rankedBest.length === 10,
+    'len=' + (rankedBest ? rankedBest.length : 'missing'));
+  check('ranked: all-best report has every AST at 100%',
+    !!rankedBest && rankedBest.every(function(r) { return r.percentage === 100; }));
+  // Tie-break: at equal percentages, ids ascend
+  var tiesBreakById = !!rankedBest;
+  if (rankedBest) {
+    for (var tb = 1; tb < rankedBest.length; tb++) {
+      if (rankedBest[tb].percentage === rankedBest[tb-1].percentage &&
+          rankedBest[tb].id <= rankedBest[tb-1].id) tiesBreakById = false;
+    }
+  }
+  check('ranked: ties break by AST ID ascending', tiesBreakById);
+
+  var rankedZero = (r0.ok && r0.report.astRanked) || [];
+  // Sorted ascending by percentage
+  var rankedAscending = true;
+  for (var ra = 1; ra < rankedZero.length; ra++) {
+    if (rankedZero[ra].percentage < rankedZero[ra-1].percentage) rankedAscending = false;
+  }
+  check('ranked: all-zero report is weakest-first (percentage ascending)', rankedAscending);
+  // Entries agree with the astScores map (two views of the same aggregates)
+  var rankedAgrees = rankedZero.every(function(r) {
+    var agg = r0.report.astScores[r.id];
+    return agg && agg.earned === r.earned && agg.possible === r.possible &&
+           agg.percentage === r.percentage;
+  });
+  check('ranked: entries match astScores aggregates', rankedAgrees);
+  // Same id set as astScores
+  var rankedIdSet = rankedZero.map(function(r) { return r.id; }).sort().join(',');
+  var scoresIdSet = Object.keys(r0.report.astScores).sort().join(',');
+  check('ranked: id set equals astScores keys', rankedIdSet === scoresIdSet,
+    rankedIdSet + ' vs ' + scoresIdSet);
+
+  // blindSpotIds: the <70% Blind Spot boundary, weakest-first
+  var blindsBest = (r1.ok && r1.report.blindSpotIds) || null;
+  check('blindSpots: empty for all-best (no Blind Spots at 100%)',
+    Array.isArray(blindsBest) && blindsBest.length === 0,
+    'len=' + (blindsBest ? blindsBest.length : 'missing'));
+  var blindsZero = (r0.ok && r0.report.blindSpotIds) || [];
+  var blindsAllBelow70 = blindsZero.length > 0 && blindsZero.every(function(id) {
+    return r0.report.astScores[id].percentage < 70;
+  });
+  check('blindSpots: every entry is below 70%', blindsAllBelow70,
+    blindsZero.join(','));
+  var blindsComplete = Object.keys(r0.report.astScores).every(function(id) {
+    var inList = blindsZero.indexOf(id) !== -1;
+    var below70 = r0.report.astScores[id].percentage < 70;
+    return (below70 && inList) || (!below70 && !inList);
+  });
+  check('blindSpots: exactly the AST Risks below 70%', blindsComplete);
+  // Weakest-first: mirrors astRanked order restricted to Blind Spots
+  var blindsWeakestFirst = blindsZero.every(function(id, i, arr) {
+    if (i === 0) return true;
+    var prevPct = r0.report.astScores[arr[i-1]].percentage;
+    var pct = r0.report.astScores[id].percentage;
+    return pct >= prevPct ? pct === prevPct || true : false;
+  });
+  check('blindSpots: ordered weakest-first like astRanked', blindsWeakestFirst);
+
   // ── 13. Browser + Node dual export ──
   check('exports: module.exports is set', typeof Scoring.computeScores === 'function');
   check('exports: globalThis.App.Scoring exists',

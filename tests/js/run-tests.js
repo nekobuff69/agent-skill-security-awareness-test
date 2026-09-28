@@ -23,7 +23,21 @@ files.forEach(function(file) {
   console.log('\n=== ' + (mod.name || file) + ' ===');
 
   var results = mod.run();
-  results.forEach(function(r) {
+  if (results && typeof results.then === 'function') {
+    // Async module: defer accounting until the promise resolves
+    pending++;
+    results.then(function(rs) {
+      report(rs);
+      pending--;
+      finish();
+    });
+  } else {
+    report(results || []);
+  }
+});
+
+function report(rs) {
+  rs.forEach(function(r) {
     if (r.pass) {
       passed++;
       console.log('  [PASS] ' + r.message);
@@ -32,9 +46,15 @@ files.forEach(function(file) {
       console.log('  [FAIL] ' + r.message);
     }
   });
-});
+}
 
-console.log('\n--- Summary ---');
-console.log(passed + ' passed, ' + failed + ' failed, ' + (passed + failed) + ' total');
-
-process.exit(failed > 0 ? 1 : 0);
+var pending = 0;
+var finished = false;
+function finish() {
+  if (finished || pending > 0) return;
+  finished = true;
+  console.log('\n--- Summary ---');
+  console.log(passed + ' passed, ' + failed + ' failed, ' + (passed + failed) + ' total');
+  process.exit(failed > 0 ? 1 : 0);
+}
+process.on('beforeExit', finish);

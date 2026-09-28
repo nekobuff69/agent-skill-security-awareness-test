@@ -37,16 +37,11 @@
       '\n' +
       'Per-AST Scores:';
 
-    // Sort AST scores weakest-first (by percentage ascending)
-    var astKeys = Object.keys(report.astScores || {});
-    astKeys.sort(function(a, b) {
-      return (report.astScores[a].percentage || 0) - (report.astScores[b].percentage || 0);
-    });
-
-    for (var i = 0; i < astKeys.length; i++) {
-      var astId = astKeys[i];
-      var ast = report.astScores[astId];
-      profile += '\n- ' + astId + ': ' + ast.percentage + '% (' + ast.earned + '/' + ast.possible + ')';
+    // Weakest-first order comes from the report — the Scoring Engine owns ranking.
+    var astRanked = (report && report.astRanked) || [];
+    for (var i = 0; i < astRanked.length; i++) {
+      var r = astRanked[i];
+      profile += '\n- ' + r.id + ': ' + r.percentage + '% (' + r.earned + '/' + r.possible + ')';
     }
 
     // --- Section 3: Choices ---

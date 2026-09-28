@@ -17,30 +17,16 @@
   };
 
   /**
-   * Rank AST risks by percentage ascending (weakest first).
+   * Select the weakest AST Risks for the Action Plan:
+   * all Blind Spots (below 70%), capped at 3–5.
+   * If fewer than 3 Blind Spots, take all of them.
+   * The report supplies the weakest-first order (astRanked); this only applies
+   * the presentation cap from ADR-0009.
    */
-  function rankRisks(astScores) {
-    var ids = Object.keys(astScores);
-    ids.sort(function(a, b) {
-      return astScores[a].percentage - astScores[b].percentage;
-    });
-    return ids;
-  }
-
-  /**
-   * Select top weakest risks: all below 70%, capped at 3–5.
-   * If fewer than 3 are below 70%, take all below 70%.
-   */
-  function selectWeakest(ranked, astScores) {
-    var below70 = [];
-    for (var i = 0; i < ranked.length; i++) {
-      if (astScores[ranked[i]].percentage < 70) {
-        below70.push(ranked[i]);
-      }
-    }
-    if (below70.length === 0) return [];
-    if (below70.length <= 3) return below70;
-    return below70.slice(0, 5);
+  function selectWeakest(blindSpotIds) {
+    if (!Array.isArray(blindSpotIds) || blindSpotIds.length === 0) return [];
+    if (blindSpotIds.length <= 3) return blindSpotIds.slice();
+    return blindSpotIds.slice(0, 5);
   }
 
   /**
@@ -183,8 +169,7 @@
       return { narrative: '', actions: [] };
     }
 
-    var ranked = rankRisks(report.astScores);
-    var weakIds = selectWeakest(ranked, report.astScores);
+    var weakIds = selectWeakest(report.blindSpotIds);
 
     if (weakIds.length === 0) {
       return {

@@ -31,6 +31,18 @@ exports.run = function() {
         'AST09': { earned: 9, possible: 12, percentage: 75.0 },
         'AST10': { earned: 7, possible: 9, percentage: 77.8 }
       },
+      astRanked: [
+        { id: 'AST02', earned: 1, possible: 9, percentage: 11.1 },
+        { id: 'AST04', earned: 2, possible: 12, percentage: 16.7 },
+        { id: 'AST01', earned: 3, possible: 12, percentage: 25 },
+        { id: 'AST03', earned: 5, possible: 9, percentage: 55.6 },
+        { id: 'AST05', earned: 5, possible: 9, percentage: 55.6 },
+        { id: 'AST08', earned: 5, possible: 9, percentage: 55.6 },
+        { id: 'AST09', earned: 9, possible: 12, percentage: 75.0 },
+        { id: 'AST07', earned: 7, possible: 9, percentage: 77.8 },
+        { id: 'AST10', earned: 7, possible: 9, percentage: 77.8 },
+        { id: 'AST06', earned: 8, possible: 9, percentage: 88.9 }
+      ],
       weakestQuestions: [
         {
           id: 'q04',

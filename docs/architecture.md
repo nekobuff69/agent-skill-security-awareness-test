@@ -40,7 +40,8 @@ questions.json + docs/owasp-ast-full.md (each loaded once)
     ├─→ Scoring Engine
     │     reads: questions[].options[].score, questions[].severity_weight,
     │            meta.scoring.severity_values
-    │     computes: per-AST aggregates, overall %, title lookup
+    │     computes: per-AST aggregates, overall %, title lookup,
+    │              ranked views (astRanked weakest-first, blindSpotIds < 70%)
     │
     ├─→ Results Renderer
     │     reads: meta.scoring.titles
@@ -53,16 +54,19 @@ questions.json + docs/owasp-ast-full.md (each loaded once)
     │     reads: title, weak ASTs, weakest questions (choice + best_practice)
     │     emits: deep-dive kickoff prompt (≤ 3000 chars)
     │
-    ├─→ LLM Recommendation (via Proxy Worker)
-    │     reads: title, per-AST aggregates, weakest questions
-    │     reads: weak-AST excerpts from docs/owasp-ast-full.md
-    │     sends: participant profile + Grounding Excerpts
-    │     renders: action cards + Narrative in the expander  (validates before render)
+    ├─→ Action Plan module (js/action-plan.js)
+    │     owns the path decision and retry policy (one retry, then fallback)
     │
-    ├─→ Deterministic Fallback
-    │     reads: same bank fields as the Deep-Dive Prompt Builder
-    │     renders: action cards + Narrative in the expander when the LLM Path is unavailable
+    │     ├─ LLM Path (via Proxy Worker)
+    │     │     reads: title, ranked per-AST scores, weakest questions
+    │     │     reads: weak-AST excerpts from docs/owasp-ast-full.md
+    │     │     sends: participant profile + Grounding Excerpts
+    │     │
+    │     └─ Deterministic Fallback
+    │           reads: same bank fields as the Deep-Dive Prompt Builder
     │
+    │     Either path resolves {narrative, actions, path}; the Results
+    │     Renderer renders action cards + Narrative in the expander.
     └─→ Review Screen (own view, reached from the results page)
           reads: questions[], Participant's saved answers
           renders: per-question accordion

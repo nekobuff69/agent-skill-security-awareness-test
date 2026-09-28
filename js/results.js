@@ -5,29 +5,7 @@
   global.App = app;
 
   /* ── constants ── */
-  var AST_IDS = [
-    'AST01','AST02','AST03','AST04','AST05',
-    'AST06','AST07','AST08','AST09','AST10'
-  ];
-
-  var AST_NAMES = {
-    AST01: 'Malicious Skills',
-    AST02: 'Supply Chain Compromise',
-    AST03: 'Over-Privileged Skills',
-    AST04: 'Insecure Metadata',
-    AST05: 'Untrusted External Instructions',
-    AST06: 'Weak Isolation',
-    AST07: 'Update Drift',
-    AST08: 'Poor Scanning',
-    AST09: 'No Governance',
-    AST10: 'Cross-Platform Reuse'
-  };
-
-  var AST_SEVERITY = {
-    AST01: 'critical', AST02: 'critical',
-    AST03: 'high', AST04: 'high', AST05: 'high', AST06: 'high',
-    AST07: 'medium', AST08: 'medium', AST09: 'medium', AST10: 'medium'
-  };
+  var AST = (global.App && global.App.AST) || { ids: [], names: {}, severity: {} };
 
   /* ── helpers ── */
 
@@ -129,6 +107,7 @@
 
     // axis lines and labels
     var astScores = report.astScores;
+    var astIds = AST.ids;
     var points = [];
 
     for (var i = 0; i < 10; i++) {
@@ -147,7 +126,7 @@
       svg.appendChild(line);
 
       // score point on axis
-      var astId = AST_IDS[i];
+      var astId = astIds[i];
       var pct = (astScores[astId] && astScores[astId].percentage != null) ? astScores[astId].percentage : 0;
       var valR = (pct / 100) * maxR;
       var px = cx + valR * Math.cos(angle);
@@ -217,7 +196,7 @@
       dot.setAttribute('cx', points[i].x);
       dot.setAttribute('cy', points[i].y);
       dot.setAttribute('r', 3.5);
-      dot.setAttribute('fill', scoreColor((astScores[AST_IDS[i]] && astScores[AST_IDS[i]].percentage != null) ? astScores[AST_IDS[i]].percentage : 0));
+      dot.setAttribute('fill', scoreColor((astScores[astIds[i]] && astScores[astIds[i]].percentage != null) ? astScores[astIds[i]].percentage : 0));
       dot.setAttribute('stroke', '#fff');
       dot.setAttribute('stroke-width', '1');
       svg.appendChild(dot);
@@ -230,18 +209,15 @@
   function buildBars(report) {
     var wrap = el('div', { className: 'results-bars' });
 
-    // sort weakest-first
-    var astIds = Object.keys(report.astScores);
-    astIds.sort(function(a, b) {
-      return (report.astScores[a].percentage || 0) - (report.astScores[b].percentage || 0);
-    });
+    // weakest-first order comes from the report (Scoring Engine owns ranking)
+    var astRanked = report.astRanked || [];
 
-    for (var i = 0; i < astIds.length; i++) {
-      var astId = astIds[i];
-      var pct = report.astScores[astId].percentage || 0;
+    for (var i = 0; i < astRanked.length; i++) {
+      var astId = astRanked[i].id;
+      var pct = astRanked[i].percentage || 0;
       var row = el('div', { className: 'results-bar-row' }, [
         el('div', { className: 'results-bar-label' }, [
-          document.createTextNode(AST_NAMES[astId])
+          document.createTextNode(AST.names[astId] || astId)
         ]),
         el('div', { className: 'results-bar-track' }, [
           el('div', {
@@ -263,21 +239,16 @@
     var proxyUrl = window.APP_CONFIG && window.APP_CONFIG.proxyUrl;
     var corpus = window.Corpus;
 
-    // Fallback-only path: no proxy or no corpus → render deterministic plan immediately
-    if (!proxyUrl || !corpus) {
-      renderFallbackPlan(wrap, report, bank);
-      return wrap;
-    }
-
-    // LLM path: show loading, then attempt LLM with one retry
+    // Loading indicator; on the fallback path assemble resolves in a
+    // microtask so this never visibly paints.
     wrap.appendChild(el('p', { className: 'results-action-narrative results-loading', textContent: 'Crafting your action plan\u2026' }));
-    attemptLlmPlan(wrap, report, bank, corpus);
-    return wrap;
-  }
 
-  function renderFallbackPlan(wrap, report, bank) {
-    var plan = App.FallbackAssembler.assemble(report, bank);
-    renderPlanContent(wrap, plan.narrative, plan.actions);
+    // The Action Plan module owns the path decision and retry policy
+    App.ActionPlan.assemble(report, bank, corpus, window.APP_CONFIG)
+      .then(function(plan) {
+        renderPlanContent(wrap, plan.narrative, plan.actions);
+      });
+    return wrap;
   }
 
   function renderPlanContent(wrap, narrative, actions) {
@@ -315,151 +286,6 @@
       }
       wrap.appendChild(narrativeDetails);
     }
-  }
-
-  function buildLlmPrompt(report, bank, excerpts) {
-    var title = report.title || { name: 'Unknown', emoji: '?' };
-    var percentage = report.percentage != null ? report.percentage : 0;
-
-    // --- System Instruction ---
-    var prompt =
-      '## System Instruction\n\n' +
-      'You are a security advisor analyzing a user\'s self-assessment results\n' +
-      'on AI agent skill security, based on the OWASP Agentic Skills Top 10.\n\n' +
-      'Your task: generate a personalized risk assessment and action plan.\n\n' +
-      'RULES:\n\n' +
-      '- Every factual claim MUST trace to the provided OWASP source material\n' +
-      '- Do NOT invent attack scenarios or statistics not in the source\n' +
-      '- Do NOT fabricate OWASP recommendations \u2014 use only what\'s provided\n' +
-      '- If the source material doesn\'t cover a specific situation, say so\n' +
-      '- Write for a non-technical audience \u2014 plain language, no jargon\n' +
-      '- Tone: helpful advisor, not alarmist or condescending\n\n';
-
-    // --- Participant Data ---
-    prompt +=
-      '## Participant Data\n\n' +
-      'Title: ' + title.emoji + ' ' + title.name + '\n' +
-      'Overall: ' + percentage + '%\n\n';
-
-    // Per-AST scores, weakest first
-    var astKeys = Object.keys(report.astScores || {});
-    astKeys.sort(function(a, b) {
-      return (report.astScores[a].percentage || 0) - (report.astScores[b].percentage || 0);
-    });
-
-    prompt += 'Per-AST Scores:\n';
-    for (var i = 0; i < astKeys.length; i++) {
-      var astId = astKeys[i];
-      var ast = report.astScores[astId];
-      var riskName = AST_NAMES[astId] || astId;
-      prompt += '- ' + astId + ' (' + riskName + ', ' + (AST_SEVERITY[astId] || 'medium') + '): ' +
-        ast.earned + '/' + ast.possible + ' (' + ast.percentage + '%)\n';
-    }
-
-    // Weakest questions with chosen option / best practice / OWASP link
-    var weakQs = report.weakestQuestions || [];
-    if (weakQs.length > 0) {
-      prompt += '\nWeakest Questions (lowest performance):\n';
-      for (var j = 0; j < weakQs.length; j++) {
-        var wq = weakQs[j];
-        // Resolve option text from bank if selectedOption not present
-        var selectedText = '';
-        if (wq.selectedOption && wq.selectedOption.text) {
-          selectedText = wq.selectedOption.text;
-        } else if (wq.selectedOptionIndex != null) {
-          // find question in bank to get option text
-          for (var q = 0; q < bank.questions.length; q++) {
-            if (bank.questions[q].id === wq.id) {
-              var opt = bank.questions[q].options[wq.selectedOptionIndex];
-              if (opt) selectedText = opt.text;
-              break;
-            }
-          }
-        }
-
-        prompt += '- ' + wq.id + ': Chose "' + selectedText + '" (score: ' +
-          (wq.weightedScore != null ? wq.weightedScore : 'N/A') + '/3)\n';
-        if (wq.scenario) prompt += '  Scenario: ' + wq.scenario + '\n';
-        if (wq.bestPractice) prompt += '  Best Practice: ' + wq.bestPractice + '\n';
-        if (wq.astSourceUrl) prompt += '  OWASP Source: ' + wq.astSourceUrl + '\n';
-      }
-    }
-
-    // --- OWASP Source Material ---
-    prompt += '\n## OWASP Source Material\n\n';
-    var excerptKeys = Object.keys(excerpts);
-    for (var e = 0; e < excerptKeys.length; e++) {
-      var ex = excerpts[excerptKeys[e]];
-      prompt += '### ' + excerptKeys[e] + '\n\n';
-      if (ex.description) prompt += ex.description + '\n\n';
-      if (ex.evidence) prompt += '**Evidence:**\n' + ex.evidence + '\n\n';
-      if (ex.mitigations) prompt += '**Mitigations:**\n' + ex.mitigations + '\n\n';
-    }
-
-    // --- Output Format ---
-    prompt +=
-      '## Output Format\n\n' +
-      'Return ONLY a JSON object, no markdown fences, no commentary:\n\n' +
-      '{\n' +
-      '  "narrative": "2-4 sentence plain-language analysis of the Participant\'s blind spots,\n' +
-      '    referencing their own choices and the OWASP evidence above",\n' +
-      '  "actions": [\n' +
-      '    {\n' +
-      '      "priority": 1,\n' +
-      '      "title": "short imperative action title",\n' +
-      '      "description": "1-2 sentences: what to do and why, grounded in the source material",\n' +
-      '      "ast_source": "AST01"\n' +
-      '    }\n' +
-      '  ]\n' +
-      '}\n\n' +
-      'Rules: 3-5 actions, most important first (priority 1 = first). Each action must be\n' +
-      'grounded in the provided material: its ast_source must be an AST ID covered by the\n' +
-      'OWASP Source Material or Weakest Questions sections, and its description must trace\n' +
-      'to that material.';
-
-    return prompt;
-  }
-
-  function attemptLlmPlan(wrap, report, bank, corpus) {
-    // Sort AST scores ascending (weakest first), take top 3\u20135
-    var astKeys = Object.keys(report.astScores || {});
-    astKeys.sort(function(a, b) {
-      return (report.astScores[a].percentage || 0) - (report.astScores[b].percentage || 0);
-    });
-    var weakAstIds = astKeys.slice(0, Math.min(5, astKeys.length));
-
-    // Extract OWASP excerpts for weakest AST risks
-    var excerpts = App.Extractor.extract(corpus, weakAstIds);
-
-    // Build the LLM prompt
-    var prompt = buildLlmPrompt(report, bank, excerpts);
-
-    var config = window.APP_CONFIG || {};
-
-    App.LLMClient.generate(prompt, config, bank)
-      .then(function(res) {
-        if (res && res.ok) {
-          renderPlanContent(wrap, res.narrative, res.actions);
-          window.Analytics.track('llm_success');
-          return null; // success — no retry
-        }
-        // First attempt failed — one retry
-        return App.LLMClient.generate(prompt, config, bank);
-      })
-      .then(function(res) {
-        if (!res) return; // first attempt already succeeded
-        if (res.ok) {
-          renderPlanContent(wrap, res.narrative, res.actions);
-          window.Analytics.track('llm_success');
-        } else {
-          renderFallbackPlan(wrap, report, bank);
-          window.Analytics.track('llm_fallback');
-        }
-      })
-      .catch(function() {
-        renderFallbackPlan(wrap, report, bank);
-        window.Analytics.track('llm_fallback');
-      });
   }
 
   /* ── Deep-Dive Prompt ── */
