@@ -139,9 +139,9 @@ The mock LLM output (`mock_llm_output.json`) matches the structure the app valid
 }
 ```
 
-### The prompt the Worker sends
+### The prompt the client sends (via the Worker)
 
-The Worker assembles this prompt (contract, not copy — the app builds it from bank data):
+The client's Action Plan module (`js/action-plan.js`) assembles this prompt (contract, not copy — built from bank data); the Proxy Worker forwards it to the Provider (ADR-0007):
 
 ```markdown
 ## System Instruction
@@ -298,14 +298,15 @@ has five grounding rules.
 
 ## 6. Node Module Gate — `tests/js/run-tests.js`
 
-Zero-dependency runner over the JS modules (pure functions, no browser). Discovers `tests/js/test-*.js`; each file exports `name` + `run()` returning `[{pass, message}]`. Exit 0/1. Covered:
+Zero-dependency runner over the JS modules (pure functions, no browser). Discovers `tests/js/test-*.js`; each file exports `name` + `run()` returning `[{pass, message}]`, or a Promise of that list for async modules (the Action Plan module tests). Exit 0/1. Covered:
 
 | Module test | Asserts |
 |---|---|
-| `test-scoring.js` | Fixtures (all-zero 2.8%/Uncharted, all-best 100%/Sentinel, common-user, security-aware), 108 Total Possible, Multi-Mapping aggregation, graceful error states, weakest questions |
+| `test-scoring.js` | Fixtures (all-zero 2.8%/Uncharted, all-best 100%/Sentinel, common-user, security-aware), 108 Total Possible, Multi-Mapping aggregation, graceful error states, weakest questions, ranked views (`astRanked` weakest-first with AST-ID tie-break, `blindSpotIds` = AST Risks below 70%) |
 | `test-session-store.js` | Save/load roundtrip, stale-hash soft reset, corrupt/empty storage |
-| `test-prompt-builder.js` | Four sections in order, ≤ 3000 chars, Weakest Questions carried |
-| `test-fallback.js` | Schema parity with LLM output, weakest-first ordering, valid AST attribution |
+| `test-prompt-builder.js` | Four sections in order, ≤ 3000 chars, Weakest Questions carried, weakest-first profile order from `astRanked` |
+| `test-fallback.js` | Schema parity with LLM output, weakest-first ordering from `blindSpotIds`, valid AST attribution |
+| `test-action-plan.js` | Path decision and retry policy at the module seam: no proxy / no corpus → fallback, LLM success → pass-through, one retry then fallback (ADR-0009), thrown adapter → fallback |
 | `test-extractor.js` | Per-AST slicing (description / evidence / mitigations) |
 | `test-validator.js` | Accepts valid output; rejects malformed JSON, unknown AST refs, short narrative; tolerates one markdown fence |
 | `test-grounding.js` | The shipped `docs/owasp-ast-full.md` yields all 10 AST Risks with non-empty Description/Evidence/Mitigations — a corpus edit that breaks extraction fails the gate |

@@ -209,16 +209,18 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 │   └── results.css
 ├── js/
 │   ├── analytics.js      # analytics helpers
+│   ├── ast.js            # AST Risk registry — canonical ids, names, severities (ADR-0013)
 │   ├── main.js           # app bootstrap, view router
 │   ├── quiz.js           # quiz chrome, question cards, back nav, localStorage
-│   ├── scoring.js        # deterministic scoring + title lookup
+│   ├── scoring.js        # deterministic scoring, title lookup, ranked views
 │   ├── session-store.js  # versioned localStorage session
 │   ├── prompt-builder.js # Deep-Dive Prompt assembly
 │   ├── fallback.js       # deterministic fallback from bank
 │   ├── extractor.js      # OWASP excerpt extraction
 │   ├── validator.js      # LLM response validation (fence-tolerant)
-│   ├── llm-client.js     # Worker call, validation, retry, fallback routing
-│   └── results.js        # Title Card, radar + bars, Action Plan, Deep-Dive, Review
+│   ├── llm-client.js     # Worker call + response validation
+│   ├── action-plan.js    # path decision, retry policy, LLM prompt assembly
+│   └── results.js        # Title Card, radar + bars, Deep-Dive, Review (pure view)
 ├── tests/
 │   ├── mock_llm_output.json
 │   └── js/
@@ -227,6 +229,7 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 │       ├── test-session-store.js
 │       ├── test-prompt-builder.js
 │       ├── test-fallback.js
+│       ├── test-action-plan.js
 │       ├── test-extractor.js
 │       ├── test-validator.js
 │       └── test-grounding.js   # gates the shipped Grounding Corpus itself
