@@ -191,6 +191,8 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 | 0010 | Two-layer grounding validation — authoring-time rule checks + runtime structural checks | [0010-two-layer-grounding-validation.md](adr/0010-two-layer-grounding-validation.md) |
 | 0011 | Versioned Session storage in localStorage | [0011-versioned-session-storage.md](adr/0011-versioned-session-storage.md) |
 | 0012 | Multiple-choice only — no free-text, no prompt-injection surface | [0012-multiple-choice-only.md](adr/0012-multiple-choice-only.md) |
+| 0013 | AST Risk registry is a code-side table, not corpus-derived | [0013-ast-registry-code-side.md](adr/0013-ast-registry-code-side.md) |
+| 0014 | No bootstrap seam for the corpus load; hand-off lives at the Action Plan interface | [0014-no-bootstrap-seam.md](adr/0014-no-bootstrap-seam.md) |
 
 ---
 
@@ -240,7 +242,7 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
     ├── architecture.md
     ├── TESTING.md
     ├── owasp-ast-full.md       # Grounding Corpus
-    ├── adr/                    # 0001–0012, one decision per note
+    ├── adr/                    # 0001–0014, one decision per note
     └── agents/                 # issue-tracker, triage-labels, domain consumer rules
 ```
 

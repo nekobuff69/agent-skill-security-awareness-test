@@ -86,7 +86,7 @@ Domain vocabulary for the Agent Skills Security Self-assessment — extracted fr
 
 ## OWASP AST Risks
 
-Canonical names and severities as titled in the Grounding Corpus (`docs/owasp-ast-full.md`). A Question's Severity inherits from the AST Risks it maps to. Severity is metadata and prompt data — it never renders in the Risk Radar or Blind-Spot Bars.
+Canonical names and severities as titled in the Grounding Corpus (`docs/owasp-ast-full.md`). In code, the id/name/severity tables live once in the AST Risk registry (`js/ast.js`) — see ADR 0013. A Question's Severity inherits from the AST Risks it maps to. Severity is metadata and prompt data — it never renders in the Risk Radar or Blind-Spot Bars.
 
 | Term                              | Severity | Definition                                                       |
 | --------------------------------- | -------- | ---------------------------------------------------------------- |
