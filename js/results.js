@@ -469,7 +469,7 @@
 
     // Engaging heading + supporting line
     wrap.appendChild(el('h3', { className: 'results-deep-dive-heading', textContent: 'Want to go deeper?' }));
-    wrap.appendChild(el('p', { className: 'results-deep-dive-sub', textContent: 'Copy this into your agent chat \u2014 it turns your agent into a private security tutor for your exact blind spots.' }));
+    wrap.appendChild(el('p', { className: 'results-deep-dive-sub', textContent: 'Copy this into your agent chat: it turns your agent into a private security tutor for your exact blind spots.' }));
 
     var details = el('details', { className: 'results-prompt-details' });
     var summary = el('summary', { className: 'results-prompt-summary' }, [

@@ -86,7 +86,7 @@
     if (snippets.length === 0) return 'display gaps in your security posture';
     if (snippets.length === 1) return 'choose ' + snippets[0] + ', which indicates limited security awareness';
     var last = snippets.pop();
-    return 'choose options like ' + snippets.join(', ') + ', and ' + last + ' — choices that reflect limited security awareness';
+    return 'choose options like ' + snippets.join(', ') + ', and ' + last + ', all of which reflect limited security awareness';
   }
 
   /**
@@ -165,7 +165,7 @@
         priority: i + 1,
         title: deriveTitle(bank, astId),
         description: description,
-        ast_source: astId + ' \u2014 ' + riskName
+        ast_source: astId + ': ' + riskName
       });
     }
     return actions;
@@ -188,7 +188,7 @@
 
     if (weakIds.length === 0) {
       return {
-        narrative: 'Your overall score is ' + (report.percentage || 0) + '%. All AST risk areas are at or above 70% — no critical gaps identified.',
+        narrative: 'Your overall score is ' + (report.percentage || 0) + '%. All AST risk areas are at or above 70%, so no critical gaps were identified.',
         actions: []
       };
     }
