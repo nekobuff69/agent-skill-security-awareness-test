@@ -169,7 +169,9 @@ def validate_variant_equivalence(source, variant, source_label, variant_label):
     satisfy while having drifted: a translated file with one re-weighted
     Question still sums to Total Possible if another moved the other way.
     This compares every language-independent field against the source bank,
-    so scoring drift is named rather than absorbed.
+    so scoring drift is named rather than absorbed — including the order of the
+    Question array, which is part of the structure even though it is invisible
+    to an id-keyed comparison.
 
     Only structural and scoring fields are compared. Authored text is the one
     thing a variant is allowed to differ on, and its currency is not
@@ -190,6 +192,27 @@ def validate_variant_equivalence(source, variant, source_label, variant_label):
         "Variant covers the same Question ids as the source bank",
         not only_src and not only_var,
         f"only in source: {only_src}; only in variant: {only_var}",
+    ))
+
+    # Question array ORDER is semantic, and every check below compares
+    # id-keyed dictionaries, so none of them can see it. Scoring resolves a
+    # stored Session positionally against questions[i] and never looks a
+    # Question up by id, so a Variant that reorders them silently
+    # re-attributes every answer a Participant gave in that language.
+    src_order = [q.get("id") for q in source.get("questions", [])]
+    var_order = [q.get("id") for q in variant.get("questions", [])]
+    first_diff = next(
+        (i for i in range(max(len(src_order), len(var_order)))
+         if src_order[i:i + 1] != var_order[i:i + 1]),
+        None,
+    )
+    results.append(detail(
+        "Question array order matches the source bank",
+        first_diff is None,
+        f"first divergence at index {first_diff}: "
+        f"source {src_order[first_diff:first_diff + 1]} vs "
+        f"variant {var_order[first_diff:first_diff + 1]}"
+        if first_diff is not None else "",
     ))
 
     for qid in sorted(set(src_questions) & set(var_questions)):

@@ -99,6 +99,12 @@
     // untranslated Chrome Strings.
     app.I18n.use(document.documentElement.lang);
     document.title = t('doc.title');
+
+    // First-visit language routing, before the bank loads — it needs no
+    // assessment content and should not wait on it.
+    if (app.LangRouting && typeof app.LangRouting.init === 'function') {
+      app.LangRouting.init();
+    }
     loadBank();
   });
 

@@ -5,9 +5,10 @@
    attribute, so the switcher works identically at the site root and at /zh/
    without any path arithmetic in JavaScript.
 
-   Deliberately no auto-detection and no redirect: a visitor who arrives at a
-   language they do not read navigates away through this control, and never
-   sees the page flash into another language first. ──────────────────────────── */
+   Routing is handled in js/lang-routing.js, not here: a visitor whose browser
+   primary language names a page this one does not offer is taken there before
+   the bank loads, and anyone else gets the dismissible offer below once. The
+   switcher stays the override — it is the only control that always works. ── */
 
 .lang-switch {
   display: inline-flex;
@@ -46,4 +47,73 @@
 .quiz-chrome .lang-switch {
   margin-left: auto;
   flex-shrink: 0;
+}
+
+/* ── First-visit language offer ────────────────────────────────────────────────
+
+   Non-blocking by construction: it sits above the title on the Landing Page,
+   states the other language, and can be dismissed for good. It never covers
+   content and never gates the Start control underneath it. ──────────────── */
+
+.lang-offer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+.lang-offer-accept,
+.lang-offer-dismiss {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.lang-offer-accept {
+  color: var(--color-accent);
+  background: none;
+  border: 1px solid var(--color-accent);
+  text-decoration: none;
+}
+
+.lang-offer-accept:hover {
+  background: var(--color-accent);
+  color: var(--color-bg);
+}
+
+.lang-offer-dismiss {
+  color: var(--color-text-muted);
+  background: none;
+  border: 1px solid transparent;
+}
+
+.lang-offer-dismiss:hover {
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.lang-offer-accept:focus-visible,
+.lang-offer-dismiss:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lang-offer-accept,
+  .lang-offer-dismiss {
+    transition: none;
+  }
 }

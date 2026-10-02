@@ -137,6 +137,7 @@ Schema validation runs each Bank Variant **on its own terms**. That is necessary
 | Compared | Rule |
 |---|---|
 | Question ids | The Variant covers exactly the source bank's set |
+| Question array order | Identical, position for position. **The one structural field no id-keyed comparison can see.** Scoring resolves a stored Session against `questions[i]` and never looks a Question up by id, so a Variant that reorders the array silently re-attributes every answer a Participant gave in that language. The failure names the first index where the two orders diverge. Ordering both banks identically is not a mismatch |
 | `phase`, `severity_weight`, `ast_source_url` | Identical per Question |
 | `ast_risks` | Same set per Question |
 | Option `score` list | Identical **and in the same order** — the index is what an answer selects |
@@ -348,7 +349,9 @@ Zero-dependency runner over the JS modules (pure functions, no browser). Discove
 | Module test | Asserts |
 |---|---|
 | `test-scoring.js` | Fixtures (all-zero 2.8%/Uncharted, all-best 100%/Sentinel, common-user, security-aware), 108 Total Possible, Multi-Mapping aggregation, graceful error states, weakest questions, ranked views (`astRanked` weakest-first with AST-ID tie-break, `blindSpotIds` = AST Risks below 70%) |
-| `test-session-store.js` | Save/load roundtrip; the structural hash is identical across Bank Variants and changes on Question reorder / Option re-score / Severity Weight change but not on rewording; stale-hash soft reset; corrupt/empty storage; answer-payload validation; migration from the ADR-0016 language-scoped keys (most-advanced record wins, legacy keys deleted, live record never overwritten) |
+| `test-session-store.js` | Save/load roundtrip; the structural hash is identical across Bank Variants and changes on Question reorder / Option re-score / Severity Weight change but not on rewording; stale-hash soft reset; corrupt/empty storage; answer-payload validation; migration from the ADR-0016 language-scoped keys (most-advanced record wins, legacy keys deleted, live record never overwritten); `exists()` reports a Session without a bank |
+| `test-lang-pref.js` | Language Preference roundtrip and tag normalization, pinned against the dictionary normalizer on every tag; dismissals accumulate once and are per-prompt; independence from the Session lifecycle and survival of a stale-Session reset; corrupt and wrongly-typed stored data degrade to a usable shape; every operation survives unavailable storage |
+| `test-lang-routing.js` | Automatic routing on a strong signal, including tag variants and the mirror-image page; a recorded preference, an in-progress Session, an unknown browser language and a single-language page each suppress it; a failure degrades silently; the offer is due only for a browser language that is neither offered page, is suppressed by a choice or a dismissal, renders the alternate link, and records accept/dismiss (ADR-0018) |
 | `test-prompt-builder.js` | Four sections in order, ≤ 3000 chars, Weakest Questions carried, weakest-first profile order from `astRanked` |
 | `test-fallback.js` | Schema parity with LLM output, weakest-first ordering from `blindSpotIds`, valid AST attribution |
 | `test-action-plan.js` | Path decision and retry policy at the module seam: no proxy / no corpus → fallback, LLM success → pass-through, one retry then fallback (ADR-0009), thrown adapter → fallback |

@@ -208,6 +208,25 @@
     }
   }
 
-  globalThis.App.SessionStore = { hashBank: hashBank, load: load, save: save, clear: clear };
+  /**
+   * Whether a Session record exists at all, without validating it against a
+   * bank.
+   *
+   * First-visit routing has to decide before the Question Bank has loaded,
+   * and a Participant who has already started must not be moved. It needs to
+   * know that a record exists, not what is in it — validity is the bank
+   * load's business.
+   */
+  function exists() {
+    try {
+      return localStorage.getItem(KEY) !== null;
+    } catch (e) {
+      // unavailable — swallow silently
+      return false;
+    }
+  }
+
+
+  globalThis.App.SessionStore = { hashBank: hashBank, load: load, save: save, clear: clear, exists: exists };
   if (typeof module !== 'undefined') module.exports = globalThis.App.SessionStore;
 })(globalThis);

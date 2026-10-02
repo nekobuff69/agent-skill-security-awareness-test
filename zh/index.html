@@ -1,9 +1,26 @@
 <!DOCTYPE html>
-<html lang="zh-Hans" data-bank="../questions.zh.json" data-corpus="../docs/owasp-ast-full.md" data-lang-alt="../">
+<html lang="zh-Hans" data-bank="../questions.zh.json" data-corpus="../docs/owasp-ast-full.md" data-lang-alt="../" data-lang-alt-locale="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>智能体安全意识测评</title>
+
+  <!-- The same assessment in Simplified Chinese. Kept in step with the
+       English page by hand: both declare both variants, so neither can end up
+       claiming to be the only one. -->
+  <link rel="canonical" href="/zh/">
+  <link rel="alternate" hreflang="en" href="/">
+  <link rel="alternate" hreflang="zh-Hans" href="/zh/">
+  <link rel="alternate" hreflang="x-default" href="/">
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="智能体安全意识测评">
+  <meta property="og:description" content="二十道题，看清一个不可信的智能体技能，究竟能对你做什么。">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="智能体安全意识测评">
+  <meta name="twitter:description" content="二十道题，看清一个不可信的智能体技能，究竟能对你做什么。">
   <link rel="stylesheet" href="../styles.css">
   <link rel="stylesheet" href="../css/quiz.css">
   <link rel="stylesheet" href="../css/results.css">
@@ -26,6 +43,8 @@
   <script src="../js/ast.js"></script>
   <script src="../js/scoring.js"></script>
   <script src="../js/session-store.js"></script>
+  <script src="../js/lang-pref.js"></script>
+  <script src="../js/lang-routing.js"></script>
   <script src="../js/prompt-builder.js"></script>
   <script src="../js/fallback.js"></script>
   <script src="../js/extractor.js"></script>

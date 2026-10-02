@@ -33,6 +33,16 @@
     a.title = t('lang.switchLabel');
     a.setAttribute('aria-label', t('lang.switchLabel'));
     a.textContent = t('lang.otherName');
+
+    // Using the switch is a decision, and recording it is what stops
+    // first-visit routing from sending the Participant straight back to the
+    // page they just left (ADR 0018).
+    if (app.LangPref && typeof app.LangPref.setLanguage === 'function') {
+      a.addEventListener('click', function() {
+        app.LangPref.setLanguage(
+          document.documentElement.getAttribute('data-lang-alt-locale'));
+      });
+    }
     return a;
   }
 
@@ -350,6 +360,12 @@
     // Language switcher: the other language is one click away, and switching
     // keeps the Session the Participant already started in this one.
     landing.appendChild(langSwitch());
+
+    // A Participant who arrived in a language they may not read gets one
+    // dismissible offer of the other, ahead of everything else on the page.
+    if (app.LangRouting && typeof app.LangRouting.offerInto === 'function') {
+      app.LangRouting.offerInto(landing);
+    }
 
     landing.appendChild(makeEl('h1', null, meta.title || t('landing.titleFallback')));
     landing.appendChild(makeEl('p', 'subtitle', meta.subtitle || t('landing.subtitleFallback')));

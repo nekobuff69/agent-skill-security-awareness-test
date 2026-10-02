@@ -25,6 +25,7 @@ Domain vocabulary for the Agent Skills Security Self-assessment — extracted fr
 | **Session**     | One quiz attempt persisted locally under the single key `quiz-session`, shared by every Bank Variant and versioned by the bank's structural hash — Question order, Option Scores, Severity Weights, AST Risk mappings, Phase membership — never by authored text | Saved answers, localStorage state, per-language Session |
 | **Completion**  | The moment all Questions are answered; triggers scoring and the Action Plan request  | Finish, submission         |
 | **Retake**      | The results-page control that clears the Session and returns to the landing view     | Restart, redo              |
+| **Language Preference** | The Participant's remembered language choice and the set of first-visit prompts they have dismissed, held under `quiz-lang` independently of their Session — never version-stamped, never reset by a Question Bank change | Locale setting, language cookie, per-language state |
 
 ## Quiz experience
 

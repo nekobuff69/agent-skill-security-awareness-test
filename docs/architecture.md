@@ -207,6 +207,7 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 | 0015 | Chrome Strings and Bank Variants — narrow the single-source rule to content; interface copy is a dictionary, a missing id throws | [0015-chrome-strings-and-bank-variants.md](adr/0015-chrome-strings-and-bank-variants.md) |
 | 0016 | Language-scoped Session storage — `quiz-session:<language>` — **superseded by 0017** | [0016-language-scoped-session-storage.md](adr/0016-language-scoped-session-storage.md) |
 | 0017 | Universal Session storage — one `quiz-session` record shared by every Bank Variant; the version stamp hashes bank structure, never authored text | [0017-universal-session-storage.md](adr/0017-universal-session-storage.md) |
+| 0018 | First-visit language routing — a Language Preference stored apart from the Session, automatic routing on a strong browser-language signal, and a dismissible offer otherwise | [0018-first-visit-language-routing.md](adr/0018-first-visit-language-routing.md) |
 
 ---
 
@@ -230,7 +231,7 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 │   ├── results.css
 │   ├── theme-surya.css   # editorial skin, linked last as override layer
 │   ├── cjk.css          # CJK typography, gated on html[lang^="zh"] (zh page only)
-│   └── lang-switch.css   # language route control
+│   └── lang-switch.css   # language switch + first-visit offer (ADR-0018)
 ├── js/
 │   ├── analytics.js      # analytics helpers
 │   ├── ast.js            # AST Risk registry — canonical ids + severities; display names are Chrome Strings (ADR-0013, ADR-0015)
@@ -239,6 +240,8 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 │   ├── quiz.js           # quiz chrome, question cards, back nav, localStorage
 │   ├── scoring.js        # deterministic scoring, title lookup, ranked views
 │   ├── session-store.js  # one Session per Participant, structural-hash versioned (ADR-0017)
+│   ├── lang-pref.js      # remembered language choice + prompt dismissals (ADR-0018)
+│   ├── lang-routing.js   # first-visit routing decision + offer rendering (ADR-0018)
 │   ├── prompt-builder.js # Deep-Dive Prompt assembly
 │   ├── fallback.js       # deterministic fallback from bank
 │   ├── extractor.js      # OWASP excerpt extraction
@@ -272,7 +275,7 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
     ├── architecture.md
     ├── TESTING.md
     ├── owasp-ast-full.md       # Grounding Corpus
-    ├── adr/                    # 0001–0017, one decision per note
+    ├── adr/                    # 0001–0018, one decision per note
     └── agents/                 # issue-tracker, triage-labels, domain consumer rules
 ```
 

@@ -1,9 +1,30 @@
 <!DOCTYPE html>
-<html lang="en" data-bank="questions.json" data-corpus="docs/owasp-ast-full.md" data-lang-alt="zh/">
+<html lang="en" data-bank="questions.json" data-corpus="docs/owasp-ast-full.md" data-lang-alt="zh/" data-lang-alt-locale="zh">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Agent Security Awareness Quiz</title>
+
+  <!-- Language relationships: one assessment in two languages, so the two
+       URLs are declared as variants of each other rather than competing.
+       Host-relative, so they are correct on whatever origin this is served
+       from. -->
+  <link rel="canonical" href="/">
+  <link rel="alternate" hreflang="en" href="/">
+  <link rel="alternate" hreflang="zh-Hans" href="/zh/">
+  <link rel="alternate" hreflang="x-default" href="/">
+
+  <!-- Share preview. Authored here rather than resolved from the dictionary:
+       a preview is read by crawlers that never run the page's JavaScript, so
+       it has to exist in the static document. -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Agent Security Awareness Quiz">
+  <meta property="og:description" content="Twenty questions on the OWASP Agentic Skills Top 10 — find out what an untrusted agent skill can actually do to you.">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="zh_CN">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Agent Security Awareness Quiz">
+  <meta name="twitter:description" content="Twenty questions on the OWASP Agentic Skills Top 10 — find out what an untrusted agent skill can actually do to you.">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="css/quiz.css">
   <link rel="stylesheet" href="css/results.css">
@@ -25,6 +46,8 @@
   <script src="js/ast.js"></script>
   <script src="js/scoring.js"></script>
   <script src="js/session-store.js"></script>
+  <script src="js/lang-pref.js"></script>
+  <script src="js/lang-routing.js"></script>
   <script src="js/prompt-builder.js"></script>
   <script src="js/fallback.js"></script>
   <script src="js/extractor.js"></script>
