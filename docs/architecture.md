@@ -43,10 +43,10 @@ questions.json — or a Bank Variant, e.g. questions.zh.json (each loaded once)
     │              all updating in place), question cards (Q-number chip,
     │              labeled Scenario/Question blocks, A–D-lettered Options),
     │              Back Navigation (← Previous, re-answer overwrites)
-    │     collects: option selections → {question_id: option_index}
-    │     stores: localStorage quiz-session:<language> {v: bank-content-hash,
-    │            answers} — per language, so switching locale never discards
-    │            an in-progress Session (ADR 0016)
+    │     collects: option selections → answers: option_index, one per Question
+    │     stores: localStorage quiz-session {v: structural-hash, answers} —
+    │            one Session per Participant, shared by every Bank Variant,
+    │            so switching language resumes in place (ADR 0017)
     │
     ├─→ Scoring Engine
     │     reads: questions[].options[].score, questions[].severity_weight,
@@ -200,12 +200,13 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 | 0008 | OpenAI-compatible wire format — one code path, many providers | [0008-openai-compatible-single-wire.md](adr/0008-openai-compatible-single-wire.md) |
 | 0009 | Deterministic Fallback from the bank when the LLM Path is unavailable | [0009-deterministic-fallback-from-bank.md](adr/0009-deterministic-fallback-from-bank.md) |
 | 0010 | Two-layer grounding validation — authoring-time rule checks + runtime structural checks | [0010-two-layer-grounding-validation.md](adr/0010-two-layer-grounding-validation.md) |
-| 0011 | Versioned Session storage in localStorage — **superseded by 0016** (key shape only) | [0011-versioned-session-storage.md](adr/0011-versioned-session-storage.md) |
+| 0011 | Versioned Session storage in localStorage — **superseded by 0017** (the version stamp is now structural, and the key is unscoped) | [0011-versioned-session-storage.md](adr/0011-versioned-session-storage.md) |
 | 0012 | Multiple-choice only — no free-text, no prompt-injection surface | [0012-multiple-choice-only.md](adr/0012-multiple-choice-only.md) |
 | 0013 | AST Risk registry is a code-side table, not corpus-derived | [0013-ast-registry-code-side.md](adr/0013-ast-registry-code-side.md) |
 | 0014 | No bootstrap seam for the corpus load; hand-off lives at the Action Plan interface | [0014-no-bootstrap-seam.md](adr/0014-no-bootstrap-seam.md) |
 | 0015 | Chrome Strings and Bank Variants — narrow the single-source rule to content; interface copy is a dictionary, a missing id throws | [0015-chrome-strings-and-bank-variants.md](adr/0015-chrome-strings-and-bank-variants.md) |
-| 0016 | Language-scoped Session storage — `quiz-session:<language>`; hash versioning unchanged | [0016-language-scoped-session-storage.md](adr/0016-language-scoped-session-storage.md) |
+| 0016 | Language-scoped Session storage — `quiz-session:<language>` — **superseded by 0017** | [0016-language-scoped-session-storage.md](adr/0016-language-scoped-session-storage.md) |
+| 0017 | Universal Session storage — one `quiz-session` record shared by every Bank Variant; the version stamp hashes bank structure, never authored text | [0017-universal-session-storage.md](adr/0017-universal-session-storage.md) |
 
 ---
 
@@ -237,7 +238,7 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 │   ├── main.js           # app bootstrap, view router
 │   ├── quiz.js           # quiz chrome, question cards, back nav, localStorage
 │   ├── scoring.js        # deterministic scoring, title lookup, ranked views
-│   ├── session-store.js  # versioned localStorage session, key scoped by language (ADR-0016)
+│   ├── session-store.js  # one Session per Participant, structural-hash versioned (ADR-0017)
 │   ├── prompt-builder.js # Deep-Dive Prompt assembly
 │   ├── fallback.js       # deterministic fallback from bank
 │   ├── extractor.js      # OWASP excerpt extraction
@@ -271,7 +272,7 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
     ├── architecture.md
     ├── TESTING.md
     ├── owasp-ast-full.md       # Grounding Corpus
-    ├── adr/                    # 0001–0016, one decision per note
+    ├── adr/                    # 0001–0017, one decision per note
     └── agents/                 # issue-tracker, triage-labels, domain consumer rules
 ```
 
@@ -290,8 +291,8 @@ npx wrangler pages deploy ./ --project-name=agent-security-quiz
 
 ## 6. Future Considerations (v2+)
 
-Multilingual delivery is built (ADR 0015, ADR 0016), so it is no longer an item here. What localization makes possible next, and what remains open:
+Multilingual delivery is built (ADR 0015, ADR 0017), so it is no longer an item here. What localization makes possible next, and what remains open:
 
 - **More languages.** Adding a language is now one bank file, one dictionary file, one page, and a stylesheet — no code changes and no build step. The gate picks up the new bank automatically. The open question is which language, and whether the Simplified Chinese AST Risk and Progression Title terminology sets are reviewed by a native speaker before a third set is coined (ADR 0015 verifies structure, not currency).
 - **Translation currency.** The one gap localization did not close: no check can tell whether a Bank Variant still says what its source bank says. A shared diff-review step or a per-language freshness signal is the candidate.
-- **Shareable result URLs**, retake tracking (ADR 0016 notes the storage shape can extend without changing the versioning mechanism), finer Grounding Corpus retrieval, an aggregate admin dashboard, and an embeddable widget for agent platform marketplaces.
+- **Shareable result URLs**, retake tracking (ADR 0017 notes the storage shape can extend without changing the versioning mechanism), finer Grounding Corpus retrieval, an aggregate admin dashboard, and an embeddable widget for agent platform marketplaces.

@@ -348,7 +348,7 @@ Zero-dependency runner over the JS modules (pure functions, no browser). Discove
 | Module test | Asserts |
 |---|---|
 | `test-scoring.js` | Fixtures (all-zero 2.8%/Uncharted, all-best 100%/Sentinel, common-user, security-aware), 108 Total Possible, Multi-Mapping aggregation, graceful error states, weakest questions, ranked views (`astRanked` weakest-first with AST-ID tie-break, `blindSpotIds` = AST Risks below 70%) |
-| `test-session-store.js` | Save/load roundtrip, stale-hash soft reset, corrupt/empty storage |
+| `test-session-store.js` | Save/load roundtrip; the structural hash is identical across Bank Variants and changes on Question reorder / Option re-score / Severity Weight change but not on rewording; stale-hash soft reset; corrupt/empty storage; answer-payload validation; migration from the ADR-0016 language-scoped keys (most-advanced record wins, legacy keys deleted, live record never overwritten) |
 | `test-prompt-builder.js` | Four sections in order, ≤ 3000 chars, Weakest Questions carried, weakest-first profile order from `astRanked` |
 | `test-fallback.js` | Schema parity with LLM output, weakest-first ordering from `blindSpotIds`, valid AST attribution |
 | `test-action-plan.js` | Path decision and retry policy at the module seam: no proxy / no corpus → fallback, LLM success → pass-through, one retry then fallback (ADR-0009), thrown adapter → fallback |

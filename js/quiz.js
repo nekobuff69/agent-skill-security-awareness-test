@@ -241,7 +241,7 @@
 
   function persist() {
     if (!bank) return;
-    app.SessionStore.save(bank, answers, app.I18n.locale);
+    app.SessionStore.save(bank, answers);
   }
 
   /* ── Quiz completion ─────────────────────────────────────────────── */
@@ -312,16 +312,17 @@
     // Language switcher: the way out of a language the Participant does not read.
     chrome.appendChild(langSwitch());
 
-    // Session resume — scoped to this page's language, so a Participant who
-    // switches language mid-assessment returns to their answers intact.
-    var session = app.SessionStore.load(bank, app.I18n.locale);
+    // Session resume — one Session per Participant, shared by every Bank
+    // Variant, so a Participant who switches language mid-assessment returns
+    // to their answers intact.
+    var session = app.SessionStore.load(bank);
     if (session.ok) {
       answers = session.answers.slice();
     } else {
       for (var i = 0; i < questions.length; i++) answers.push(null);
       if (session.reason === 'stale') {
         showNotice(t('quiz.bankChanged'));
-        app.SessionStore.clear(app.I18n.locale);
+        app.SessionStore.clear();
       }
     }
 

@@ -498,7 +498,7 @@
   function buildRetake() {
     var btn = el('button', { className: 'results-retake-btn', textContent: t('results.retake') });
     btn.addEventListener('click', function() {
-      App.SessionStore.clear(App.I18n.locale);
+      App.SessionStore.clear();
       App.showView('landing-view');
     });
     return btn;
@@ -534,7 +534,7 @@
     reviewView.appendChild(el('h2', { className: 'results-section-title', textContent: t('results.reviewTitle') }));
 
     // Review accordion
-    var stored = App.SessionStore.load(_lastBank, App.I18n.locale);
+    var stored = App.SessionStore.load(_lastBank);
     var selections = stored.ok ? stored.answers : [];
     reviewView.appendChild(buildReview(_lastBank, selections));
   }

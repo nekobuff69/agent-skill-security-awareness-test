@@ -22,7 +22,7 @@ Domain vocabulary for the Agent Skills Security Self-assessment — extracted fr
 | --------------- | ------------------------------------------------------------------------------------ | -------------------------- |
 | **Participant** | The person taking the assessment                                                     | User, quiz-taker, respondent |
 | **Agent**       | The Participant's own AI coding app, where the Deep-Dive Prompt is pasted             | Assistant, bot             |
-| **Session**     | One quiz attempt persisted locally under the language-scoped key `quiz-session:<language>`, versioned by its Bank Variant's content hash | Saved answers, localStorage state |
+| **Session**     | One quiz attempt persisted locally under the single key `quiz-session`, shared by every Bank Variant and versioned by the bank's structural hash — Question order, Option Scores, Severity Weights, AST Risk mappings, Phase membership — never by authored text | Saved answers, localStorage state, per-language Session |
 | **Completion**  | The moment all Questions are answered; triggers scoring and the Action Plan request  | Finish, submission         |
 | **Retake**      | The results-page control that clears the Session and returns to the landing view     | Restart, redo              |
 
@@ -109,7 +109,7 @@ The ten names are a fixed terminology set per language, not text assembled per f
 
 - A **Question** belongs to exactly one **Phase** and maps to one or more **AST Risks**.
 - An **Option** belongs to exactly one **Question** and carries exactly one **Option Score**, one **Feedback**, and one letter badge (A–D).
-- A **Session** records exactly one **Option** per **Question**; a bank change version-stamps stale Sessions; **Back Navigation** re-answers overwrite in place and re-advance. Sessions are scoped per language — a **Bank Variant** keeps its own, so switching language never discards in-progress answers (ADR 0016).
+- A **Session** records exactly one **Option** per **Question**; a structural bank change version-stamps stale Sessions while authored-text changes do not; **Back Navigation** re-answers overwrite in place and re-advance. One **Participant** has one Session for the whole assessment — every **Bank Variant** reads and writes the same record, so switching language resumes in place rather than starting a second run, and rewriting prose never costs anyone their progress (ADR 0017).
 - The **Quiz Chrome** updates in place: the **Question Counter** shows the question being viewed, the **Progress Fill** shows answered/20, the **Phase Chip** swaps the Phase title — nothing stacks, nothing appends.
 - A **Completion** consumes one **Session**, produces exactly one **Progression Title** and one Action Plan request; the **Progress Fill** holds 100% for a beat before the hand-off.
 - A **Blind Spot** is one **Participant**'s low **AST Score** on one **AST Risk**; a Multi-Mapping Question feeds every mapped **AST Score**, so one bad answer can open two Blind Spots.
