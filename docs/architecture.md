@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-A single-page web app delivering a self-assessment quiz on AI agent skill security, grounded in the [OWASP Agentic Skills Top 10](https://owasp.org/www-project-agentic-skills-top-10/top10). Two-pass UX: answer all questions → see your profile → review with explanations.
+A no-build web app delivering a self-assessment quiz on AI agent skill security, grounded in the [OWASP Agentic Skills Top 10](https://owasp.org/www-project-agentic-skills-top-10/top10). Two-pass UX: answer all questions → see your profile → review with explanations. One codebase serves both shipped languages — an English page and a Simplified Chinese page — each declaring its own Question Bank and its own locale dictionary at the page level (ADR 0015).
 
 **Design philosophy:** Self-assessment, not knowledge test. Every option reflects a real behavioral choice. Scoring reveals blind spots, not trivia gaps. There are no letter grades — results render as a shareable risk radar and a progression title ("Sentinel", "Newcomer", …), because a mirror shows where you haven't looked yet, not what you failed.
 
@@ -12,20 +12,29 @@ A single-page web app delivering a self-assessment quiz on AI agent skill securi
 
 | File                | Role                                                                                           | Updated by     |
 | ------------------- | ---------------------------------------------------------------------------------------------- | -------------- |
-| `questions.json`    | Question Bank — source of truth for scenarios, Options, scoring, Feedback, Best Practices, OWASP sources | Content author |
+| `questions.json`    | Question Bank (English) — source of truth for scenarios, Options, scoring, Feedback, Best Practices, OWASP sources | Content author |
+| `questions.zh.json` | Bank Variant (Simplified Chinese) — structurally identical to the English bank; authored text only (ADR 0015) | Content author |
+| `i18n/en.js`<br>`i18n/zh.js` | Chrome String dictionaries — every user-visible interface string by id, plus the AST Risk display names. A missing id throws (ADR 0015) | Content author |
 | `docs/owasp-ast-full.md` | Full extracted OWASP AST content (~53 KB) — Grounding Corpus               | Content author |
 | `docs/architecture.md` | Overview, journey, deployment + ADR index; decisions live in `docs/adr/` | Developer      |
 | `docs/TESTING.md`   | Testing spec: schema validation, scoring fixtures, grounding rules                             | Developer      |
-| `run_tests.py`      | Stdlib-only Python runner implementing the testing spec                                        | Developer      |
+| `run_tests.py`      | Stdlib-only Python runner implementing the testing spec; discovers every `questions*.json`      | Developer      |
 
-`questions.json` is the **database**. Parsed at load time. No server-side database. Multiple-choice only — nothing the Participant authors reaches the LLM. Prompt-injection surface ≈ zero.
+Each page's bank is the **database**, declared by the page itself via `data-bank` on `<html>` and parsed at load. No server-side database. Multiple-choice only — nothing the Participant authors reaches the LLM. Prompt-injection surface ≈ zero.
 
 ### Runtime Data Flow
 
-Two `fetch()`es on page load — the Question Bank and the Grounding Corpus — parsed once, used everywhere:
+Two `fetch()`es on page load — the page's declared Question Bank and the Grounding Corpus — parsed once, used everywhere. The locale dictionary is not fetched: it is loaded as a `<script>` alongside the other modules and registers itself, so interface copy resolves at render time with no network round-trip:
 
 ```
-questions.json + docs/owasp-ast-full.md (each loaded once)
+<html lang="…" data-bank="questions.json" data-corpus="…" data-lang-alt="…">
+    │  the page declares its own bank, its corpus, and its language route
+    ├─→ App.I18n (js/i18n.js + i18n/<lang>.js)
+    │     selects the dictionary from document.documentElement.lang
+    │     resolves Chrome Strings by id — interface copy and AST Risk
+    │     display names; a missing id throws (no English fallback)
+    │
+questions.json — or a Bank Variant, e.g. questions.zh.json (each loaded once)
     │
     ├─→ Quiz Renderer
     │     reads: meta, phases[], questions[]
@@ -35,7 +44,9 @@ questions.json + docs/owasp-ast-full.md (each loaded once)
     │              labeled Scenario/Question blocks, A–D-lettered Options),
     │              Back Navigation (← Previous, re-answer overwrites)
     │     collects: option selections → {question_id: option_index}
-    │     stores: localStorage {v: bank-content-hash, answers} (survives refresh)
+    │     stores: localStorage quiz-session:<language> {v: bank-content-hash,
+    │            answers} — per language, so switching locale never discards
+    │            an in-progress Session (ADR 0016)
     │
     ├─→ Scoring Engine
     │     reads: questions[].options[].score, questions[].severity_weight,
@@ -76,7 +87,7 @@ questions.json + docs/owasp-ast-full.md (each loaded once)
                    └ ast_source_url (clickable OWASP link)
 ```
 
-**Key:** `questions.json` serves every consumer — rendering, scoring, results, the Deep-Dive Prompt, LLM grounding, Deterministic Fallback, and Review. No secondary content source at runtime.
+**Key:** each page's Question Bank serves every consumer — rendering, scoring, results, the Deep-Dive Prompt, LLM grounding, Deterministic Fallback, and Review. Interface copy is not in the bank: it is Chrome Strings resolved from the page's locale dictionary. There is no secondary source of assessment content (ADR 0015).
 
 ---
 
@@ -159,7 +170,7 @@ questions.json + docs/owasp-ast-full.md (each loaded once)
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Copy is data.** All landing page and results strings — question count, time estimate, `<title>` — derive from `questions.json` `meta` at render time.
+**Copy is data — and copy is split.** Assessment content (question count, time estimate, app title, subtitle, Phase heading, Progression Title names) still derives from the page's Question Bank `meta` at render time, so a bank edit updates the whole page. Everything else the interface says — button labels, Quiz Chrome text, the soft-reset notice, Deterministic Fallback prose, AST Risk display names — is a **Chrome String** resolved by id from `i18n/<lang>.js`. Neither source is a code literal, and the client config still carries only infrastructure values (ADR 0015).
 
 **Key UX decisions:**
 
@@ -180,7 +191,7 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 | # | Decision | File |
 |---|---|---|
 | 0001 | Vanilla static — no build step, no framework | [0001-vanilla-static-no-build.md](adr/0001-vanilla-static-no-build.md) |
-| 0002 | Question Bank as single source of truth | [0002-question-bank-single-source.md](adr/0002-question-bank-single-source.md) |
+| 0002 | Question Bank as single source of truth — **superseded by 0015** (survives for content) | [0002-question-bank-single-source.md](adr/0002-question-bank-single-source.md) |
 | 0003 | Deterministic scoring — Option Score × Severity Weight, per-AST aggregates | [0003-deterministic-scoring.md](adr/0003-deterministic-scoring.md) |
 | 0004 | Progression Titles replace letter grades | [0004-progression-titles-replace-grades.md](adr/0004-progression-titles-replace-grades.md) |
 | 0005 | Risk Radar as shareable hero artifact | [0005-risk-radar-shareable-hero.md](adr/0005-risk-radar-shareable-hero.md) |
@@ -189,33 +200,44 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 | 0008 | OpenAI-compatible wire format — one code path, many providers | [0008-openai-compatible-single-wire.md](adr/0008-openai-compatible-single-wire.md) |
 | 0009 | Deterministic Fallback from the bank when the LLM Path is unavailable | [0009-deterministic-fallback-from-bank.md](adr/0009-deterministic-fallback-from-bank.md) |
 | 0010 | Two-layer grounding validation — authoring-time rule checks + runtime structural checks | [0010-two-layer-grounding-validation.md](adr/0010-two-layer-grounding-validation.md) |
-| 0011 | Versioned Session storage in localStorage | [0011-versioned-session-storage.md](adr/0011-versioned-session-storage.md) |
+| 0011 | Versioned Session storage in localStorage — **superseded by 0016** (key shape only) | [0011-versioned-session-storage.md](adr/0011-versioned-session-storage.md) |
 | 0012 | Multiple-choice only — no free-text, no prompt-injection surface | [0012-multiple-choice-only.md](adr/0012-multiple-choice-only.md) |
 | 0013 | AST Risk registry is a code-side table, not corpus-derived | [0013-ast-registry-code-side.md](adr/0013-ast-registry-code-side.md) |
 | 0014 | No bootstrap seam for the corpus load; hand-off lives at the Action Plan interface | [0014-no-bootstrap-seam.md](adr/0014-no-bootstrap-seam.md) |
+| 0015 | Chrome Strings and Bank Variants — narrow the single-source rule to content; interface copy is a dictionary, a missing id throws | [0015-chrome-strings-and-bank-variants.md](adr/0015-chrome-strings-and-bank-variants.md) |
+| 0016 | Language-scoped Session storage — `quiz-session:<language>`; hash versioning unchanged | [0016-language-scoped-session-storage.md](adr/0016-language-scoped-session-storage.md) |
 
 ---
 
 ## 5. Deployment
 
-├── index.html
+├── index.html               # English page — declares data-bank / data-lang-alt
+├── zh/
+│   └── index.html           # Simplified Chinese page — same app, Bank Variant
 ├── config.js
 ├── styles.css
 ├── design-dna-surya.json   # extracted Design DNA of the Surya reference site
-├── questions.json
+├── questions.json           # Question Bank (English)
+├── questions.zh.json        # Bank Variant (Simplified Chinese)
+├── i18n/
+│   ├── en.js                # Chrome String dictionary — English
+│   └── zh.js                # Chrome String dictionary — Simplified Chinese
 ├── AGENTS.md
 ├── UBIQUITOUS_LANGUAGE.md
 ├── css/
 │   ├── quiz.css
 │   ├── results.css
-│   └── theme-surya.css   # editorial skin, linked last as override layer
+│   ├── theme-surya.css   # editorial skin, linked last as override layer
+│   ├── cjk.css          # CJK typography, gated on html[lang^="zh"] (zh page only)
+│   └── lang-switch.css   # language route control
 ├── js/
 │   ├── analytics.js      # analytics helpers
-│   ├── ast.js            # AST Risk registry — canonical ids, names, severities (ADR-0013)
+│   ├── ast.js            # AST Risk registry — canonical ids + severities; display names are Chrome Strings (ADR-0013, ADR-0015)
+│   ├── i18n.js          # Chrome String resolution — dictionary select by lang, t(), throws on missing id (ADR-0015)
 │   ├── main.js           # app bootstrap, view router
 │   ├── quiz.js           # quiz chrome, question cards, back nav, localStorage
 │   ├── scoring.js        # deterministic scoring, title lookup, ranked views
-│   ├── session-store.js  # versioned localStorage session
+│   ├── session-store.js  # versioned localStorage session, key scoped by language (ADR-0016)
 │   ├── prompt-builder.js # Deep-Dive Prompt assembly
 │   ├── fallback.js       # deterministic fallback from bank
 │   ├── extractor.js      # OWASP excerpt extraction
@@ -234,6 +256,8 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 │       ├── test-action-plan.js
 │       ├── test-extractor.js
 │       ├── test-validator.js
+│       ├── test-i18n.js            # dictionary contract — missing id throws, no English fallback
+│       ├── test-action-plan-budget.js  # Action Plan prompt stays within llm.budget, trim ladder deterministic
 │       └── test-grounding.js   # gates the shipped Grounding Corpus itself
 ├── scripts/
 │   ├── preflight.sh
@@ -247,7 +271,7 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
     ├── architecture.md
     ├── TESTING.md
     ├── owasp-ast-full.md       # Grounding Corpus
-    ├── adr/                    # 0001–0014, one decision per note
+    ├── adr/                    # 0001–0016, one decision per note
     └── agents/                 # issue-tracker, triage-labels, domain consumer rules
 ```
 
@@ -266,4 +290,8 @@ npx wrangler pages deploy ./ --project-name=agent-security-quiz
 
 ## 6. Future Considerations (v2+)
 
-Multilingual question variants, shareable result URLs, retake tracking, finer Grounding Corpus retrieval, aggregate admin dashboard, embeddable widget for agent platform marketplaces.
+Multilingual delivery is built (ADR 0015, ADR 0016), so it is no longer an item here. What localization makes possible next, and what remains open:
+
+- **More languages.** Adding a language is now one bank file, one dictionary file, one page, and a stylesheet — no code changes and no build step. The gate picks up the new bank automatically. The open question is which language, and whether the Simplified Chinese AST Risk and Progression Title terminology sets are reviewed by a native speaker before a third set is coined (ADR 0015 verifies structure, not currency).
+- **Translation currency.** The one gap localization did not close: no check can tell whether a Bank Variant still says what its source bank says. A shared diff-review step or a per-language freshness signal is the candidate.
+- **Shareable result URLs**, retake tracking (ADR 0016 notes the storage shape can extend without changing the versioning mechanism), finer Grounding Corpus retrieval, an aggregate admin dashboard, and an embeddable widget for agent platform marketplaces.

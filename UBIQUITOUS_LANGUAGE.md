@@ -1,12 +1,13 @@
 # Ubiquitous Language
 
-Domain vocabulary for the Agent Skills Security Self-assessment — extracted from the design session, `docs/architecture.md`, `docs/TESTING.md`, `questions.json`, the OWASP Agentic Skills Top 10 corpus, and the post-redesign implementation rounds (UX redesign #13–#18, LLM pipeline hardening).
+Domain vocabulary for the Agent Skills Security Self-assessment — extracted from the design session, `docs/architecture.md`, `docs/TESTING.md`, `questions.json`, the OWASP Agentic Skills Top 10 corpus, the post-redesign implementation rounds (UX redesign #13–#18, LLM pipeline hardening), and the localization round (Bank Variants and Chrome Strings).
 
 ## Assessment content
 
 | Term                 | Definition                                                                                          | Aliases to avoid                    |
 | -------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| **Question Bank**    | The single source of truth for all assessment content, parsed at load; the app's only runtime database | Database, question set              |
+| **Question Bank**    | The source of truth for assessment *content* in one language, parsed at load; the app's only runtime content database | Database (bare), question set, secondary content source |
+| **Bank Variant**     | A Question Bank for one language, structurally identical to its sibling banks — same Question ids, Phase membership, AST Risk mappings, Option Scores, Severity Weights, and Title Ladder thresholds — differing only in authored text; the only content duplication the project permits (ADR 0015) | Translation file, locale bank, secondary content source, duplicate bank |
 | **Question**         | One assessed decision point: a Scenario, four Options, a Severity, a Best Practice, one or more AST Risks | Item, quiz question                 |
 | **Phase**            | One of the three thematic stages of the quiz (install trust / permissions / lifecycle)               | Section, part, step                 |
 | **Scenario**         | The realistic situation a Question presents before its Options                                      | Story, prompt (collides with LLM prompt) |
@@ -21,7 +22,7 @@ Domain vocabulary for the Agent Skills Security Self-assessment — extracted fr
 | --------------- | ------------------------------------------------------------------------------------ | -------------------------- |
 | **Participant** | The person taking the assessment                                                     | User, quiz-taker, respondent |
 | **Agent**       | The Participant's own AI coding app, where the Deep-Dive Prompt is pasted             | Assistant, bot             |
-| **Session**     | One quiz attempt persisted locally, versioned by the bank's content hash             | Saved answers, localStorage state |
+| **Session**     | One quiz attempt persisted locally under the language-scoped key `quiz-session:<language>`, versioned by its Bank Variant's content hash | Saved answers, localStorage state |
 | **Completion**  | The moment all Questions are answered; triggers scoring and the Action Plan request  | Finish, submission         |
 | **Retake**      | The results-page control that clears the Session and returns to the landing view     | Restart, redo              |
 
@@ -36,6 +37,7 @@ Domain vocabulary for the Agent Skills Security Self-assessment — extracted fr
 | **Question Card**    | The one-at-a-time card: Q-number chip, labeled Scenario and Question blocks, A–D-lettered Options | Quiz card, quiz page                 |
 | **Back Navigation**  | Back-only movement: ← Previous from the second Question onward; re-answering overwrites and re-advances | Forward skip (does not exist)        |
 | **Advance Transition** | The slide-up + fade card swap on answering; disabled under prefers-reduced-motion             | Animation, transition effect         |
+| **Chrome String** | A translatable interface string, resolved by id from the locale dictionary (`i18n/<lang>.js`) and kept strictly separate from Question Bank content; a missing id throws rather than falling back | Copy (bare), localized string, bank copy, display data, title (bare) |
 
 ## Scoring
 
@@ -57,8 +59,8 @@ Domain vocabulary for the Agent Skills Security Self-assessment — extracted fr
 
 | Term                  | Definition                                                                                       | Aliases to avoid              |
 | --------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------- |
-| **Progression Title** | The game-style tier a Completion yields: Sentinel, Practitioner, Aware, Newcomer, or Uncharted    | Grade, rank, level, badge     |
-| **Title Ladder**      | The five thresholds-and-names table in the bank's meta (`meta.scoring.titles`)                    | Grades table, grading curve   |
+| **Progression Title** | The game-style tier a Completion yields — Sentinel, Practitioner, Aware, Newcomer, or Uncharted in English; 守望者, 实干者, 觉察者, 新手, 未开垦 in Simplified Chinese | Grade, rank, level, badge |
+| **Title Ladder**      | The five thresholds-and-names table carried in each Bank Variant's meta (`meta.scoring.titles`); thresholds and emoji are identical across Variants, only the names are localized | Grades table, grading curve |
 | **Title Card**        | The results header showing the Progression Title, its emoji, and the Overall Percentage           | Score card, grade card        |
 | **Risk Radar**        | The ten-axis shareable SVG chart of AST Scores with AST-ID + percentage axis labels               | Radar chart, spider chart, infogram |
 | **Blind-Spot Bars**   | The horizontal AST Scores sorted weakest-first, full AST names + percentage                       | Gap bars, risk profile bars   |
@@ -86,7 +88,9 @@ Domain vocabulary for the Agent Skills Security Self-assessment — extracted fr
 
 ## OWASP AST Risks
 
-Canonical names and severities as titled in the Grounding Corpus (`docs/owasp-ast-full.md`). In code, the id/name/severity tables live once in the AST Risk registry (`js/ast.js`) — see ADR 0013. A Question's Severity inherits from the AST Risks it maps to. Severity is metadata and prompt data — it never renders in the Risk Radar or Blind-Spot Bars.
+Canonical names and severities as titled in the Grounding Corpus (`docs/owasp-ast-full.md`). In code, the **ids** and **severities** live once in the AST Risk registry (`js/ast.js`) — see ADR 0013; the **display names** are Chrome Strings resolved from the locale dictionary, so each surface reads them from one place rather than keeping its own table. A Question's Severity inherits from the AST Risks it maps to. Severity is metadata and prompt data — it never renders in the Risk Radar or Blind-Spot Bars.
+
+The ten names are a fixed terminology set per language, not text assembled per file. The Simplified Chinese set — 恶意技能 / 供应链入侵 / 权限过度的技能 / 不安全的元数据 / 不可信的外部指令 / 隔离不严 / 更新漂移 / 扫描不力 / 缺乏治理 / 跨平台复用 — is the deliberately chosen translation held in `i18n/zh.js` under ids `ast.AST01`…`ast.AST10`, and it is the single source for those terms. That is what keeps the Risk Radar, Blind-Spot Bars, Action Plan, Deterministic Fallback, and LLM Path prompt showing one consistent name per AST Risk: a **Bank Variant** supplies its own display names through its locale's dictionary and never re-declares them.
 
 | Term                              | Severity | Definition                                                       |
 | --------------------------------- | -------- | ---------------------------------------------------------------- |
@@ -105,7 +109,7 @@ Canonical names and severities as titled in the Grounding Corpus (`docs/owasp-as
 
 - A **Question** belongs to exactly one **Phase** and maps to one or more **AST Risks**.
 - An **Option** belongs to exactly one **Question** and carries exactly one **Option Score**, one **Feedback**, and one letter badge (A–D).
-- A **Session** records exactly one **Option** per **Question**; a bank change version-stamps stale Sessions; **Back Navigation** re-answers overwrite in place and re-advance.
+- A **Session** records exactly one **Option** per **Question**; a bank change version-stamps stale Sessions; **Back Navigation** re-answers overwrite in place and re-advance. Sessions are scoped per language — a **Bank Variant** keeps its own, so switching language never discards in-progress answers (ADR 0016).
 - The **Quiz Chrome** updates in place: the **Question Counter** shows the question being viewed, the **Progress Fill** shows answered/20, the **Phase Chip** swaps the Phase title — nothing stacks, nothing appends.
 - A **Completion** consumes one **Session**, produces exactly one **Progression Title** and one Action Plan request; the **Progress Fill** holds 100% for a beat before the hand-off.
 - A **Blind Spot** is one **Participant**'s low **AST Score** on one **AST Risk**; a Multi-Mapping Question feeds every mapped **AST Score**, so one bad answer can open two Blind Spots.
@@ -140,6 +144,9 @@ Canonical names and severities as titled in the Grounding Corpus (`docs/owasp-as
 ## Flagged ambiguities
 
 - **"title" still carries three meanings** — the app title (`meta.title`), the Phase heading (`phases[].title`), and the tier name (`meta.scoring.titles[]`). Domain term: **Progression Title**; say "app title" and "Phase heading" for the others, never bare "title".
+- **"copy is data" narrowed** — the retired blanket claim no longer holds. Assessment *content* is still the Bank's; interface copy is a **Chrome String** resolved from the locale dictionary, and "no secondary content source" now means no secondary *source of assessment content*. A **Bank Variant** is not a second source — it is the same content in another language (ADR 0015).
+- **"language" vs "locale" vs "translation"** — a **Bank Variant** is a whole Question Bank per language; the Chrome String dictionary is the per-language string table. Never call either a "translation file": the Variant is content, the dictionary is interface copy, and neither is generated at build time.
+- **AST Risk display names are not code and not bank content** — ids and severities are code (`js/ast.js`), display names are Chrome Strings. A hardcoded AST name in any `js/` module is a regression (ADR 0013 as narrowed by ADR 0015).
 - **"user" still forbidden** — **Participant** for the person assessed, **Agent** for their AI app.
 - **"score" is never bare** — Option Score, Weighted Score, AST Score, and Overall Percentage are four distinct numbers. Always qualify.
 - **"grade" is retired** — Progression Titles replaced it. Must not reappear.
