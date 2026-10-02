@@ -201,6 +201,18 @@ exports.run = function() {
   check('llm.budget is a positive number', typeof I18n.t('llm.budget') === 'number' &&
     I18n.t('llm.budget') > 0, String(I18n.t('llm.budget')));
 
+  // A Chinese Participant must not get a different guardrail from an English
+  // one — the same ceiling in both dictionaries.
+  // Requiring the dictionary registers it; it exports nothing of its own.
+  require(path.join(ROOT, 'i18n/zh.js'));
+  I18n.use('zh');
+  var zhLlmBudget = I18n.t('llm.budget');
+  var zhPromptBudget = I18n.t('prompt.budget');
+  I18n.use('en');
+  check('both languages enforce the same budgets',
+    zhLlmBudget === I18n.t('llm.budget') && zhPromptBudget === I18n.t('prompt.budget'),
+    zhLlmBudget + '/' + zhPromptBudget);
+
   // --- format() leaves unknown placeholders intact ---
 
   check('format() leaves an unsupplied placeholder intact',

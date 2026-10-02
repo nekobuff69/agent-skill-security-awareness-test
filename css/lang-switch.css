@@ -1,0 +1,49 @@
+/* ── Language switcher ────────────────────────────────────────────────────────
+
+   One control, two placements: the top of the landing view and the right-hand
+   end of the Quiz Chrome. The href comes from each page's data-lang-alt
+   attribute, so the switcher works identically at the site root and at /zh/
+   without any path arithmetic in JavaScript.
+
+   Deliberately no auto-detection and no redirect: a visitor who arrives at a
+   language they do not read navigates away through this control, and never
+   sees the page flash into another language first. ──────────────────────────── */
+
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--color-text-muted);
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.lang-switch:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+
+.lang-switch:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Landing view: sits above the app title, left-aligned with the content. */
+#landing-view > .lang-switch {
+  margin-bottom: var(--space-4);
+}
+
+/* Quiz Chrome: the last child, separated from the Phase Chip. The chip
+   truncates first, so the switcher keeps its place at the far end. */
+.quiz-chrome .lang-switch {
+  margin-left: auto;
+  flex-shrink: 0;
+}

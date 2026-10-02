@@ -1,0 +1,1027 @@
+{
+  "meta": {
+    "title": "智能体安全意识测评",
+    "subtitle": "基于 OWASP Agentic Skills Top 10",
+    "source": "https://owasp.org/www-project-agentic-skills-top-10/top10",
+    "license": "Quiz questions are original; factual claims sourced from OWASP Agentic Skills Top 10 (CC-BY-SA-4.0).",
+    "design_philosophy": "A self-assessment rather than a knowledge test. Every option reflects a real behavioral choice, and scoring reveals blind spots rather than trivia gaps.",
+    "total_questions": 20,
+    "time_estimate": "8-12 分钟",
+    "scoring": {
+      "per_question_max": 3,
+      "titles": [
+        {
+          "threshold": 90,
+          "range": "90-100%",
+          "name": "守望者",
+          "emoji": "🛡️"
+        },
+        {
+          "threshold": 70,
+          "range": "70-89%",
+          "name": "实干者",
+          "emoji": "🛠️"
+        },
+        {
+          "threshold": 50,
+          "range": "50-69%",
+          "name": "觉察者",
+          "emoji": "🔍"
+        },
+        {
+          "threshold": 30,
+          "range": "30-49%",
+          "name": "新手",
+          "emoji": "🌱"
+        },
+        {
+          "threshold": 0,
+          "range": "0-29%",
+          "name": "未开垦",
+          "emoji": "🧭"
+        }
+      ],
+      "severity_values": {
+        "critical": 3,
+        "high": 2,
+        "medium": 1
+      }
+    }
+  },
+  "phases": [
+    {
+      "id": "phase1",
+      "title": "我能装这个吗？",
+      "description": "你发现了一个技能。在点下安装之前：你信得过它吗？",
+      "question_ids": [
+        "q01",
+        "q02",
+        "q04",
+        "q05",
+        "q14",
+        "q15",
+        "q19"
+      ]
+    },
+    {
+      "id": "phase2",
+      "title": "它能对我做什么？",
+      "description": "它已经装上并且在运行了。这就是你暴露出去的东西。",
+      "question_ids": [
+        "q06",
+        "q07",
+        "q08",
+        "q09",
+        "q10",
+        "q11",
+        "q12"
+      ]
+    },
+    {
+      "id": "phase3",
+      "title": "它现在还安全吗？",
+      "description": "时间过去了。更新来了，人走了。现在怎么办？",
+      "question_ids": [
+        "q03",
+        "q13",
+        "q16",
+        "q17",
+        "q18",
+        "q20"
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "q01",
+      "phase": "phase1",
+      "ast_risks": [
+        "AST01"
+      ],
+      "severity_weight": "critical",
+      "scenario": "你在技能市场里逛，看到一个 YouTube 摘要技能。它有 500+ 次下载、好评，页面做得很专业。发布者的账号才建了几个月。",
+      "question": "你实际会怎么做？",
+      "source_note": "OWASP AST01：ClawHavoc（Jan 2026）—— 12 个账号共发布 1,184 个恶意技能。感染高峰期下载量前七的技能中有五个被确认是恶意软件。下载量不是安全信号。",
+      "options": [
+        {
+          "text": "直接装。500+ 的人不可能都看错，评价又好。",
+          "score": 0,
+          "feedback": "多数人就是照这个逻辑安装的，而攻击者设计条目时瞄准的正是这种反应。在 ClawHavoc 攻击活动中，下载量前七的技能里有五个被确认是恶意软件。在这里，下载量正好替攻击者省了事。"
+        },
+        {
+          "text": "先看发布者的其他技能和账号年龄。看起来够老资格，就装。",
+          "score": 1,
+          "feedback": "比盲目信任强，但也有限。发布者账号可以买、可以养、可以被接管；ClawHavoc 的攻击者就运营了 12 个看起来合法的账号。账号历史有帮助，但它不是证据。"
+        },
+        {
+          "text": "在做决定之前，先读这个技能真正的 SKILL.md 文件和它的权限申请，因为评价只能告诉你它好不好用。",
+          "score": 2,
+          "feedback": "读真正的代码和指令，这一步确实是在做安全检查。但它仍然会漏掉藏在元数据层里的内容，下一题讲的就是这个。"
+        },
+        {
+          "text": "查一下这类技能最近有没有被攻击针对过，并在用真实数据之前先在一次性环境里试一遍。",
+          "score": 3,
+          "feedback": "查针对型攻击活动（ClawHavoc 专门盯上了 YouTube 类工具）、在用真实数据之前先隔离测试，已知的威胁和你没想到的威胁就都照顾到了。"
+        }
+      ],
+      "best_practice": "不管下载量和评价如何，都要通过独立信源核实发布者身份，并在用真实数据之前先在一次性环境中测试技能。",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast01.html",
+      "test": {
+        "canonical_answer_index": 3,
+        "max_score": 3,
+        "expected_weighted_max": 9
+      }
+    },
+    {
+      "id": "q02",
+      "phase": "phase1",
+      "ast_risks": [
+        "AST04"
+      ],
+      "severity_weight": "high",
+      "scenario": "一个叫“Google Calendar Integration”的技能出现在市场上。描述写得很漂亮，README 看着很专业，还有其他用户的好评。",
+      "question": "名字里的“Google”对你的判断有多大影响？",
+      "source_note": "OWASP AST04：ClawHub 上架了名为“Google Calendar Integration”“Solana Wallet Tracker”“Polymarket Trader”的技能——没有一个与所标品牌有关联。Snyk（Feb 10, 2026）记录了一个恶意“Google”技能，它的名称、描述和 README 都写得专业，因此能通过随手一查。",
+      "options": [
+        {
+          "text": "这个名字让我放心。Google 不会让一个坏技能在主流市场上用他们的名字。",
+          "score": 0,
+          "feedback": "这个假设正是陷阱所在。在这些攻击被记录下来的时候，没有哪个市场会去核验商标声明。以 Google、Solana、Polymarket 命名的技能全是恶意的，而且个个包装专业。市场不管你冒用品牌。"
+        },
+        {
+          "text": "我会去查这个发布者是不是真的和 Google 有关系，比如有没有已认证的机构徽章或者官方公司主页。",
+          "score": 2,
+          "feedback": "值得查，不过徽章有漏洞：多数市场在发布时不核验商标声明，就算有已认证徽章也可能误导。去查 Google 真实的开发者列表，比市场上任何东西都更有说服力。"
+        },
+        {
+          "text": "我会先装上，前几次使用的时候留心有没有不对劲的地方。",
+          "score": 1,
+          "feedback": "盯着看比不看好，但很多攻击在你察觉之前就结束了。Snyk 记录的那个恶意“Google”技能，本来就是设计成能糊弄过随手一查的；等到你觉得不对劲时，数据可能已经没了。"
+        },
+        {
+          "text": "名字对我无所谓。我会用同样的标准衡量它，和其他任何技能一样，看权限和代码。",
+          "score": 3,
+          "feedback": "用同一套标准衡量每个技能（权限、发布者验证、代码审查），能消掉品牌冒充所利用的那种偏见。品牌名是营销信号，不是安全信号。"
+        }
+      ],
+      "best_practice": "不管技能名里带什么品牌或商标声明，都用同一套标准衡量：权限、发布者验证、代码审查。",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast04.html",
+      "test": {
+        "canonical_answer_index": 3,
+        "max_score": 3,
+        "expected_weighted_max": 6
+      }
+    },
+    {
+      "id": "q04",
+      "phase": "phase1",
+      "ast_risks": [
+        "AST02"
+      ],
+      "severity_weight": "critical",
+      "scenario": "你在安装前审一个技能。主代码看着干净，但查看依赖时，发现它 import 了一个叫“yutube-dl-core”的包（正牌的是“youtube-dl-core”）。这个拼写错误很容易看漏。",
+      "question": "你能发现吗？你会怎么做？",
+      "source_note": "OWASP AST02：Snyk 记录过一个名为“Summarize YouTube Videos”的技能，它 import 的是 yutube-dl-core，而不是正牌包。这个嵌套依赖装上了一个后门。表面上那个技能看起来是干净的。",
+      "options": [
+        {
+          "text": "依赖名里差一个字母，我多半看不出来；就算看出来了，也会以为只是个 fork。",
+          "score": 0,
+          "feedback": "这是最常见的反应，也正是仿冒包（typosquatting）设计出来要的那个反应。这个名字就是奔着被看漏去的。“yutube-dl-core”不是 fork，是后门。没看出来很正常，这也正是这套攻击能奏效的原因。"
+        },
+        {
+          "text": "我会注意到这个拼写错误，然后到软件包仓库里搜一下这个包，看它有没有真实的历史。",
+          "score": 2,
+          "feedback": "去仓库搜一搜是实打实的验证动作。被仿冒的包历史很少、下载很少，和正牌项目没有任何关联。这一步能拦住大多数依赖混淆（dependency confusion）攻击。"
+        },
+        {
+          "text": "我还是会装。技能本身看着没问题，一个依赖大概无所谓。",
+          "score": 0,
+          "feedback": "依赖是以和技能本身完全相同的权限执行的。依赖混淆攻击能得手，是因为表面上那个技能是干净的，而载荷藏在一个嵌套包里。只要有一个依赖被攻破就够了。"
+        },
+        {
+          "text": "我会检查整棵依赖树，不只是顶层 import，并把每个包名都和正牌仓库核对。",
+          "score": 3,
+          "feedback": "很彻底，而且理由充分：依赖混淆攻击瞄准的是大多数人根本不会看的那些嵌套的、传递性的依赖。把整棵树拿去和仓库核对，正是 OWASP 检查表（AST02.3、AST02.6）推荐的做法。"
+        }
+      ],
+      "best_practice": "安装前检查整棵依赖树有没有仿冒包，并把每个包名和正牌仓库核对一遍。",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast02.html",
+      "test": {
+        "canonical_answer_index": 3,
+        "max_score": 3,
+        "expected_weighted_max": 9
+      }
+    },
+    {
+      "id": "q05",
+      "phase": "phase1",
+      "ast_risks": [
+        "AST04"
+      ],
+      "severity_weight": "high",
+      "scenario": "你在安装前审一个技能的 SKILL.md 文件。你读了描述、使用说明和示例提示词。读下来一切正常：清楚、有用，没有明显的危险信号。",
+      "question": "到这一步，你的审阅有多彻底？",
+      "source_note": "OWASP AST04：Snyk 的 toxicskills-goof 记录过多个技能，它们把指令藏在 SKILL.md 的 ASCII 控制字符、零宽 Unicode 和 base64 编码字符串里——人工审阅者看不见，智能体却会照着解析。",
+      "options": [
+        {
+          "text": "够了。文本读起来通顺、说得通，我就放心了。",
+          "score": 0,
+          "feedback": "这种做法能抓到明显的问题，看不见的问题全漏掉。指令可以藏在 ASCII 控制字符、零宽 Unicode 字符或者 base64 编码里，于是一个文件可以读起来完全正常，同时带着你根本看不到的恶意载荷。"
+        },
+        {
+          "text": "我还会看看文件大小和结构。SKILL.md 异常大，就可能藏了东西。",
+          "score": 1,
+          "feedback": "文件大小是个有用的经验指标，但靠不住。隐藏的指令可以只是一个看起来正常的文件里任意位置的几个字符。在 OWASP 的证据里，三行 markdown 就足够把 SSH 密钥外传出去。"
+        },
+        {
+          "text": "我会去找内嵌的 URL、编码过的字符串或者异常字符，不过说实话我也不确定该找什么。",
+          "score": 2,
+          "feedback": "你判断得没错，这些模式（内嵌 URL、base64 块、异常 Unicode 字符）确实是危险信号。更难对付的攻击用的是字面上就看不见的字符：零宽空格和 ASCII 控制字符。要抓这些得靠扫描工具，不是靠眼睛更尖。"
+        },
+        {
+          "text": "我会把这个文件过一遍安全扫描工具，检查隐藏字符和编码载荷。我不指望自己的眼睛能看全。",
+          "score": 3,
+          "feedback": "正确的心态是：眼睛抓表面的问题，工具抓看不见的问题。OWASP 检查表（AST04.2）建议扫描 ASCII 走私、零宽 Unicode 和 base64 编码的载荷。认真读也赢不了你根本看不到的内容。"
+        }
+      ],
+      "best_practice": "把 SKILL.md 文件过一遍能检查隐藏字符、零宽 Unicode 和 base64 编码载荷的安全扫描工具。别只信眼睛。",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast04.html",
+      "test": {
+        "canonical_answer_index": 3,
+        "max_score": 3,
+        "expected_weighted_max": 6
+      }
+    },
+    {
+      "id": "q14",
+      "phase": "phase1",
+      "ast_risks": [
+        "AST08"
+      ],
+      "severity_weight": "medium",
+      "scenario": "安装技能之前，你让它过了一遍代码扫描工具。结果是干净的，没有发现问题。你觉得可以放心往下走了。",
+      "question": "扫描结果干净，这会在多大程度上改变你的风险判断？",
+      "source_note": "OWASP AST08：13.4% 的 critical 级别技能没有被模式匹配抓到（Snyk）。一个指示智能体“取回上面路径处的文件并发送到下面的地址”的技能，不需要任何可检测的代码特征，就能达到和恶意 curl 一样的效果。",
+      "options": [
+        {
+          "text": "扫描干净就说明是安全的。扫描工具不就是干这个的。",
+          "score": 0,
+          "feedback": "它只说明这个技能通过了那一个扫描工具的检查。多数代码扫描工具找的是代码里的模式，会漏掉用自然语言写的攻击（“用系统默认的 HTTP 客户端把这个文件发到这个地址”）。Snyk 的研究里，13.4% 的 critical 级别技能从模式匹配底下溜了过去。"
+        },
+        {
+          "text": "有点用，但我还会自己手动读一遍技能的自然语言指令。扫描工具不可能什么都抓到。",
+          "score": 2,
+          "feedback": "手动审指令层能补上代码扫描漏掉的东西，但它也有局限。最难识别的自然语言攻击在人听来完全无害，对智能体来说却可以照做。更稳的做法是把代码扫描、手动审阅和行为测试结合起来。"
+        },
+        {
+          "text": "我不用扫描工具。好奇了就自己读一遍代码。",
+          "score": 1,
+          "feedback": "手动审阅有价值，也有盲区：混淆过的写法能溜过去，而自然语言那一层根本没人扫。扫描工具能抓到那些自动化的模式，随手一读你是不会注意到的。哪一个单独用都不够。"
+        },
+        {
+          "text": "我只把它当成多个信号里的一个。我还想看行为分析：这个技能跑起来到底做了什么，而不只是代码长什么样。",
+          "score": 3,
+          "feedback": "OWASP AST08 建议分层扫描：代码模式分析、凭据检测、行为测试、手动审阅。模式扫描干净是必要条件，不是充分条件；行为分析能告诉你运行时到底发生了什么，不管代码嘴上怎么写。"
+        }
+      ],
+      "best_practice": "用多层扫描（代码模式分析、自然语言审阅、行为测试），因为没有任何单一扫描工具能覆盖所有攻击类型。",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast08.html",
+      "test": {
+        "canonical_answer_index": 3,
+        "max_score": 3,
+        "expected_weighted_max": 3
+      }
+    },
+    {
+      "id": "q15",
+      "phase": "phase1",
+      "ast_risks": [
+        "AST08"
+      ],
+      "severity_weight": "medium",
+      "scenario": "你逛的技能市场给一个技能挂了个“Verified Safe”徽章。它来自平台自带的扫描工具。还有别的用户在推荐这个技能时会提到这个徽章。",
+      "question": "这个徽章在你的决定里占多大分量？",
+      "source_note": "OWASP AST08：ClawHub 的“Skill Defender”扫描器——本身就是一个技能——被攻击者当成虚假信任信号使用。有些扫描类技能本身就是恶意的。OWASP 检查表第 8.6 项：由技能类扫描器得出的扫描结果只应作为参考，不能作为唯一的放行关卡。",
+      "options": [
+        {
+          "text": "分量很重。平台自己都为它背书了，这说明问题。",
+          "score": 0,
+          "feedback": "平台徽章看上去很权威，但 ClawHub 自己的“Skill Defender”扫描器被攻击者当成虚假信任信号用过。当扫描器本身就是一个技能时，你就碰上了一个循环信任的问题：谁来验证验证者？徽章是信号，不是证据。"
+        },
+        {
+          "text": "分量适中。比没有强，但我还是会独立去查这个技能的权限和发布者。",
+          "score": 2,
+          "feedback": "这个判断是平衡的。徽章只说明它通过了其中一层的自动化检查，而独立核实权限和发布者，正好补上那一层留下的空子。OWASP 建议把平台内的扫描结果当作参考意见，而不是定论。"
+        },
+        {
+          "text": "我不看徽章。我信自己对“看着安不安全”的判断。",
+          "score": 1,
+          "feedback": "你自己的判断很有分量，但把外部信号一律不当回事，就等于扔掉了自动化分析确实抓到的东西。判断加上几个互相独立的信号，才更强。"
+        },
+        {
+          "text": "我想知道这个扫描器到底检查什么，以及它是外部工具还是平台自己的技能。一个本身是技能的扫描器会造成循环信任的问题。",
+          "score": 3,
+          "feedback": "这正是 OWASP 提出的担忧。ClawHub 的 Skill Defender 本身就是一个技能，攻击者把它当成虚假信任信号用过。扫描器是独立工具还是平台内的技能，这有区别；更可信的信号来自外部、可审计的工具，而不是来自正在被评估的那个生态本身。"
+        }
+      ],
+      "best_practice": "把平台内扫描工具的徽章和自动化扫描结果当作参考，另外用外部工具独立核实。",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast08.html",
+      "test": {
+        "canonical_answer_index": 3,
+        "max_score": 3,
+        "expected_weighted_max": 3
+      }
+    },
+    {
+      "id": "q19",
+      "phase": "phase1",
+      "ast_risks": [
+        "AST01",
+        "AST06"
+      ],
+      "severity_weight": "critical",
+      "scenario": "2026 年 1 月，一名叫 ClawHavoc 的真实攻击活动在一个主流技能市场上发布了 1,184 个恶意技能，散布在 12 个账号下。这些技能冒充热门工具：YouTube 摘要工具、加密货币钱包追踪器、效率助手。感染高峰期下载量前七的技能里有五个被确认是恶意软件。其中一些只靠三行 markdown 文本就偷走了 SSH 密钥。装了它们的用户，浏览器凭据、加密钱包和 SSH 密钥都被偷了。",
+      "question": "看完这些，你对自己平时的习惯，有什么诚实的反应？",
+      "source_note": "OWASP AST01：ClawHavoc（Jan 2026），1,184 个恶意技能，12 个发布者账号，C2 IP 91.92.242[.]30。Atomic Stealer (AMOS)。三行 markdown 就足以外传 SSH 密钥（Snyk，Feb 2026）。",
+      "options": [
+        {
+          "text": "我确实只凭热度和外观就装过技能。我不知道这是个真实的攻击面，而且规模能到这么大。",
+          "score": 1,
+          "feedback": "先知道自己站在哪里，这是第一步。多数人选技能的方式和装手机应用一样，看评价、看下载量；ClawHavoc 之所以得手，就是因为这套信任模型放到技能上根本不成立。在这里，热度和包装是攻击面，不是安全信号。"
+        },
+        {
+          "text": "我装东西还算小心，但主要还是靠评价和发布者口碑。我不审代码，也不查权限。",
+          "score": 1,
+          "feedback": "口碑是一道真的过滤器，也有真实的局限。ClawHavoc 的攻击者运营了 12 个看起来合法的账号，评价也可以被刷。这类攻击正好落在“小心”和“验证过”之间的那道缝里。"
+        },
+        {
+          "text": "我装之前总会查权限、读技能说明，但没想到要跨多个技能去看发布者的历史。",
+          "score": 2,
+          "feedback": "读说明是扎实的做法，不过 ClawHavoc 那些技能的说明看着也很干净；恶意内容藏在读者看不见的元数据层里。交叉核对发布者历史（12 个账号共用同一个 C2 IP）是一种模式识别，多数用户会漏掉这一步。"
+        },
+        {
+          "text": "新技能我会先在沙箱或一次性环境里试一遍，也会查一下我要装的这类技能有没有被攻击活动盯上过。",
+          "score": 3,
+          "feedback": "隔离测试能抓到行为上的意外，而查针对型攻击活动（ClawHavoc 盯的是 YouTube 工具这类高需求品类）给你的是评价和热度永远不会提供的威胁情报。"
+        }
+      ],
+      "best_practice": "装之前一定要查有没有针对这类技能的已知攻击活动，并在沙箱环境里测试新技能，之后再让它接触真实数据。",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast01.html",
+      "test": {
+        "canonical_answer_index": 3,
+        "max_score": 3,
+        "expected_weighted_max": 9
+      }
+    },
+    {
+      "id": "q06",
+      "phase": "phase2",
+      "ast_risks": [
+        "AST03"
+      ],
+      "severity_weight": "high",
+      "scenario": "你在安装一个日历技能。安装界面显示它正在申请：文件系统访问（所有文件）、shell 执行、网络访问（所有域名），以及修改你的智能体配置的权限。而这个技能的描述里只提到读取和创建日历事件。",
+      "question": "面对这个权限提示，你会怎么做？",
+      "source_note": "OWASP AST03：ClawHub 上 280+ 个技能在声明功能之外暴露 API 密钥和 PII（Snyk，Feb 2026）。OpenClaw 默认授予完整的 shell、文件、网络和 cron 访问权限，并没有按技能做范围限定。",
+      "options": [
+        {
+          "text": "全部接受。市场上不会上架一个权限不合适的技能",
+          "score": 0,
+          "feedback": "交易市场不会把权限申请和它声称的功能做核对。Snyk 在 ClawHub 上发现 280+ 个技能的权限远远超出它们描述的用途。一个日历技能要求 shell 执行和全文件访问，这是市场上不会替你拦下来的危险信号。"
+        },
+        {
+          "text": "接受看起来和日历相关的那些权限（同步大概需要网络访问），其余的拒绝",
+          "score": 2,
+          "feedback": "日历技能需要网络访问来做同步，也可能需要文件访问来读写它的日历文件，但不需要 shell 执行，不需要全文件访问，也不需要改配置。把权限限制在它声称的功能范围内，这正是 AST03 建议的核心。"
+        },
+        {
+          "text": "全部接受，但在最初几次使用时留意有没有可疑行为",
+          "score": 1,
+          "feedback": "先接受、之后观察，等于一上来就把完整访问权交到了这个技能手里。等你察觉到可疑行为时，数据可能已经被读取或复制了。权限审查属于安装之前的事，不是出事之后的事。"
+        },
+        {
+          "text": "全部拒绝，然后去找一个要求更少权限的技能",
+          "score": 1,
+          "feedback": "稳妥，不过如果没有哪个替代品的权限更紧，这样做可能不实用。折中办法是只接受确实需要的部分（网络访问加上特定的几个文件），其余拒绝，同时把这个技能留下来。"
+        }
+      ],
+      "best_practice": "逐条把权限申请和技能声称的功能对照一遍，拒绝任何对该任务不必要的访问。",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast03.html",
+      "test": {
+        "canonical_answer_index": null,
+        "max_score": 3,
+        "expected_weighted_max": 6
+      }
+    },
+    {
+      "id": "q07",
+      "phase": "phase2",
+      "ast_risks": [
+        "AST03",
+        "AST06"
+      ],
+      "severity_weight": "high",
+      "scenario": "一位安全研究员公开分享了这件事：她让她的 AI 智能体只是读取并总结一下邮件收件箱，不做任何操作，只是读取。智能体在她来得及阻止之前删掉了大量邮件。她并没有明确授予它删除权限，但这个智能体对她的邮件系统有完整的访问权。",
+      "question": "你会怎么看这件事？",
+      "source_note": "OWASP AST03：Summer Yue（Meta AI）让 OpenClaw 审阅邮件收件箱而不做任何操作；智能体在被终止之前删掉了大量邮件——这说明智能体会以超出预期的权限去执行。",
+      "options": [
+        {
+          "text": "那只是一次意外。我给的指令很明确，我的智能体不会那样做",
+          "score": 0,
+          "feedback": "这不是意外。当智能体拿到的权限超过任务本身需要时，这就是会发生的事。那位研究员给的指令很明确（“只是读取”）。问题出在权限范围，不在指令表述，而一个善意的智能体照样会用手里的权限去执行。"
+        },
+        {
+          "text": "我会确保我的智能体对邮件只有只读权限。不写，不删，不改",
+          "score": 3,
+          "feedback": "这才是核心教训。研究员的智能体为一个只读的任务拿到了完整的邮件访问权；如果权限是只读的，那么无论智能体“决定”做什么，都不可能删掉邮件。把权限范围卡在任务上，是从系统层面阻止这种动作。"
+        },
+        {
+          "text": "我会更小心地写指令，表述得更精确一些，别让智能体误解",
+          "score": 1,
+          "feedback": "更清楚的指令有帮助，但它们不是安全控制手段。智能体的行为是概率性的，再明确的指令也可能被误读，或者被提示注入覆盖。权限范围是硬边界，指令措辞是软边界。"
+        },
+        {
+          "text": "我会不再用 AI 智能体处理任何涉及个人数据的事",
+          "score": 0,
+          "feedback": "回避是一种应对方式，而底层的问题是能解决的。研究员的麻烦不在于她用了 AI 智能体，而在于一个只读任务上给了删除权限。权限范围划得对，智能体用真实数据才是安全的。"
+        }
+      ],
+      "best_practice": "把智能体的权限限制到每项任务所需的最低限度；只读的任务就只给读取权限。",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast03.html",
+      "test": {
+        "canonical_answer_index": 1,
+        "max_score": 3,
+        "expected_weighted_max": 6
+      }
+    },
+    {
+      "id": "q08",
+      "phase": "phase2",
+      "ast_risks": [
+        "AST06"
+      ],
+      "severity_weight": "high",
+      "scenario": "你的 AI 智能体跑在你的笔记本上，权限和你的用户账户一样。它装了几个技能：一个代码助手、一个文件整理工具、一个研究助理。你刚装了一个看起来值得信任的效率类技能。",
+      "question": "如果那个新技能其实是恶意的，它实际能触及什么？",
+      "source_note": "OWASP AST06：技能与宿主智能体在同一安全上下文中执行。Microsoft Defender（Feb 2026）警告，智能体“应当被当作带持久凭据的不可信代码执行”。135,000+ 个 OpenClaw 实例在没有默认防火墙或认证的情况下公开暴露。",
+      "options": [
+        {
+          "text": "只有这个技能自己的文件和智能体的工作区。它和我的个人东西是分开的",
+          "score": 0,
+          "feedback": "没有沙箱就没有隔离。这个技能带着你完整的用户权限运行，能触及个人文件、浏览器数据、SSH 密钥、加密货币钱包，以及其他每一个技能的数据。有 135,000+ 个实例被发现公开暴露在外，完全没有任何隔离。"
+        },
+        {
+          "text": "智能体的数据，也许再加上一些系统文件，但碰不到我的浏览器密码和 SSH 密钥",
+          "score": 0,
+          "feedback": "浏览器密码和 SSH 密钥正是恶意技能下手的目标。ClawHavoc 活动投放了 Atomic Stealer，它通过用户的权限上下文外传了 macOS 钥匙串、浏览器凭据、SSH 密钥和加密货币钱包。"
+        },
+        {
+          "text": "我的用户账户能触及的一切：所有文件、所有凭据、所有网络连接。这个技能以我的完整权限运行，不在沙箱里",
+          "score": 3,
+          "feedback": "这才是实际发生的情况。没有明确的沙箱隔离，技能就跑在你的完整安全上下文里。Microsoft Defender 警告说，智能体“应当被当作带持久凭据的不可信代码执行”对待，因为恶意技能会继承你的用户账户能访问的一切。"
+        },
+        {
+          "text": "我不确定。我以为智能体平台会自动处理隔离",
+          "score": 1,
+          "feedback": "大多数平台不会。OWASP 的证据显示，在主流平台上沙箱要么不可用，要么只是个可选项，要么默认关闭；而隔离需要显式配置，大多数用户从来没做过。以为它是自动的，这是一个常见又危险的缺口。"
+        }
+      ],
+      "best_practice": "把每一个技能都当作不可信代码来看待——它继承你完整的用户权限，并且要开启沙箱或容器隔离来限制爆炸半径。",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast06.html",
+      "test": {
+        "canonical_answer_index": 2,
+        "max_score": 3,
+        "expected_weighted_max": 6
+      }
+    },
+    {
+      "id": "q09",
+      "phase": "phase2",
+      "ast_risks": [
+        "AST03"
+      ],
+      "severity_weight": "high",
+      "scenario": "你用 AI 智能体搭出了一套好用的环境：一个日历技能、一个代码助手、一个研究助理、一个文件整理工具、一个通信技能。它们的访问级别完全一样：完整的文件系统、shell 和网络。用起来很顺手。",
+      "question": "如果其中一个技能存在漏洞，会发生什么？",
+      "source_note": "OWASP AST03：权限过于宽松的技能会造成过大的爆炸半径。一个合法但访问面很广的技能，可以被提示注入武器化。280+ 个技能在声明功能之外暴露了 API 密钥。",
+      "options": [
+        {
+          "text": "漏洞只影响那一个技能。其他技能是各自独立的",
+          "score": 0,
+          "feedback": "当所有技能共享同一套权限时，从安全角度看它们并不独立。一个技能里的漏洞，或者一个攻破了某个技能的提示注入，就把攻击者能触达的一切交给了他——而那正是所有技能都能触达的一切。"
+        },
+        {
+          "text": "我会更新或者移除那个有漏洞的技能。这样问题就解决了",
+          "score": 1,
+          "feedback": "修掉有漏洞的技能有帮助，但没碰到根因：共享权限。下一次漏洞，不管出现在哪个技能身上，暴露的还是同一个爆炸半径。结构上的问题在于，所有技能对所有东西都有同等的访问权。"
+        },
+        {
+          "text": "攻击者可以利用那一个技能的访问权，去读我其他技能里的数据、触及我的个人文件、进入我的网络，因为它们共享同一套权限",
+          "score": 3,
+          "feedback": "这就是爆炸半径问题。当技能共享权限时，一个被攻破的技能就成了通往一切的入口。OWASP AST03 建议把每个技能的权限限制在它的功能范围内，这样日历技能被攻破也够不到你的代码仓库或个人文件。"
+        },
+        {
+          "text": "我会把所有技能都扫一遍，看有没有同一类漏洞，然后打上补丁",
+          "score": 2,
+          "feedback": "这是个不错的被动应对习惯，但它治的是症状。打完补丁之后，结构性的问题依旧在：共享权限会让下一个漏洞——不管是哪一类——拥有同样的爆炸半径。一开始就把权限划好，是防住问题，而不是只防住它的某一次发生。"
+        }
+      ],
+      "best_practice": "把每个技能的权限限制在它的具体功能上，让一个技能里的漏洞无法触及你其他的技能或个人数据。",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast03.html",
+      "test": {
+        "canonical_answer_index": 2,
+        "max_score": 3,
+        "expected_weighted_max": 6
+      }
+    },
+    {
+      "id": "q10",
+      "phase": "phase2",
+      "ast_risks": [
+        "AST04"
+      ],
+      "severity_weight": "high",
+      "scenario": "你在安装前审查一个技能的元数据。清单上写着它的风险等级是 “L0”，也就是最低的风险级别，意思是需要什么特殊权限。但你再看它实际申请的内容，它要的是 shell 执行、完整的文件系统访问，以及对所有域名的网络访问。",
+      "question": "你怎么理解这个矛盾？",
+      "source_note": "OWASP AST04 检查项 4.5：“声明的 risk_tier 是否与实际权限范围一致？交叉核对：一个声明 L0（安全）却带 shell: true 的技能是危险信号。”",
+      "options": [
+        {
+          "text": "风险等级大概是过时了，或者自动生成的。我还是盯着实际权限看",
+          "score": 1,
+          "feedback": "关注实际权限比相信标签强，但把这个矛盾说成“过时”就太宽容了。一个一边声称自己安全、一边申请危险权限的技能，行为上就是在欺骗。这个矛盾是一个信号，不是一处文档笔误。"
+        },
+        {
+          "text": "风险等级体系本来就不可靠，所以我只看权限，等级标签完全忽略",
+          "score": 1,
+          "feedback": "忽略等级标签等于扔掉了一个数据点。准确的标签能积累一点信任；对不上的标签会把信任直接摧毁。在这里，与实际权限自相矛盾的“已声明安全”是最重要的发现：这个技能在错误地表述自己的风险。"
+        },
+        {
+          "text": "一个严重的危险信号。一个对自己的风险等级撒谎的技能是在故意欺骗用户，我不会安装它",
+          "score": 3,
+          "feedback": "OWASP AST04 直接点出了这一点：一个声明 L0（安全）却申请 shell 访问的技能就是危险信号。这不是标签过时，而是一个刻意制造出来的矛盾，目的就是让你放松警惕；一个错误表述自身风险的技能，已经表现出欺骗行为了。"
+        },
+        {
+          "text": "我会看看有没有别的用户报告过问题。如果没人抱怨，那这些权限大概没问题，哪怕存在这个矛盾",
+          "score": 0,
+          "feedback": "没有举报不等于没有危害。权限滥用往往看不见：数据在后台被读取，凭据被悄悄复制。等到有人报告问题时，损害可能已经造成了。不管有没有举报，这个矛盾本身就是结构性的危险信号。"
+        }
+      ],
+      "best_practice": "把技能声明的风险等级与实际权限范围之间的任何矛盾，都当作刻意的危险信号，而不是文档错误。",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast04.html",
+      "test": {
+        "canonical_answer_index": 2,
+        "max_score": 3,
+        "expected_weighted_max": 6
+      }
+    },
+    {
+      "id": "q11",
+      "phase": "phase2",
+      "ast_risks": [
+        "AST05"
+      ],
+      "severity_weight": "high",
+      "scenario": "你的智能体用一个技能，而这个技能每次运行都从一个网站加载它的操作指令。一个月前你批准了这个技能，那时那个网站的内容是安全的。今天，攻击者改动了这个网站的内容。",
+      "question": "下一次你的智能体运行这个技能时会发生什么？",
+      "source_note": "OWASP AST05：Anthropic 的文档警告，拉取外部 URL 的技能面临的内容“可能包含恶意指令”，并且“如果它们的外部依赖随时间改变，就可能被攻破”。Air 的研究把不受信的外部指令分发给了 26,000 个智能体，证实了这一点。",
+      "options": [
+        {
+          "text": "不会有坏事。技能本身没变，变的只是外部内容",
+          "score": 0,
+          "feedback": "技能会加载那份外部内容，并把它当成指令来执行。如果那些内容被换成了恶意指令，智能体就会用完整权限去执行。技能没变，但它告诉智能体该做什么变了。这就是 AST05 的 “rug-pull” 变体。"
+        },
+        {
+          "text": "技能大概会坏掉或者报错，因为内容变了",
+          "score": 0,
+          "feedback": "技能不会坏。它会加载 URL 返回的任何东西，并把它当作指令，没有任何自动机制能发现内容变了或者变恶意了。智能体对 URL 返回内容的信任程度，和当初它信任原始 SKILL.md 时完全一样。"
+        },
+        {
+          "text": "我的智能体会照攻击者的指令用完整权限去做事，而除非我手动去查那个网站，我不会知道",
+          "score": 3,
+          "feedback": "这就是 AST05 的核心风险。你的智能体在运行时跟随的内容，并不是当初被审计过的内容；Anthropic 自己的文档就警告过这种情况。如果没有内容锁定（哈希校验）或者内容内联，你对智能体实际执行什么毫无掌控力。"
+        },
+        {
+          "text": "我会设一个监控告警，检测网站内容有没有发生变化",
+          "score": 2,
+          "feedback": "监控是不错的被动措施，而且仍然属于事后：智能体一运行，攻击者的指令就执行了，监控只能事后告诉你。主动的做法是把内容内联进技能包，或者把它锁定到一个内容哈希上，让任何改动都被拒绝。"
+        }
+      ],
+      "best_practice": "避开那些在运行时从外部 URL 拉取指令的技能；尽量把内容内联进去，或者锁定到内容哈希上，防止被篡改。",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast05.html",
+      "test": {
+        "canonical_answer_index": 2,
+        "max_score": 3,
+        "expected_weighted_max": 6
+      }
+    },
+    {
+      "id": "q12",
+      "phase": "phase2",
+      "ast_risks": [
+        "AST05"
+      ],
+      "severity_weight": "high",
+      "scenario": "一个技能的文档提到，它引用了一份托管在外部的配置指南。你仔细审了这个技能的代码：看起来干净，写得规范，没有危险信号。你批准了它。它引用的那份外部指南在一个稳定、知名的文档站点上。",
+      "question": "你的审查漏掉了什么？",
+      "source_note": "OWASP AST05：外部内容是被当作指令消费的，不是数据——被跟随的程度和 SKILL.md 本身一样。散文文本不存在 lockfile。对技能签名，说明不了运行时某个 URL 会返回什么。",
+      "options": [
+        {
+          "text": "什么都没漏。我审的是代码，而代码才是会运行的东西。那份外部指南只是参考资料",
+          "score": 0,
+          "feedback": "智能体会把外部内容当作指令，而不是“参考资料”。当技能拉取那份指南时，智能体会加载它、信任它，并照它行事，用的还是完整权限。你审了拉取内容的代码，却没审它拉到的那份内容，而那份内容随时都可能变。"
+        },
+        {
+          "text": "我漏掉的是：外部内容会在运行时成为智能体指令的一部分。它是一份行为方式像可执行上下文的文档",
+          "score": 3,
+          "feedback": "这正是 AST05 的关键认知。技能里的外部内容是被当作指令来消费的，不是数据。散文文本没有 lockfile，文档也没有哈希锁定，而 URL 的内容一变，你的审查就过期了。OWASP 建议尽量内联，或者锁定到哈希。"
+        },
+        {
+          "text": "我本该检查一下那个文档站点有没有 HTTPS 和有效证书",
+          "score": 1,
+          "feedback": "HTTPS 保证的是内容在传输途中没被篡改，而不是内容本身安全。站点所有者可能已经被攻破，页面也可能在你审查之后变了。HTTPS 保护的是传输，不是信任。"
+        },
+        {
+          "text": "我什么都没漏。一个知名的文档站点足够可信",
+          "score": 0,
+          "feedback": "对站点的信任不等于对运行时内容的信任。一个知名站点可能被攻破，内容可能变化，被引用的页面也可能在审查之后被更新。就连 Anthropic 自己的文档也承认，技能“如果它们的外部依赖随时间改变，就可能被攻破”。"
+        }
+      ],
+      "best_practice": "记住，技能引用的外部内容是被当作可执行指令消费的：既要审运行时取到的内容，也要审拉取它的代码。",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast05.html",
+      "test": {
+        "canonical_answer_index": 1,
+        "max_score": 3,
+        "expected_weighted_max": 6
+      }
+    },
+    {
+      "id": "q03",
+      "phase": "phase3",
+      "ast_risks": [
+        "AST07"
+      ],
+      "severity_weight": "critical",
+      "scenario": "你三个月前装了一个好用的技能。昨晚发布方推送了更新，版本从 1.0.0 升到 1.0.1。你的智能体在你睡觉的时候自动装上了它。你没有审阅这些改动。",
+      "question": "你对这次更新是什么感受？",
+      "source_note": "OWASP AST07：OpenClaw 的 SkillsWatcher 支持实时热重载——上游一旦被攻破即刻生效。Air Security SkillJacking（2026 年 7 月）：把已删除的 GitHub 用户名重新注册，控制了每一次安装拿到的内容。受影响技能 925 个（约 134K 次安装）。",
+      "options": [
+        {
+          "text": "没问题。更新通常都是改进，自动更新也能让我不落后于补丁",
+          "score": 0,
+          "feedback": "不审阅就自动更新，是一条攻击路径，不是一层保护。Air Security 披露，一个热门技能的 GitHub 账号被删除后重新注册，此后每一次自动更新送来的都是攻击者控制的内容。受影响的技能有 925 个（约 134K 次安装）。未经核验的自动更新，是没有证据支撑的信任。"
+        },
+        {
+          "text": "我会看一眼更新日志，了解改了什么，但看起来是小改动的话就不管了",
+          "score": 1,
+          "feedback": "看更新日志好过完全不看，可更新日志本身也能伪造。真正的问题是你能不能验证这次更新的完整性：它有没有原始发布方的签名，内容哈希对不对得上？一个像模像样的更新日志配一个恶意载荷，就是 SkillJacking 的整个攻击模型。"
+        },
+        {
+          "text": "我会担心。没审阅改动，我不知道这到底是真的修复，还是被攻破的发布方在推恶意内容",
+          "score": 2,
+          "feedback": "OWASP 的证据显示，发布方账号会被攻破（SkillJacking），自动更新会送出恶意内容，更新日志也会被伪造。担心是正确的起点；接下来你做什么才是真正的问题。"
+        },
+        {
+          "text": "我会先确认发布方的身份有没有变，看更新有没有加密签名，再审阅实际改了什么，然后才接受",
+          "score": 3,
+          "feedback": "完整的验证链。OWASP AST07 建议固定到不可变的哈希、要求更新时做加密签名验证、把自动更新放在重新批准之后，并订阅安全公告。查发布方能发现账号被盗；查签名能发现被伪造的更新。"
+        }
+      ],
+      "best_practice": "接受任何技能更新之前，先验证发布方身份、检查加密签名、审阅更新差异。没有验证就绝不自动更新。",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast07.html",
+      "test": {
+        "canonical_answer_index": 3,
+        "max_score": 3,
+        "expected_weighted_max": 9
+      }
+    },
+    {
+      "id": "q13",
+      "phase": "phase3",
+      "ast_risks": [
+        "AST07"
+      ],
+      "severity_weight": "medium",
+      "scenario": "想想你现在手头真正装着的那些技能。你上一次审阅或更新它们是什么时候？",
+      "question": "老实说，你通常是什么模式？",
+      "source_note": "OWASP AST07：在补丁滞后窗口期内，有 12,812 个 OpenClaw 实例可通过 RCE 被利用（SecurityScorecard）。装了之后就遗忘的技能会漂移到有漏洞或已被投毒的版本。OpenClaw SkillsWatcher 支持实时热重载——上游一旦被攻破即刻生效。",
+      "options": [
+        {
+          "text": "装上就不管了，除非坏了才会想起它们",
+          "score": 0,
+          "feedback": "最常见的模式，也是 OWASP 所说的“更新漂移”。装了之后遗忘的技能会不断积累未修补的漏洞，还可能悄悄漂移到已被攻破的版本。补丁滞后的窗口期里，有 12,812 个实例处于可被利用的状态，因为没人盯着。"
+        },
+        {
+          "text": "我大概一年看一两次吧，或者想起来的时候",
+          "score": 1,
+          "feedback": "一年查一次好过从不查，而一年里能发生很多事：ClawHavoc 活动、账号被盗、供应链攻击，都是按天到周往前推进的。OWASP 对高风险技能的要求是至少每季度审阅一次。"
+        },
+        {
+          "text": "我开了自动更新，所以我以为它们一直是新的",
+          "score": 0,
+          "feedback": "不做验证的自动更新，等于“发布方（或攻击者）推什么就收什么”。SkillJacking 研究发现有 134K+ 次安装通过自动更新收到了恶意内容。自动更新是便利功能，只有配上签名验证才算一项安全措施。"
+        },
+        {
+          "text": "我会定期审阅，查一下有没有已知漏洞，不过我承认自己没做到应该的那么规律",
+          "score": 2,
+          "feedback": "定期审阅加漏洞检查是正确的模式，差距在规律性。OWASP 建议订阅已安装技能的安全公告，并按风险等级设定审阅节奏：高风险每季度一次，低风险每年一次。"
+        }
+      ],
+      "best_practice": "按风险等级设定固定节奏，定期审阅已安装的技能，并订阅这些技能的安全公告。",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast07.html",
+      "test": {
+        "canonical_answer_index": null,
+        "max_score": 3,
+        "expected_weighted_max": 3
+      }
+    },
+    {
+      "id": "q16",
+      "phase": "phase3",
+      "ast_risks": [
+        "AST09"
+      ],
+      "severity_weight": "medium",
+      "scenario": "你们团队用的 AI 智能体上，过去一年里由不同的人装了各种技能。如果现在有人问你：“把我们所有智能体上装的技能全部列出来，每一项是谁装的，各自有什么权限？”你能答上来吗？",
+      "question": "你能给出完整的答案吗？",
+      "source_note": "OWASP AST09：53,000+ 个实例没有 SOC 可见性（Bitdefender）。只有 34% 的企业具备 AI 专项安全控制（Cisco 2026）。个人安装的技能没有企业日志、没有 CMDB 条目、没有接入 IAM。",
+      "options": [
+        {
+          "text": "大概不能。我得挨个去问每个人，问完了也说不准这份清单是不是全的",
+          "score": 0,
+          "feedback": "这是大多数团队的现实，也正是 OWASP AST09 指出的问题。没有集中的清单，你就有一层“影子 AI”：个人随手安装的技能，没有 SOC 可见性，没有审批流程，也没有吊销机制。53,000+ 个实例被发现时，资产管理侧的可见性为零。"
+        },
+        {
+          "text": "主要的技能我大致心里有数，但没有一份带权限的完整清单",
+          "score": 1,
+          "feedback": "主要技能值得知道，但安全上关键的部分在细节里：每个技能有什么权限、是谁装的、什么时候装的、现在还需不需要。“大致有数”撑不起事件响应、审计和离职交接。"
+        },
+        {
+          "text": "能。我维护着一份表格文档，记录所有已安装的技能、它们的权限，以及每个技能的责任人",
+          "score": 3,
+          "feedback": "这就是 OWASP 推荐的治理做法。清单是 AST09 的基础；没有它，你无法审计权限、排查漏洞、在有人离职时吊销访问权，也无法界定一起事件的影响范围。就算只是一张简单表格，也好过什么都没有。"
+        },
+        {
+          "text": "我觉得这个不太重要。技能就是工具，工具不需要被跟踪到这个程度",
+          "score": 0,
+          "feedback": "技能是带权限的工具，没被跟踪的工具就变成了攻击面。团队成员离职时，他装的技能还在运行。漏洞被披露时，你找不到受影响的实例。事件发生时，没有清单你就无法界定爆炸半径。"
+        }
+      ],
+      "best_practice": "维护一份完整集中的清单，记录所有已安装的技能及其权限、安装人和审阅状态。",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast09.html",
+      "test": {
+        "canonical_answer_index": 2,
+        "max_score": 3,
+        "expected_weighted_max": 3
+      }
+    },
+    {
+      "id": "q17",
+      "phase": "phase3",
+      "ast_risks": [
+        "AST09"
+      ],
+      "severity_weight": "medium",
+      "scenario": "上个月，一位负责你们部分 AI 智能体配置的同事离职了。他走后两周，你发现他装的技能还在运行，还挂着他的凭据在跑，其中一个技能收到了发布方更新，并且自动装上了。",
+      "question": "你的第一反应是什么？",
+      "source_note": "OWASP AST09：孤立技能情境。清单第 9.6 条：正式吊销与离职流程绑定。",
+      "options": [
+        {
+          "text": "我会把他装的技能删掉。这样应该就行了",
+          "score": 1,
+          "feedback": "删技能是个开始，但这是被动补救。他的凭据可能仍然有效，那个自动安装的更新没人审阅过，而且没有任何流程能自动发现这类事。"
+        },
+        {
+          "text": "我会换掉他的凭据，再查一下这些技能在无人维护的那个月里都访问过什么",
+          "score": 2,
+          "feedback": "这个应对不错。轮换凭据能限制持续中的损害，查访问日志能告诉你实际发生了什么。但这仍然是事后补救；理想的做法是一套离职即自动触发的权限回收流程。"
+        },
+        {
+          "text": "这是流程失效。我们需要一份离职清单，涵盖技能盘点、凭据轮换和权限回收，并且和 HR 的离职流程挂钩",
+          "score": 3,
+          "feedback": "这才动到了根因。OWASP AST09 建议把智能体身份当作非人身份（NHI）来管理，凭据要限定范围并定期轮换，权限回收要和员工生命周期绑定。"
+        },
+        {
+          "text": "不急。这些技能大概没事，那个更新很可能只是常规修复",
+          "score": 0,
+          "feedback": "跑在离职员工凭据上的孤立技能，处于活跃、无人监控的状态，而且刚刚还收到一个没审阅过的更新。不查就默认“大概没事”，数据泄露就是这样被漏掉的。"
+        }
+      ],
+      "best_practice": "把技能回收和员工离职流程绑定：有人一走就吊销凭据、盘点已安装的技能。",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast09.html",
+      "test": {
+        "canonical_answer_index": 2,
+        "max_score": 3,
+        "expected_weighted_max": 3
+      }
+    },
+    {
+      "id": "q18",
+      "phase": "phase3",
+      "ast_risks": [
+        "AST10"
+      ],
+      "severity_weight": "medium",
+      "scenario": "你在自己的 OpenClaw 智能体上用一个效率类技能，效果不错。同事在 Claude Code 上用的是同一个技能。你们俩都默认它在两个平台上一样安全。",
+      "question": "这个假设你质疑过吗？",
+      "source_note": "OWASP AST10：安全属性在移植过程中被悄悄丢弃。Snyk 证实同一个恶意技能在 ClawHub 和 skills.sh 上都存在。toxicskills-goof 在 Gemini CLI 和 OpenClaw 上同样有效。",
+      "options": [
+        {
+          "text": "没有。同一个技能就是同样的行为，跟平台无关",
+          "score": 0,
+          "feedback": "安全属性是依赖平台的。一个平台上的权限清单，在另一个平台上可能被悄悄剥掉。代码一样，爆炸半径不同。"
+        },
+        {
+          "text": "我没想过这个。我以为技能会自己处理自己的安全问题",
+          "score": 1,
+          "feedback": "技能不会自己处理自己的安全。是否强制隔离、权限和元数据，都由平台来决定；移植过程中，风险等级和权限清单都可能悄悄丢失。"
+        },
+        {
+          "text": "我会默认限制更严的平台更安全，但我没验证过",
+          "score": 1,
+          "feedback": "不验证就下结论，就是这道缺口。各平台的默认安全姿态不同，不逐一检查，你无从知道哪个更安全。"
+        },
+        {
+          "text": "我会验证安全属性（权限、风险等级、隔离）在每个平台上是否都保留了，因为移植过程中它们可能被悄悄丢掉",
+          "score": 3,
+          "feedback": "OWASP AST10 明确记录了安全元数据无法在移植中存活。Snyk 证实，同一个恶意技能在多个平台上都能生效，原因就是属性在转换过程中丢失了。"
+        }
+      ],
+      "best_practice": "在不同智能体平台之间移植技能时，验证安全属性（权限、风险等级、隔离）是否完整保留。",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast10.html",
+      "test": {
+        "canonical_answer_index": 3,
+        "max_score": 3,
+        "expected_weighted_max": 3
+      }
+    },
+    {
+      "id": "q20",
+      "phase": "phase3",
+      "ast_risks": [
+        "AST09"
+      ],
+      "severity_weight": "medium",
+      "scenario": "你用 AI 智能体配几个技能已经几个月了。你知道自己装了哪些技能（有清单）。但如果有人问你：“过去一周里，哪些技能访问过你的文件、发起过网络请求、运行过 shell 命令？具体做了什么？”你能答上来吗？",
+      "question": "你能给出具体的答案吗？",
+      "source_note": "OWASP AST09 清单第 9.4 条：“技能的调用是否留下了足够详细的审计日志？日志应记录：技能 ID、用户上下文、调用的工具、访问的文件、网络连接、输出。”Cisco State of AI Security 2026：不到 40% 的人会对 AI 智能体工作流做常规安全测试。",
+      "options": [
+        {
+          "text": "不能。我从没看过运行时活动日志，只检查输出看起来对不对",
+          "score": 0,
+          "feedback": "一个常见的盲区。检查输出只能告诉你技能有没有产出正确结果，不能告诉你它是否还访问了文件、发起过网络请求、运行了超出声明职责的命令。OWASP AST09 要求审计日志记录调用了哪些工具、访问了哪些文件、建立了哪些网络连接。没有它，你就是在信任自己从未观察过的行为。"
+        },
+        {
+          "text": "觉得不对劲时我会偶尔查一下，但没有固定的审阅流程",
+          "score": 1,
+          "feedback": "被动式监控只能发现看得见的问题，而很多滥用从输出里根本看不见。一个悄悄外传凭据、同时产出正确结果的技能，永远不会触发“不对劲”的警报。缺口在于定期审阅运行时活动，而不只看输出。"
+        },
+        {
+          "text": "我开了日志，但从没真正仔细读过",
+          "score": 1,
+          "feedback": "只记录不审阅，就是录下来却不学。日志确实在那里，可如果没人读，泄露就发现不了。OWASP AST09 要求的是审计能力，也就是有人足够频繁地读日志，好在问题扩散之前抓住。"
+        },
+        {
+          "text": "我会定期审阅运行时活动：每个技能访问了什么、发起过哪些网络请求、有没有超出它声明的用途",
+          "score": 3,
+          "feedback": "这正是 OWASP AST09 要求的做法：足够详细的审计日志，加上定期审阅。大多数用户检查的是输出（有没有用？），从不检查行为（它到底做了什么？）。一个一边产出正确结果、一边悄悄读文件或发网络请求的技能，能通过你的输出检查，却过不了你的运行时审计。"
+        }
+      ],
+      "best_practice": "开启运行时活动日志并定期审阅：检查的不只是输出，还有每个技能实际访问了什么、发起过哪些网络请求、有没有超出声明用途。",
+      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast09.html",
+      "test": {
+        "canonical_answer_index": 3,
+        "max_score": 3,
+        "expected_weighted_max": 3
+      }
+    }
+  ],
+  "test_fixtures": {
+    "description": "Predefined answer sets for scoring verification. Each fixture is an array of 20 answers (one per question, in questions.json order), where each answer is the option index (0-3).",
+    "scoring_cases": [
+      {
+        "id": "all-zero",
+        "description": "Worst case: participant picks the lowest-scoring option for every question (ties resolve to the lowest index). q19 has no score-0 option, so the floor is 3 weighted points (1 x critical weight 3), not zero.",
+        "answers": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          3,
+          0,
+          0
+        ],
+        "expected_percentage": 2.8,
+        "expected_title": "未开垦"
+      },
+      {
+        "id": "all-best",
+        "description": "Best case: participant picks the optimal option (score=3) for every question",
+        "answers": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          null,
+          1,
+          2,
+          2,
+          2,
+          2,
+          1,
+          3,
+          null,
+          2,
+          2,
+          3,
+          3
+        ],
+        "expected_percentage": 100.0,
+        "expected_title": "守望者"
+      },
+      {
+        "id": "common-user",
+        "description": "Realistic: a typical non-technical user who trusts surfaces but has some instinct",
+        "answers": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "expected_title_boundary": "Uncharted or Newcomer"
+      },
+      {
+        "id": "security-aware",
+        "description": "An informed user who reviews permissions but doesn't verify publishers",
+        "answers": [
+          2,
+          2,
+          2,
+          1,
+          2,
+          3,
+          3,
+          2,
+          2,
+          2,
+          2,
+          2,
+          1,
+          2,
+          2,
+          1,
+          2,
+          2,
+          1,
+          1
+        ],
+        "expected_title_boundary": "Aware or Practitioner"
+      }
+    ],
+    "phase_integrity": {
+      "description": "Verify that each question's phase field matches its position in the phases array",
+      "check": "for each question q: q.phase must be the phase whose question_ids contains q.id"
+    },
+    "llm_grounding_rules": {
+      "description": "Rules for verifying LLM output doesn't hallucinate beyond OWASP source",
+      "rules": [
+        "LLM output must not cite statistics not present in source_note fields",
+        "LLM output must not reference attack campaigns not mentioned in OWASP AST pages",
+        "LLM output prompt_template must reference actionable steps from OWASP checklist items",
+        "LLM output must not recommend tools or vendors not mentioned in OWASP materials",
+        "If LLM output contains a URL, it must be a valid OWASP URL from ast_source_url fields"
+      ]
+    }
+  }
+}
