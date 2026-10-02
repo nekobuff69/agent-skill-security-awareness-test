@@ -6,6 +6,11 @@ exports.name = 'FallbackAssembler';
 exports.run = function() {
   var bank = require(path.resolve(__dirname, '../../questions.json'));
   var FallbackAssembler = require(path.resolve(__dirname, '../../js/fallback.js'));
+  // Select the Chrome String dictionary — the Deterministic Fallback
+  // resolves its prose through App.I18n at assemble() time.
+  var I18n = require(path.resolve(__dirname, '../../js/i18n.js'));
+  require(path.resolve(__dirname, '../../i18n/en.js'));
+  I18n.use('en');
   var results = [];
 
   function check(desc, pass, extra) {

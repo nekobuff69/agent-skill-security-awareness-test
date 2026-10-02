@@ -1,6 +1,10 @@
 exports.name = 'PromptBuilder';
 
 exports.run = function() {
+  // Select the Chrome String dictionary before building any prompt.
+  var I18n = require('../../js/i18n.js');
+  require('../../i18n/en.js');
+  I18n.use('en');
   var PromptBuilder = require('../../js/prompt-builder.js');
   var results = [];
 

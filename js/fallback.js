@@ -3,18 +3,16 @@
 
   globalThis.App = globalThis.App || {};
 
-  var AST_RISK_NAMES = {
-    AST01: 'Malicious Skills',
-    AST02: 'Supply Chain Compromise',
-    AST03: 'Over-Privileged Skills',
-    AST04: 'Insecure Metadata',
-    AST05: 'Untrusted External Instructions',
-    AST06: 'Weak Isolation',
-    AST07: 'Update Drift',
-    AST08: 'Poor Scanning',
-    AST09: 'No Governance',
-    AST10: 'Cross-Platform Reuse'
-  };
+  // Chrome String lookup, resolved at call time so the Deterministic
+  // Fallback prose localizes with the rest of the UI.
+  function t(id, vars) {
+    return globalThis.App.I18n.t(id, vars);
+  }
+
+  /** AST Risk display name — owned by the dictionary as 'ast.ASTnn'. */
+  function riskName(astId) {
+    return globalThis.App.I18n.astName(astId);
+  }
 
   /**
    * Select the weakest AST Risks for the Action Plan:
@@ -60,19 +58,21 @@
         }
       }
     }
-    if (matched.length === 0) return 'display gaps in your security posture';
+    if (matched.length === 0) return t('fallback.behavior.none');
     var snippets = [];
     for (var k = 0; k < matched.length; k++) {
       var opt = matched[k].selectedOption;
       if (opt && opt.text) {
-        var t = opt.text.length > 60 ? opt.text.slice(0, 57) + '...' : opt.text;
-        snippets.push('"' + t + '"');
+        var snippet = opt.text.length > 60
+          ? opt.text.slice(0, 57) + t('fallback.ellipsis')
+          : opt.text;
+        snippets.push(t('fallback.quoteOpen') + snippet + t('fallback.quoteClose'));
       }
     }
-    if (snippets.length === 0) return 'display gaps in your security posture';
-    if (snippets.length === 1) return 'choose ' + snippets[0] + ', which indicates limited security awareness';
+    if (snippets.length === 0) return t('fallback.behavior.none');
+    if (snippets.length === 1) return t('fallback.behavior.single', { quote: snippets[0] });
     var last = snippets.pop();
-    return 'choose options like ' + snippets.join(', ') + ', and ' + last + ', all of which reflect limited security awareness';
+    return t('fallback.behavior.multiple', { list: snippets.join(', '), last: last });
   }
 
   /**
@@ -83,7 +83,7 @@
     for (var i = 0; i < weakIds.length; i++) {
       var astId = weakIds[i];
       var pct = astScores[astId].percentage;
-      var riskName = AST_RISK_NAMES[astId] || astId;
+      var risk = riskName(astId);
       var behavior = summarizeBehavior(weakQuestions, astId);
 
       var qs = questionsForRisk(bank, astId);
@@ -93,13 +93,14 @@
       }
       var insight = bestPractices.length > 0
         ? bestPractices[0]
-        : 'Applying OWASP best practices for ' + riskName + ' would significantly reduce your exposure.';
+        : t('fallback.insight.generic', { risk: risk });
 
-      parts.push(
-        riskName + ' is your weakest area at ' + pct + '%. ' +
-        'Among the questions mapped to this risk, you tended to ' + behavior + '. ' +
-        insight
-      );
+      parts.push(t('fallback.narrative.item', {
+        risk: risk,
+        percentage: pct,
+        behavior: behavior,
+        insight: insight
+      }));
     }
     return parts.join('\n\n');
   }
@@ -108,12 +109,12 @@
    * Derive a concise action title from best practices for a risk.
    */
   function deriveTitle(bank, astId) {
-    var riskName = AST_RISK_NAMES[astId] || astId;
+    var risk = riskName(astId);
     var qs = questionsForRisk(bank, astId);
-    if (qs.length === 0) return 'Improve ' + riskName;
+    if (qs.length === 0) return t('fallback.action.title', { risk: risk });
 
     // Default to "Improve {risk_name}" — the most concise, clear pattern
-    return 'Improve ' + riskName;
+    return t('fallback.action.title', { risk: risk });
   }
 
   /**
@@ -123,7 +124,7 @@
     var actions = [];
     for (var i = 0; i < weakIds.length; i++) {
       var astId = weakIds[i];
-      var riskName = AST_RISK_NAMES[astId] || astId;
+      var risk = riskName(astId);
       var qs = questionsForRisk(bank, astId);
 
       var bestPractices = [];
@@ -139,19 +140,17 @@
       }
       if (descriptionParts.length === 0) {
         descriptionParts.push(
-          'Review OWASP Agentic Skills guidance for ' + riskName + ' and apply the recommended mitigations to reduce your exposure.'
+          t('fallback.action.description.generic', { risk: risk })
         );
       }
-      descriptionParts.push(
-        'Refer to the OWASP Agentic Skills Top 10 for detailed checklists and remediation steps.'
-      );
+      descriptionParts.push(t('fallback.action.description.owaspRef'));
       var description = descriptionParts.join(' ');
 
       actions.push({
         priority: i + 1,
         title: deriveTitle(bank, astId),
         description: description,
-        ast_source: astId + ': ' + riskName
+        ast_source: astId + ': ' + risk
       });
     }
     return actions;
@@ -173,7 +172,7 @@
 
     if (weakIds.length === 0) {
       return {
-        narrative: 'Your overall score is ' + (report.percentage || 0) + '%. All AST risk areas are at or above 70%, so no critical gaps were identified.',
+        narrative: t('fallback.narrative.clear', { percentage: report.percentage || 0 }),
         actions: []
       };
     }

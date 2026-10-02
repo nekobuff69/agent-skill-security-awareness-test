@@ -8,11 +8,32 @@
 
   function byId(id) { return document.getElementById(id); }
 
+  // Chrome String lookup, resolved at render time.
+  function t(id, vars) {
+    return app.I18n.t(id, vars);
+  }
+
   function makeEl(tag, cls, text) {
     var n = document.createElement(tag);
     if (cls) n.className = cls;
     if (text) n.textContent = text;
     return n;
+  }
+
+  /**
+   * The language switcher: one control, placed on the landing view and at the
+   * end of the Quiz Chrome. The target URL comes from the page's data-lang-alt
+   * attribute, so no path arithmetic and no auto-detection are involved — a
+   * visitor who does not read the current language navigates away from here.
+   */
+  function langSwitch() {
+    var a = document.createElement('a');
+    a.className = 'lang-switch';
+    a.href = document.documentElement.getAttribute('data-lang-alt') || '#';
+    a.title = t('lang.switchLabel');
+    a.setAttribute('aria-label', t('lang.switchLabel'));
+    a.textContent = t('lang.otherName');
+    return a;
   }
 
   /* ── Quiz state ──────────────────────────────────────────────────── */
@@ -59,7 +80,7 @@
       if (phases[c].id === q.phase) { chipNum = c + 1; break; }
     }
     if (data) {
-      chromeChip.textContent = 'Phase ' + chipNum + ' \u00b7 ' + data.title;
+      chromeChip.textContent = t('quiz.phaseChip', { number: chipNum, title: data.title });
     }
   }
 
@@ -91,18 +112,18 @@
 
     // ── Card header: question-number chip ──
     var cardHeader = makeEl('div', 'quiz-card-header');
-    var numChip = makeEl('span', 'quiz-number-chip', 'Q' + (idx + 1));
+    var numChip = makeEl('span', 'quiz-number-chip', t('quiz.questionChip', { number: idx + 1 }));
     cardHeader.appendChild(numChip);
     card.appendChild(cardHeader);
 
     // ── Scenario block with micro-label ──
     if (q.scenario) {
-      card.appendChild(makeEl('span', 'quiz-label', 'Scenario'));
+      card.appendChild(makeEl('span', 'quiz-label', t('quiz.labelScenario')));
       card.appendChild(makeEl('p', 'quiz-scenario', q.scenario));
     }
 
     // ── Question block with micro-label ──
-    card.appendChild(makeEl('span', 'quiz-label', 'Question'));
+    card.appendChild(makeEl('span', 'quiz-label', t('quiz.labelQuestion')));
     card.appendChild(makeEl('p', 'quiz-question', q.question));
 
     // ── Option buttons with letter badges ──
@@ -139,7 +160,7 @@
 
     // ── Back button (hidden on first card) ──
     if (idx > 0) {
-      var backBtn = makeEl('button', 'quiz-back-btn', '\u2190 Previous');
+      var backBtn = makeEl('button', 'quiz-back-btn', t('quiz.previous'));
       backBtn.addEventListener('click', function() {
         renderQuestion(idx - 1);
       });
@@ -220,7 +241,7 @@
 
   function persist() {
     if (!bank) return;
-    app.SessionStore.save(bank, answers);
+    app.SessionStore.save(bank, answers, app.I18n.locale);
   }
 
   /* ── Quiz completion ─────────────────────────────────────────────── */
@@ -288,15 +309,19 @@
 
     view.appendChild(chrome);
 
-    // Session resume
-    var session = app.SessionStore.load(bank);
+    // Language switcher: the way out of a language the Participant does not read.
+    chrome.appendChild(langSwitch());
+
+    // Session resume — scoped to this page's language, so a Participant who
+    // switches language mid-assessment returns to their answers intact.
+    var session = app.SessionStore.load(bank, app.I18n.locale);
     if (session.ok) {
       answers = session.answers.slice();
     } else {
       for (var i = 0; i < questions.length; i++) answers.push(null);
       if (session.reason === 'stale') {
-        showNotice('The question bank has changed. Starting fresh.');
-        app.SessionStore.clear();
+        showNotice(t('quiz.bankChanged'));
+        app.SessionStore.clear(app.I18n.locale);
       }
     }
 
@@ -321,11 +346,18 @@
     if (!landing) return;
     landing.innerHTML = '';
 
-    landing.appendChild(makeEl('h1', null, meta.title || 'Agent Security Awareness Quiz'));
-    landing.appendChild(makeEl('p', 'subtitle', meta.subtitle || ''));
-    landing.appendChild(makeEl('p', 'meta', (meta.total_questions || 20) + ' questions, ' + (meta.time_estimate || '8-12 minutes')));
+    // Language switcher: the other language is one click away, and switching
+    // keeps the Session the Participant already started in this one.
+    landing.appendChild(langSwitch());
 
-    var btn = makeEl('button', 'btn-primary', 'Start Assessment');
+    landing.appendChild(makeEl('h1', null, meta.title || t('landing.titleFallback')));
+    landing.appendChild(makeEl('p', 'subtitle', meta.subtitle || t('landing.subtitleFallback')));
+    landing.appendChild(makeEl('p', 'meta', t('landing.meta', {
+      count: meta.total_questions || t('landing.metaCountFallback'),
+      time: meta.time_estimate || t('landing.timeFallback')
+    })));
+
+    var btn = makeEl('button', 'btn-primary', t('landing.start'));
     btn.id = 'start-btn';
     btn.addEventListener('click', function() {
       global.Analytics.track('quiz_started');
@@ -334,6 +366,7 @@
     });
     landing.appendChild(btn);
   }
+
 
   /* ── Exports ─────────────────────────────────────────────────────── */
 

@@ -1,7 +1,11 @@
 var fs = require('fs');
 var path = require('path');
 
-// Load the modules under test (they register on globalThis.App)
+// Select the Chrome String dictionary before the modules build any prompt.
+var I18n = require('../../js/i18n.js');
+require('../../i18n/en.js');
+I18n.use('en');
+
 require('../../js/scoring.js');
 require('../../js/fallback.js');
 require('../../js/extractor.js');

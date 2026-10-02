@@ -3,6 +3,12 @@
 
   global.App = global.App || {};
 
+  // Chrome String lookup, resolved inside buildLlmPrompt so the LLM Path
+  // prompt localizes with the rest of the UI.
+  function t(id, vars) {
+    return global.App.I18n.t(id, vars);
+  }
+
   /**
    * Action Plan module.
    *
@@ -76,44 +82,46 @@
    * Grounding Excerpts, with the grounding rules and output contract.
    */
   function buildLlmPrompt(report, bank, excerpts) {
-    var AST = global.App.AST || { names: {}, severity: {} };
-    var title = report.title || { name: 'Unknown', emoji: '?' };
+    var AST = global.App.AST || { severity: {} };
+    var title = report.title || {
+      name: t('prompt.titleFallback'),
+      emoji: t('prompt.titleFallbackEmoji')
+    };
     var percentage = report.percentage != null ? report.percentage : 0;
 
     // --- System Instruction ---
-    var prompt =
-      '## System Instruction\n\n' +
-      'You are a security advisor analyzing a user\'s self-assessment results\n' +
-      'on AI agent skill security, based on the OWASP Agentic Skills Top 10.\n\n' +
-      'Your task: generate a personalized risk assessment and action plan.\n\n' +
-      'RULES:\n\n' +
-      '- Every factual claim MUST trace to the provided OWASP source material\n' +
-      '- Do NOT invent attack scenarios or statistics not in the source\n' +
-      '- Do NOT fabricate OWASP recommendations \u2014 use only what\'s provided\n' +
-      '- If the source material doesn\'t cover a specific situation, say so\n' +
-      '- Write for a non-technical audience \u2014 plain language, no jargon\n' +
-      '- Tone: helpful advisor, not alarmist or condescending\n\n';
+    var prompt = t('llm.system', {
+      languageRule: t('llm.languageRule', { language: t('lang.name') })
+    });
 
     // --- Participant Data ---
-    prompt +=
-      '## Participant Data\n\n' +
-      'Title: ' + title.emoji + ' ' + title.name + '\n' +
-      'Overall: ' + percentage + '%\n\n';
+    // The dictionary template ends with a single newline after the language
+    // rule; the pre-change prompt separated these sections with a blank line,
+    // so the newlines are reproduced here.
+    prompt += '\n' +
+      t('llm.participant.heading') + '\n\n' +
+      t('llm.participant.title', { title: title.emoji + ' ' + title.name }) + '\n' +
+      t('llm.participant.overall', { percentage: percentage }) + '\n\n';
 
     // Per-AST scores, weakest first (order owned by the Scoring report)
     var astRanked = report.astRanked || [];
-    prompt += 'Per-AST Scores:\n';
+    prompt += t('llm.astScores.heading') + '\n';
     for (var i = 0; i < astRanked.length; i++) {
       var r = astRanked[i];
-      var riskName = AST.names[r.id] || r.id;
-      prompt += '- ' + r.id + ' (' + riskName + ', ' + (AST.severity[r.id] || 'medium') + '): ' +
-        r.earned + '/' + r.possible + ' (' + r.percentage + '%)\n';
+      prompt += t('llm.astLine', {
+        id: r.id,
+        name: global.App.I18n.astName(r.id),
+        severity: t('severity.' + (AST.severity[r.id] || 'medium')),
+        earned: r.earned,
+        possible: r.possible,
+        percentage: r.percentage
+      }) + '\n';
     }
 
     // Weakest questions with chosen option / best practice / OWASP link
     var weakQs = report.weakestQuestions || [];
     if (weakQs.length > 0) {
-      prompt += '\nWeakest Questions (lowest performance):\n';
+      prompt += t('llm.weakest.heading');
       for (var j = 0; j < weakQs.length; j++) {
         var wq = weakQs[j];
         // Resolve option text from bank if selectedOption not present
@@ -131,45 +139,30 @@
           }
         }
 
-        prompt += '- ' + wq.id + ': Chose "' + selectedText + '" (score: ' +
-          (wq.weightedScore != null ? wq.weightedScore : 'N/A') + '/3)\n';
-        if (wq.scenario) prompt += '  Scenario: ' + wq.scenario + '\n';
-        if (wq.bestPractice) prompt += '  Best Practice: ' + wq.bestPractice + '\n';
-        if (wq.astSourceUrl) prompt += '  OWASP Source: ' + wq.astSourceUrl + '\n';
+        prompt += t('llm.weakestLine', {
+          id: wq.id,
+          selected: selectedText,
+          score: (wq.weightedScore != null ? wq.weightedScore : 'N/A')
+        }) + '\n';
+        if (wq.scenario) prompt += t('llm.weakestScenario', { text: wq.scenario }) + '\n';
+        if (wq.bestPractice) prompt += t('llm.weakestBestPractice', { text: wq.bestPractice }) + '\n';
+        if (wq.astSourceUrl) prompt += t('llm.weakestOwasp', { url: wq.astSourceUrl }) + '\n';
       }
     }
 
     // --- OWASP Source Material ---
-    prompt += '\n## OWASP Source Material\n\n';
+    prompt += t('llm.source.heading');
     var excerptKeys = Object.keys(excerpts);
     for (var e = 0; e < excerptKeys.length; e++) {
       var ex = excerpts[excerptKeys[e]];
-      prompt += '### ' + excerptKeys[e] + '\n\n';
+      prompt += t('llm.source.section', { id: excerptKeys[e] });
       if (ex.description) prompt += ex.description + '\n\n';
-      if (ex.evidence) prompt += '**Evidence:**\n' + ex.evidence + '\n\n';
-      if (ex.mitigations) prompt += '**Mitigations:**\n' + ex.mitigations + '\n\n';
+      if (ex.evidence) prompt += t('llm.source.evidence', { text: ex.evidence });
+      if (ex.mitigations) prompt += t('llm.source.mitigations', { text: ex.mitigations });
     }
 
     // --- Output Format ---
-    prompt +=
-      '## Output Format\n\n' +
-      'Return ONLY a JSON object, no markdown fences, no commentary:\n\n' +
-      '{\n' +
-      '  "narrative": "2-4 sentence plain-language analysis of the Participant\'s blind spots,\n' +
-      '    referencing their own choices and the OWASP evidence above",\n' +
-      '  "actions": [\n' +
-      '    {\n' +
-      '      "priority": 1,\n' +
-      '      "title": "short imperative action title",\n' +
-      '      "description": "1-2 sentences: what to do and why, grounded in the source material",\n' +
-      '      "ast_source": "AST01"\n' +
-      '    }\n' +
-      '  ]\n' +
-      '}\n\n' +
-      'Rules: 3-5 actions, most important first (priority 1 = first). Each action must be\n' +
-      'grounded in the provided material: its ast_source must be an AST ID covered by the\n' +
-      'OWASP Source Material or Weakest Questions sections, and its description must trace\n' +
-      'to that material.';
+    prompt += t('llm.outputFormat');
 
     return prompt;
   }

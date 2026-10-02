@@ -5,7 +5,14 @@
   global.App = app;
 
   /* ── constants ── */
-  var AST = (global.App && global.App.AST) || { ids: [], names: {}, severity: {} };
+  // AST ids and Severity come from js/ast.js; display names are Chrome
+  // Strings in the dictionary, resolved via App.I18n.astName at render time.
+  var AST = (global.App && global.App.AST) || { ids: [], severity: {} };
+
+  // Chrome String lookup, resolved at render time.
+  function t(id, vars) {
+    return app.I18n.t(id, vars);
+  }
 
   /* ── helpers ── */
 
@@ -217,7 +224,7 @@
       var pct = astRanked[i].percentage || 0;
       var row = el('div', { className: 'results-bar-row' }, [
         el('div', { className: 'results-bar-label' }, [
-          document.createTextNode(AST.names[astId] || astId)
+          document.createTextNode(app.I18n.astName(astId))
         ]),
         el('div', { className: 'results-bar-track' }, [
           el('div', {
@@ -241,7 +248,7 @@
 
     // Loading indicator; on the fallback path assemble resolves in a
     // microtask so this never visibly paints.
-    wrap.appendChild(el('p', { className: 'results-action-narrative results-loading', textContent: 'Crafting your action plan\u2026' }));
+    wrap.appendChild(el('p', { className: 'results-action-narrative results-loading', textContent: t('results.planLoading') }));
 
     // The Action Plan module owns the path decision and retry policy
     App.ActionPlan.assemble(report, bank, corpus, window.APP_CONFIG)
@@ -276,7 +283,7 @@
     if (narrative) {
       var narrativeDetails = el('details', { className: 'results-narrative-details' });
       narrativeDetails.appendChild(el('summary', { className: 'results-narrative-summary' }, [
-        document.createTextNode('Why these actions? Read the analysis')
+        document.createTextNode(t('results.narrativeSummary'))
       ]));
       var paras = narrative.split(/\n\n+/);
       for (var i = 0; i < paras.length; i++) {
@@ -294,25 +301,25 @@
     var wrap = el('div', { className: 'results-deep-dive' });
 
     // Engaging heading + supporting line
-    wrap.appendChild(el('h3', { className: 'results-deep-dive-heading', textContent: 'Want to go deeper?' }));
-    wrap.appendChild(el('p', { className: 'results-deep-dive-sub', textContent: 'Copy this into your agent chat: it turns your agent into a private security tutor for your exact blind spots.' }));
+    wrap.appendChild(el('h3', { className: 'results-deep-dive-heading', textContent: t('results.deepDiveHeading') }));
+    wrap.appendChild(el('p', { className: 'results-deep-dive-sub', textContent: t('results.deepDiveSub') }));
 
     var details = el('details', { className: 'results-prompt-details' });
     var summary = el('summary', { className: 'results-prompt-summary' }, [
-      document.createTextNode('Show Deep-Dive Prompt')
+      document.createTextNode(t('results.showPrompt'))
     ]);
     details.appendChild(summary);
 
     var pre = el('pre', { className: 'results-prompt-pre', textContent: promptText });
     details.appendChild(pre);
 
-    var btn = el('button', { className: 'results-copy-btn', textContent: 'Copy to Clipboard' });
+    var btn = el('button', { className: 'results-copy-btn', textContent: t('results.copy') });
     btn.addEventListener('click', function() {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(promptText).then(function() {
           window.Analytics.track('template_copied');
-          btn.textContent = 'Copied!';
-          setTimeout(function() { btn.textContent = 'Copy to Clipboard'; }, 2000);
+          btn.textContent = t('results.copied');
+          setTimeout(function() { btn.textContent = t('results.copy'); }, 2000);
         }).catch(function() {
           fallbackCopy(promptText, btn);
         });
@@ -336,11 +343,11 @@
     try {
       document.execCommand('copy');
       window.Analytics.track('template_copied');
-      btn.textContent = 'Copied!';
-      setTimeout(function() { btn.textContent = 'Copy to Clipboard'; }, 2000);
+      btn.textContent = t('results.copied');
+      setTimeout(function() { btn.textContent = t('results.copy'); }, 2000);
     } catch (e) {
-      btn.textContent = 'Copy failed';
-      setTimeout(function() { btn.textContent = 'Copy to Clipboard'; }, 2000);
+      btn.textContent = t('results.copyFailed');
+      setTimeout(function() { btn.textContent = t('results.copy'); }, 2000);
     }
     document.body.removeChild(ta);
   }
@@ -371,7 +378,7 @@
 
       // summary — question text as the clickable header
       var summaryEl = el('summary', { className: 'results-review-summary' }, [
-        el('span', { className: 'results-review-qnum', textContent: 'Q' + (q + 1) }),
+        el('span', { className: 'results-review-qnum', textContent: t('quiz.questionChip', { number: q + 1 }) }),
         document.createTextNode(' ' + question.question)
       ]);
       details.appendChild(summaryEl);
@@ -406,7 +413,7 @@
       // selected option feedback
       if (selectedOption && selectedOption.feedback) {
         inner.appendChild(el('div', { className: 'results-review-feedback' }, [
-          el('strong', { textContent: 'Feedback: ' }),
+          el('strong', { textContent: t('review.feedbackLabel') }),
           document.createTextNode(selectedOption.feedback)
         ]));
       }
@@ -414,7 +421,7 @@
       // best practice
       if (question.best_practice) {
         inner.appendChild(el('div', { className: 'results-review-best' }, [
-          el('strong', { textContent: 'Best Practice: ' }),
+          el('strong', { textContent: t('review.bestPracticeLabel') }),
           document.createTextNode(question.best_practice)
         ]));
       }
@@ -426,7 +433,7 @@
           href: question.ast_source_url,
           target: '_blank',
           rel: 'noopener',
-          textContent: 'View on OWASP ↗'
+          textContent: t('review.viewOnOwasp')
         });
         inner.appendChild(link);
       }
@@ -440,7 +447,7 @@
 
   /* ── PNG Download ── */
   function buildDownloadPng(svgEl) {
-    var btn = el('button', { className: 'results-download-btn', textContent: 'Download PNG' });
+    var btn = el('button', { className: 'results-download-btn', textContent: t('results.downloadPng') });
     btn.addEventListener('click', function() {
       var svgStr = new XMLSerializer().serializeToString(svgEl);
       var blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
@@ -472,11 +479,16 @@
   /* ── Share Button ── */
   function buildShareBtn(report) {
     if (!navigator.share) return null;
-    var btn = el('button', { className: 'results-share-btn', textContent: 'Share Results' });
+    var btn = el('button', { className: 'results-share-btn', textContent: t('results.share') });
     btn.addEventListener('click', function() {
       navigator.share({
-        title: 'AST Quiz Results',
-        text: 'I scored ' + report.percentage + '% as ' + report.title.emoji + ' ' + report.title.name + ' on the Agent Security Awareness Quiz.'
+        title: t('results.shareTitle'),
+        text: t('results.shareText', {
+          percentage: report.percentage,
+          emoji: report.title.emoji,
+          name: report.title.name,
+          app: t('doc.title')
+        })
       }).catch(function() { /* user cancelled */ });
     });
     return btn;
@@ -484,9 +496,9 @@
 
   /* ── Retake Button ── */
   function buildRetake() {
-    var btn = el('button', { className: 'results-retake-btn', textContent: 'Retake Assessment' });
+    var btn = el('button', { className: 'results-retake-btn', textContent: t('results.retake') });
     btn.addEventListener('click', function() {
-      App.SessionStore.clear();
+      App.SessionStore.clear(App.I18n.locale);
       App.showView('landing-view');
     });
     return btn;
@@ -511,7 +523,7 @@
 
     // Back control
     var header = el('div', { className: 'results-review-header' }, [
-      el('button', { className: 'results-review-back-btn', textContent: '\u2190 Back to results' })
+      el('button', { className: 'results-review-back-btn', textContent: t('results.reviewBack') })
     ]);
     header.querySelector('.results-review-back-btn').addEventListener('click', function() {
       if (app.showView) app.showView('results-view');
@@ -519,16 +531,16 @@
     reviewView.appendChild(header);
 
     // Heading
-    reviewView.appendChild(el('h2', { className: 'results-section-title', textContent: 'Review Your Answers' }));
+    reviewView.appendChild(el('h2', { className: 'results-section-title', textContent: t('results.reviewTitle') }));
 
     // Review accordion
-    var stored = App.SessionStore.load(_lastBank);
+    var stored = App.SessionStore.load(_lastBank, App.I18n.locale);
     var selections = stored.ok ? stored.answers : [];
     reviewView.appendChild(buildReview(_lastBank, selections));
   }
 
   function buildReviewBtn() {
-    var btn = el('button', { className: 'results-review-btn', textContent: 'Review your answers \u2192' });
+    var btn = el('button', { className: 'results-review-btn', textContent: t('results.reviewBtn') });
     btn.addEventListener('click', function() {
       populateReview();
       if (app.showView) app.showView('review-view');
@@ -550,7 +562,7 @@
 
     // Section: Risk Radar
     var radarSection = el('div', { className: 'results-section' });
-    radarSection.appendChild(el('h2', { className: 'results-section-title', textContent: 'Risk Radar' }));
+    radarSection.appendChild(el('h2', { className: 'results-section-title', textContent: t('results.radarTitle') }));
     var radarWrap = el('div', { className: 'results-radar-wrap' });
     var svg = buildRadar(report);
     radarWrap.appendChild(svg);
@@ -566,19 +578,19 @@
 
     // Blind-Spot Bars
     var barsSection = el('div', { className: 'results-section' });
-    barsSection.appendChild(el('h2', { className: 'results-section-title', textContent: 'Blind-Spot Bars' }));
+    barsSection.appendChild(el('h2', { className: 'results-section-title', textContent: t('results.barsTitle') }));
     barsSection.appendChild(buildBars(report));
     view.appendChild(barsSection);
 
     // Action Plan
     var actionSection = el('div', { className: 'results-section' });
-    actionSection.appendChild(el('h2', { className: 'results-section-title', textContent: 'Action Plan' }));
+    actionSection.appendChild(el('h2', { className: 'results-section-title', textContent: t('results.actionPlanTitle') }));
     actionSection.appendChild(buildActionPlan(report, bank));
     view.appendChild(actionSection);
 
     // Deep-Dive Prompt
     var ddSection = el('div', { className: 'results-section' });
-    ddSection.appendChild(el('h2', { className: 'results-section-title', textContent: 'Deep-Dive Prompt' }));
+    ddSection.appendChild(el('h2', { className: 'results-section-title', textContent: t('results.deepDiveTitle') }));
     ddSection.appendChild(buildDeepDive(report));
     view.appendChild(ddSection);
 
