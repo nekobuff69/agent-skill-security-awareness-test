@@ -6,19 +6,35 @@ Rule-based validation only. No LLM-as-judge, no external API calls, no network r
 
 ## 1. Overview
 
-**Purpose:** Validate `questions.json` integrity, scoring math, LLM output grounding, and the JS module contracts before deployment.
+**Purpose:** Validate every Bank Variant's integrity, scoring math, LLM output grounding, and the JS module contracts before deployment.
 
-**Approach:** Every check is deterministic. The Python runner (`run_tests.py`) reads `questions.json` and a mock LLM output and validates schema, scoring fixtures, and grounding rules. The Node runner (`tests/js/run-tests.js`) executes the JS module tests (pure functions, no browser) — including a gate on the shipped Grounding Corpus itself. Both must pass; `scripts/preflight.sh` runs both as the single pre-deploy gate and exits 0 (all pass) or 1 (any fail).
+**Approach:** Every check is deterministic. The Python runner (`run_tests.py`) discovers every Bank Variant in the repo root (`questions*.json`), validates each one's schema, scoring fixtures, and grounding rules, and prints every failure with the file it came from. The Node runner (`tests/js/run-tests.js`) executes the JS module tests (pure functions, no browser) — including a gate on the shipped Grounding Corpus itself. Both must pass; `scripts/preflight.sh` runs both as the single pre-deploy gate and exits 0 (all pass) or 1 (any fail).
 
-**Scripts:** `run_tests.py` (stdlib only — `json`, `re`, `sys`, `os`, `argparse`) and `tests/js/run-tests.js` (Node, zero dependencies)
+**Scripts:** `run_tests.py` (stdlib only — `json`, `re`, `sys`, `os`, `glob`, `argparse`) and `tests/js/run-tests.js` (Node, zero dependencies)
 
 **Usage:**
 ```bash
-python3 run_tests.py                          # validates questions.json
-python3 run_tests.py --llm tests/mock_llm_output.json  # also validates LLM grounding
+python3 run_tests.py                          # validates every questions*.json Bank Variant
+python3 run_tests.py --llm tests/mock_llm_output.json  # also validates LLM grounding, per Bank Variant
 node tests/js/run-tests.js                    # JS module contracts + grounding corpus gate
 ./scripts/preflight.sh                        # both suites, the pre-deploy gate
 ```
+
+
+## 1a. Multi-Bank Discovery
+
+The gate opens **every** Bank Variant in the repository, not one hardcoded path. A second Variant that is malformed — missing Feedback metadata, a broken Option Score, a dangling Phase reference — fails the gate by name instead of shipping silently.
+
+| Concern | Rule |
+|---|---|
+| Convention | `questions*.json` in the repo root — `questions.json` is the source-language bank, `questions.<tag>.json` is a translated or derived Variant |
+| Ordering | Sorted by path, so output is deterministic across runs |
+| Empty discovery | Zero Banks found is a gate failure, not a silent pass |
+| Per-Bank labelling | Every check message is prefixed with the Bank Variant's filename, e.g. `[FAIL] questions.zh.json Q q06 opt 2: score int 0-3` |
+| Sections | Sections 2 and 3 run per Bank Variant; Section 4 runs per Bank Variant too (one LLM output, validated against each) |
+| Unreadable Bank | A Bank that will not parse as JSON fails the gate with its filename in the message; other Banks still run |
+| `--bank-dir` | Override the discovery directory (default: repo root) |
+| `--grounding-source` | Override which bank's `source_note` fields feed the grounding vocabulary (default: `questions.json`) |
 
 ---
 
@@ -82,12 +98,7 @@ percentage      = (total_earned / total_possible) × 100
 title = first title where percentage ≥ title.threshold
 ```
 
-Title thresholds (from `meta.scoring.titles`):
-- Sentinel: ≥ 90%
-- Practitioner: ≥ 70%
-- Aware: ≥ 50%
-- Newcomer: ≥ 30%
-- Uncharted: < 30%
+Title thresholds (from `meta.scoring.titles`): ≥ 90%, ≥ 70%, ≥ 50%, ≥ 30%, < 30% — five rungs, strictly descending. In the source-language bank those rungs are named Sentinel, Practitioner, Aware, Newcomer, and Uncharted; the gate never hardcodes those names (see §3b).
 
 **Critical detail:** `max_possible` uses the actual maximum option score per question, not a fixed `3`. Two questions (q06, q13) have no score=3 option — their max is 2. This keeps total_possible = 108.
 
@@ -97,12 +108,16 @@ For each entry in `test_fixtures.scoring_cases`:
 
 | Case | Expected | How to verify |
 |---|---|---|
-| `all-zero` | 2.8%, title Uncharted | All answers select the lowest-scoring option per question (ties → lowest index). q19 has no score-0 option, so the floor is 3 weighted points (1 × critical weight 3), not zero |
-| `all-best` | 100%, title Sentinel | Answers select highest-scoring option per question. `null` answers resolve to the index of the highest-scoring option |
-| `common-user` | Title in {Uncharted, Newcomer} | Compute percentage, check title falls in boundary |
-| `security-aware` | Title in {Aware, Practitioner} | Compute percentage, check title falls in boundary |
+| `all-zero` | Percentage matches the bank; Progression Title is the lowest ladder rung | All answers select the lowest-scoring Option per Question (ties → lowest index). q19 has no score-0 Option, so the floor is 3 weighted points (1 × critical Severity Weight 3), not zero |
+| `all-best` | 100%; Progression Title is the highest ladder rung | Answers select the highest-scoring Option per Question. `null` answers resolve to the index of the highest-scoring Option |
+| `common-user` | Progression Title is one of the two lowest ladder rungs | Compute the percentage, resolve the rung, check it is a bottom-of-ladder rung |
+| `security-aware` | Progression Title is one of the middle ladder rungs | Compute the percentage, resolve the rung, check it is a middle rung |
 
-**Null answer resolution:** When an answer is `null`, find the option with the highest `score` and use that. If multiple options tie for highest, use the lowest index.
+**Language independence:** every title assertion compares *which rung of `meta.scoring.titles`* the percentage resolves to — by threshold, not by name — so a Bank Variant carrying a translated Title Ladder passes the same fixtures the source-language bank passes. `all-zero` and `all-best` additionally cross-check the bank's own declared `expected_title` against the resolved rung, so a mistranslated or reordered ladder still fails.
+
+**Length independence:** edge-case inputs are sized from `len(questions)` rather than a hardcoded 20, so a Variant with a different Question count neither spuriously fails nor false-passes.
+
+**Null answer resolution:** When an answer is `null`, find the Option with the highest `score` and use that. If multiple Options tie for highest, use the lowest index.
 
 ### 3c. Edge Cases
 
@@ -114,6 +129,24 @@ For each entry in `test_fixtures.scoring_cases`:
 | Non-integer answer (e.g., `"2"`, `2.5`) | Same — must error gracefully |
 
 These are behavioral checks: call the scoring logic with bad input and assert it does not return a valid score.
+
+### 3d. Variant Equivalence
+
+Schema validation runs each Bank Variant **on its own terms**. That is necessary but not sufficient: a translated file can satisfy every schema rule and still have drifted, because a Variant that re-weights one Question and compensates elsewhere still sums to Total Possible. Section 3d compares every language-independent field of each Variant against the source-language bank, so scoring drift is named rather than absorbed.
+
+| Compared | Rule |
+|---|---|
+| Question ids | The Variant covers exactly the source bank's set |
+| `phase`, `severity_weight`, `ast_source_url` | Identical per Question |
+| `ast_risks` | Same set per Question |
+| Option `score` list | Identical **and in the same order** — the index is what an answer selects |
+| `test` block | Identical per Question |
+| `question_ids` per Phase | Identical membership, not merely the same set of ids |
+| `severity_values` | Identical |
+| `titles[].threshold`, `titles[].emoji` | Identical — a Variant may rename its Progression Title rungs, never move them |
+| `test_fixtures` | Same fixture ids, answers, and expected percentages. `expected_title` is **excluded**: renaming the ladder is what a Variant is for, so a translated fixture's `expected_title` legitimately differs from the source's |
+
+Authored text is the one thing a Variant may differ on. Its **currency** — whether it still says what the English says — is not mechanically checkable, and this section makes no attempt to fake it; that limit is recorded in ADR-0015.
 
 ---
 
@@ -207,13 +240,24 @@ description must trace to that material.
 
 ### Rules
 
+#### The Grounding Corpus
+
+Rules 1 and 2 compare the LLM output against a single **source-language** vocabulary, not against the Bank Variant under test:
+
+```
+grounding text = docs/owasp-ast-full.md
+              + every source_note field of the source-language bank
+```
+
+`GROUNDING_CORPUS_PATH` names the corpus and it is loaded once per run, then reused for every Bank Variant (`--grounding-source` overrides which bank contributes the `source_note` fields). This matters because a translated Bank Variant's `source_note` fields are prose in another language: an English campaign name like `ClawHavoc` in an LLM output would otherwise be rejected as phantom, and translated numerals could raise spurious phantom-statistic hits. Every Bank Variant, in any language, is validated against the same source-language vocabulary. If the corpus or the source-language bank cannot be read, the gate fails rather than comparing against an empty string.
+
 #### Rule 1 — No Phantom Statistics
 
 Extract all numbers from the LLM output (regex: `\b\d[\d,\.]*\b`). For each number found:
 
-- Check if it appears (as a substring) in at least one `source_note` field from `questions.json`
+- Check if it appears (as a substring) in the Grounding Corpus — see the source-language corpus note above
 - If a number is a common structural value (year like `2026`, single digit, percentage format `%`), allow it without source verification
-- Flag any statistic (e.g., `1,184`, `13.4%`, `280+`, `135,000`) not traceable to a `source_note`
+- Flag any statistic (e.g., `1,184`, `13.4%`, `280+`, `135,000`) not traceable to that corpus
 
 **Numbers to allow without source check:** 2, 3, 4, 5, 10, 20 (quiz structural numbers); years `2026`, `2025`; any number followed by `%` if it appears in a title range string.
 
@@ -221,13 +265,13 @@ Extract all numbers from the LLM output (regex: `\b\d[\d,\.]*\b`). For each numb
 
 Extract capitalized multi-word proper nouns (regex: `\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b`). Check each against:
 
-**Known valid campaigns** (from `source_note` fields):
+**Known valid campaigns** (from the Grounding Corpus):
 - `ClawHavoc`
 - `ClawJacked`
 - `SkillJacking`
 - `ToxicSkills`
 
-Any proper-noun attack campaign name not in this list and not appearing in any `source_note` field → FAIL.
+Any proper-noun attack campaign name not in this list and not appearing in the Grounding Corpus → FAIL. The corpus is source-language, so this rule behaves identically for a translated Bank Variant.
 
 #### Rule 3 — No Phantom Tools
 
@@ -272,26 +316,27 @@ has five grounding rules.
 
 ### Runner contract
 
-- **CLI:** `python run_tests.py` validates the bank; `--llm mock_llm_output.json` additionally validates grounding.
-- **Stdlib only** (`json`, `re`, `sys`, `os`, `argparse`); single file in the project root alongside the bank.
-- **Exit code:** 0 = all pass, 1 = any failure.
-- **Output:** one line per check (`[PASS]` / `[FAIL]`), then a summary line.
+- **CLI:** `python run_tests.py` validates every discovered Bank Variant; `--llm mock_llm_output.json` additionally validates grounding, once per Bank Variant; `--bank-dir` and `--grounding-source` override discovery and the source-language bank.
+- **Stdlib only** (`json`, `re`, `sys`, `os`, `glob`, `argparse`); single file in the project root alongside the banks.
+- **Exit code:** 0 = all pass, 1 = any failure. Zero Bank Variants discovered is a failure.
+- **Output:** one line per check (`[PASS]` / `[FAIL]`), each prefixed with the Bank Variant it came from, then a bank list and a summary line.
 - The implementation in `run_tests.py` is the source of truth for mechanics — this spec catalogs the checks, not the code.
 
 ### Constraints
 
-- **Stdlib only:** `json`, `re`, `sys`, `os`, `argparse`
+- **Stdlib only:** `json`, `re`, `sys`, `os`, `glob`, `argparse`
 - **No imports** beyond stdlib
-- **Single file:** `run_tests.py`, placed in the project root alongside `questions.json`
+- **Single file:** `run_tests.py`, placed in the project root alongside the banks
 - **Exit code:** 0 = all pass, 1 = any failure
-- **Output format:** One line per check with `[PASS]` or `[FAIL]`, then summary
+- **Output format:** One line per check with `[PASS]` or `[FAIL]` and the Bank Variant's filename, then bank list and summary
 
-### Expected Check Count (current bank, drifts with content)
+### Expected Check Count (per Bank Variant, drifts with content)
 
-- Section 2: ~656 checks (per-field expansion across 20 Questions and their 80 Options, plus global checks)
-- Section 3: 14 checks (4 fixture cases + 4 edge cases + sub-assertions)
-- Section 4: 7 checks (the five grounding rules)
-- **Total: 677 checks** (as printed by `run_tests.py --llm`)
+- Section 2: 660 checks per Bank Variant (per-field expansion across 20 Questions and their 80 Options, plus global checks)
+- Section 3: 12 checks per Bank Variant (4 fixture cases + 4 edge cases + sub-assertions)
+- Section 3d: 128 checks **per non-source Variant** (the source-language bank is its own reference and is skipped) — 6 per Question plus Phase membership, Severity Weights, Title Ladder, and fixtures
+- Section 4: 7 checks per Bank Variant (the five grounding rules)
+- **Two banks as shipped: 1486 checks** with `--llm` (660 + 660 schema, 12 + 12 scoring, 128 equivalence, 7 + 7 grounding); **1472 without**. With *n* discovered Banks the total scales with *n*, and every check carries its Bank Variant's filename.
 
 
 ---
@@ -358,6 +403,9 @@ A valid mock output for testing Section 4. Every claim traces to `source_note` f
 | `canonical_answer_index` check fails | Options were reordered; score=3 option moved | Reorder or update index |
 | `expected_weighted_max` check fails | severity_weight changed without updating test metadata | Sync `test.expected_weighted_max` with `3 × severity_values[severity_weight]` |
 | Phase-question mapping fails | Question added/removed without updating phase `question_ids` | Sync phase arrays |
+| Failures name only a `questions.<tag>.json` file | That Bank Variant is malformed while the source-language bank is fine | Fix the named Variant; check messages always carry the Bank Variant's filename |
+| `No Bank Variant found matching questions*.json` | The bank was renamed or moved out of the discovery directory | Restore the `questions*.json` naming convention, or point `--bank-dir` at the right directory |
+| LLM Rule 1 (phantom stat) fails for every Bank Variant | The Grounding Corpus or source-language bank is unreadable | The gate already fails loudly in that case; check `docs/owasp-ast-full.md` exists and `--grounding-source` points at a readable bank |
 | LLM Rule 1 (phantom stat) fails | LLM cited a number not in any `source_note` | Add source_note coverage or remove the claim from the prompt |
 | LLM Rule 3 (phantom tool) fails | LLM recommended a tool not in the allowlist | Add to allowlist or remove from prompt |
 | Scoring fixture mismatch | Questions reordered but fixture answers not updated | Reorder fixture answers to match questions array order |

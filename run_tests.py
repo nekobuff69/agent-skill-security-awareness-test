@@ -1,18 +1,35 @@
 #!/usr/bin/env python3
 """Agent Security Quiz — deploy gate.
 
-Validates questions.json schema, scoring math, and LLM output grounding.
-Stdlib only: json, re, sys, os, argparse.
+Validates every Bank Variant in the repo: schema, scoring math, and LLM
+output grounding. Stdlib only: json, re, sys, os, glob, argparse.
 """
 
 import argparse
+import glob
 import json
 import os
 import re
 import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-QUESTIONS_PATH = os.path.join(SCRIPT_DIR, "questions.json")
+
+# ── Bank discovery ────────────────────────────────────────────────────────
+# Every Bank Variant lives in the repo root and matches questions*.json:
+# questions.json is the source-language bank, questions.<tag>.json is a
+# translated or otherwise derived Variant.
+BANK_GLOB = "questions*.json"
+
+# The source-language bank. Its source_note fields are part of the grounding
+# vocabulary, whichever Bank Variant is under test.
+SOURCE_LANGUAGE_BANK = os.path.join(SCRIPT_DIR, "questions.json")
+
+# ── Grounding vocabulary ─────────────────────────────────────────────────
+# Grounding comparisons always resolve against the source language: the OWASP
+# Grounding Corpus plus the source-language bank's source_note fields. A Bank
+# Variant in any language is validated against that same vocabulary, so a
+# campaign name is not judged phantom just because it was translated.
+GROUNDING_CORPUS_PATH = os.path.join(SCRIPT_DIR, "docs", "owasp-ast-full.md")
 
 SEVERITY_VALUES = {"critical": 3, "high": 2, "medium": 1}
 TITLE_THRESHOLDS = [90, 70, 50, 30, 0]
@@ -39,6 +56,58 @@ ALLOWED_NUMBER_RE = re.compile(
 def load_json(path):
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def discover_banks(bank_dir):
+    """Every Bank Variant in bank_dir, sorted for deterministic output."""
+    matches = glob.glob(os.path.join(bank_dir, BANK_GLOB))
+    return sorted(p for p in matches if os.path.isfile(p))
+
+
+# ── Grounding vocabulary, loaded once per source-language bank ───────────
+_GROUNDING_CACHE = {}
+
+
+def load_grounding_corpus(source_bank_path):
+    """Return (text, errors): the source-language grounding vocabulary.
+
+    Built from the OWASP Grounding Corpus plus the source-language bank's
+    source_note fields — never from the bank under test, whose source_note
+    prose may be written in another language.
+    """
+    key = os.path.abspath(source_bank_path)
+    if key in _GROUNDING_CACHE:
+        return _GROUNDING_CACHE[key]
+
+    errors = []
+    parts = []
+
+    try:
+        with open(GROUNDING_CORPUS_PATH, "r", encoding="utf-8") as f:
+            parts.append(f.read())
+    except OSError as exc:
+        errors.append(
+            f"grounding corpus unreadable at {GROUNDING_CORPUS_PATH}: {exc}"
+        )
+
+    if not os.path.exists(source_bank_path):
+        errors.append(f"source-language bank not found at {source_bank_path}")
+    else:
+        try:
+            source_bank = load_json(source_bank_path)
+        except (OSError, ValueError) as exc:
+            errors.append(
+                f"source-language bank unreadable at {source_bank_path}: {exc}"
+            )
+            source_bank = {}
+        for q in source_bank.get("questions", []):
+            note = q.get("source_note", "")
+            if isinstance(note, str):
+                parts.append(note)
+
+    result = ("\n".join(parts), errors)
+    _GROUNDING_CACHE[key] = result
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -68,18 +137,138 @@ def compute_score(bank, answers):
     return earned, possible
 
 
+def title_ladder(bank):
+    """The bank's Title Ladder, ascending by threshold."""
+    titles = bank.get("meta", {}).get("scoring", {}).get("titles", [])
+    return sorted(
+        (t for t in titles if isinstance(t.get("threshold"), (int, float))),
+        key=lambda t: t["threshold"],
+    )
+
+
 def resolve_title(bank, percentage):
     for t in bank["meta"]["scoring"]["titles"]:
         if percentage >= t["threshold"]:
             return t["name"]
-    return "Uncharted"
+    ladder = title_ladder(bank)
+    return ladder[0].get("name") if ladder else None
+
+
+def label_results(label, results):
+    """Prefix every check label with the Bank Variant it came from."""
+    if not label:
+        return results
+    return [(f"{label} {msg}", ok) for msg, ok in results]
+
+
+
+def validate_variant_equivalence(source, variant, source_label, variant_label):
+    """Assert a Bank Variant is scoring-equivalent to its source bank.
+
+    Schema validation runs each bank on its own terms, which a variant can
+    satisfy while having drifted: a translated file with one re-weighted
+    Question still sums to Total Possible if another moved the other way.
+    This compares every language-independent field against the source bank,
+    so scoring drift is named rather than absorbed.
+
+    Only structural and scoring fields are compared. Authored text is the one
+    thing a variant is allowed to differ on, and its currency is not
+    mechanically checkable at all.
+    """
+    results = []
+
+    src_questions = {q.get("id"): q for q in source.get("questions", [])}
+    var_questions = {q.get("id"): q for q in variant.get("questions", [])}
+
+    def detail(msg, ok, extra):
+        """Fold diagnostics into the message — the gate's (label, ok) contract."""
+        return (f"{msg} [{extra}]" if extra else msg, ok)
+
+    only_src = sorted(set(src_questions) - set(var_questions))
+    only_var = sorted(set(var_questions) - set(src_questions))
+    results.append(detail(
+        "Variant covers the same Question ids as the source bank",
+        not only_src and not only_var,
+        f"only in source: {only_src}; only in variant: {only_var}",
+    ))
+
+    for qid in sorted(set(src_questions) & set(var_questions)):
+        s, v = src_questions[qid], var_questions[qid]
+        for field in ("phase", "severity_weight", "ast_source_url"):
+            results.append((
+                f"Q {qid}: {field} matches the source bank",
+                s.get(field) == v.get(field),
+            ))
+        results.append((
+            f"Q {qid}: ast_risks match the source bank",
+            sorted(s.get("ast_risks", [])) == sorted(v.get("ast_risks", [])),
+        ))
+        s_scores = [o.get("score") for o in s.get("options", [])]
+        v_scores = [o.get("score") for o in v.get("options", [])]
+        results.append(detail(
+            f"Q {qid}: Option Scores match the source bank, in order",
+            s_scores == v_scores,
+            f"source {s_scores} vs variant {v_scores}",
+        ))
+        results.append((
+            f"Q {qid}: test block matches the source bank",
+            s.get("test") == v.get("test"),
+        ))
+
+    # Phase membership must be identical, not merely the same set of ids.
+    src_phases = {p.get("id"): p.get("question_ids", []) for p in source.get("phases", [])}
+    var_phases = {p.get("id"): p.get("question_ids", []) for p in variant.get("phases", [])}
+    for pid in sorted(set(src_phases) | set(var_phases)):
+        results.append(detail(
+            f"Phase {pid}: question membership matches the source bank",
+            src_phases.get(pid) == var_phases.get(pid),
+            f"source {src_phases.get(pid)} vs variant {var_phases.get(pid)}",
+        ))
+
+    # Severity weights and Title Ladder thresholds drive scoring, so a
+    # translated ladder may rename its rungs but never move them.
+    src_scoring = source.get("meta", {}).get("scoring", {})
+    var_scoring = variant.get("meta", {}).get("scoring", {})
+    results.append((
+        "Severity Weights match the source bank",
+        src_scoring.get("severity_values") == var_scoring.get("severity_values"),
+    ))
+    results.append((
+        "Title Ladder thresholds match the source bank",
+        [t.get("threshold") for t in src_scoring.get("titles", [])]
+        == [t.get("threshold") for t in var_scoring.get("titles", [])],
+    ))
+    results.append((
+        "Title Ladder emoji match the source bank",
+        [t.get("emoji") for t in src_scoring.get("titles", [])]
+        == [t.get("emoji") for t in var_scoring.get("titles", [])],
+    ))
+    results.append((
+        "Scoring fixtures match the source bank",
+        _fixture_shape(source) == _fixture_shape(variant),
+    ))
+
+    return label_results(variant_label, results)
+
+
+def _fixture_shape(bank):
+    """Fixture answers and expected percentages, ignoring fixture titles.
+
+    A variant renames its Progression Title rungs, so expected_title differs
+    by design; the answers and percentages that define them must not.
+    """
+    cases = bank.get("test_fixtures", {}).get("scoring_cases", [])
+    return [
+        (c.get("id"), c.get("answers"), c.get("expected_percentage"))
+        for c in cases
+    ]
 
 
 # ---------------------------------------------------------------------------
 # Section 2 — Schema validation
 # ---------------------------------------------------------------------------
 
-def validate_schema(bank):
+def validate_schema(bank, label):
     results = []
     questions = bank.get("questions", [])
 
@@ -286,16 +475,23 @@ def validate_schema(bank):
         len(q_id_list) == len(set(q_id_list)),
     ))
 
-    return results
+    return label_results(label, results)
 
 
 # ---------------------------------------------------------------------------
 # Section 3 — Scoring verification
 # ---------------------------------------------------------------------------
 
-def validate_scoring(bank):
+def validate_scoring(bank, label):
     results = []
     fixtures = bank.get("test_fixtures", {}).get("scoring_cases", [])
+    ladder = title_ladder(bank)
+    # Title Ladder rungs by position, so fixture boundaries are expressed as
+    # "which rung" rather than as English Progression Title names.
+    thresholds = [t["threshold"] for t in ladder]
+    low_rungs = set(thresholds[:2])
+    mid_rungs = set(thresholds[2:4])
+    q_count = len(bank.get("questions", []))
 
     # --- Fixture tests ---
     for case in fixtures:
@@ -303,90 +499,89 @@ def validate_scoring(bank):
         answers = case.get("answers", [])
         result = compute_score(bank, answers)
 
+        if cid not in ("all-zero", "all-best", "common-user", "security-aware"):
+            continue
+
+        if result is None:
+            results.append((f"Fixture '{cid}': scored", False))
+            continue
+
+        earned, possible = result
+        pct = (earned / possible * 100) if possible else 0
+        title = resolve_title(bank, pct)
+
         if cid == "all-zero":
-            if result is None:
-                results.append((f"Fixture '{cid}': scored", False))
-            else:
-                earned, possible = result
-                pct = (earned / possible * 100) if possible else 0
-                title = resolve_title(bank, pct)
-                expected_pct = case.get("expected_percentage")
-                results.append((
-                    f"Fixture '{cid}': percentage == {expected_pct} (from bank)",
-                    expected_pct is not None and round(pct, 1) == round(float(expected_pct), 1),
-                ))
-                results.append((
-                    f"Fixture '{cid}': title == Uncharted",
-                    title == case.get("expected_title", "Uncharted"),
-                ))
-
+            expected_pct = case.get("expected_percentage")
+            results.append((
+                f"Fixture '{cid}': percentage == {expected_pct} (from bank)",
+                expected_pct is not None
+                and round(pct, 1) == round(float(expected_pct), 1),
+            ))
         elif cid == "all-best":
-            if result is None:
-                results.append((f"Fixture '{cid}': scored", False))
-            else:
-                earned, possible = result
-                pct = (earned / possible * 100) if possible else 0
-                title = resolve_title(bank, pct)
-                results.append((
-                    f"Fixture '{cid}': percentage == 100",
-                    pct == 100.0,
-                ))
-                results.append((
-                    f"Fixture '{cid}': title == Sentinel",
-                    title == "Sentinel",
-                ))
+            results.append((
+                f"Fixture '{cid}': percentage == 100",
+                pct == 100.0,
+            ))
 
+        resolved_threshold = None
+        for t in ladder:
+            if t.get("name") == title:
+                resolved_threshold = t["threshold"]
+                break
+
+        if cid in ("all-zero", "all-best"):
+            top = max(thresholds) if thresholds else None
+            want = thresholds[0] if cid == "all-zero" else top
+            results.append((
+                f"Fixture '{cid}': resolves to ladder rung with threshold {want}",
+                resolved_threshold == want,
+            ))
+            declared = case.get("expected_title")
+            if declared is not None:
+                results.append((
+                    f"Fixture '{cid}': title matches bank-declared expected_title",
+                    title == declared,
+                ))
         elif cid == "common-user":
-            if result is None:
-                results.append((f"Fixture '{cid}': scored", False))
-            else:
-                earned, possible = result
-                pct = (earned / possible * 100) if possible else 0
-                title = resolve_title(bank, pct)
-                results.append((
-                    f"Fixture '{cid}': title in {{Uncharted, Newcomer}}",
-                    title in {"Uncharted", "Newcomer"},
-                ))
-
+            results.append((
+                f"Fixture '{cid}': resolves to the two lowest ladder rungs",
+                resolved_threshold in low_rungs,
+            ))
         elif cid == "security-aware":
-            if result is None:
-                results.append((f"Fixture '{cid}': scored", False))
-            else:
-                earned, possible = result
-                pct = (earned / possible * 100) if possible else 0
-                title = resolve_title(bank, pct)
-                results.append((
-                    f"Fixture '{cid}': title in {{Aware, Practitioner}}",
-                    title in {"Aware", "Practitioner"},
-                ))
+            results.append((
+                f"Fixture '{cid}': resolves to the middle ladder rungs",
+                resolved_threshold in mid_rungs,
+            ))
 
     # --- Edge cases ---
     edge_cases = [
         ("empty answers", []),
-        ("short answers", [0] * 10),
-        ("invalid index", [5] * 20),
-        ("non-integer", ["2"] * 20),
+        ("short answers", [0] * max(1, q_count // 2)),
+        ("invalid index", [5] * q_count),
+        ("non-integer", ["2"] * q_count),
     ]
-    for label, bad_answers in edge_cases:
+    for edge_label, bad_answers in edge_cases:
         result = compute_score(bank, bad_answers)
         results.append((
-            f"Edge '{label}': returns None (error state)",
+            f"Edge '{edge_label}': returns None (error state)",
             result is None,
         ))
 
-    return results
+    return label_results(label, results)
 
 
 # ---------------------------------------------------------------------------
 # Section 4 — LLM grounding validation
 # ---------------------------------------------------------------------------
 
-def validate_llm_grounding(bank, llm_output):
+def validate_llm_grounding(bank, llm_output, label, grounding_text):
     results = []
     narrative = llm_output.get("narrative", "")
     actions = llm_output.get("actions", [])
-    source_notes = [q.get("source_note", "") for q in bank.get("questions", [])]
-    all_source_text = " ".join(source_notes)
+    # Grounding vocabulary is the source-language corpus, not the bank under
+    # test: a translated Bank Variant must still recognise the campaign names
+    # and statistics of the source material.
+    all_source_text = grounding_text
     ast_risks_in_bank = set()
     for q in bank.get("questions", []):
         for r in q.get("ast_risks", []):
@@ -486,7 +681,7 @@ def validate_llm_grounding(bank, llm_output):
             ast_id in ast_risks_in_bank,
         ))
 
-    return results
+    return label_results(label, results)
 
 
 # ---------------------------------------------------------------------------
@@ -496,48 +691,108 @@ def validate_llm_grounding(bank, llm_output):
 def main():
     parser = argparse.ArgumentParser(description="Agent Security Quiz deploy gate")
     parser.add_argument("--llm", help="Path to LLM output JSON for grounding validation")
+    parser.add_argument(
+        "--grounding-source",
+        default=SOURCE_LANGUAGE_BANK,
+        help="Source-language bank whose source_note fields feed the grounding vocabulary",
+    )
+    parser.add_argument(
+        "--bank-dir",
+        default=SCRIPT_DIR,
+        help="Directory to discover Bank Variants in (default: repo root)",
+    )
     args = parser.parse_args()
 
-    # Load questions.json
-    if not os.path.exists(QUESTIONS_PATH):
-        print(f"[FAIL] questions.json not found at {QUESTIONS_PATH}")
+    # Discover every Bank Variant: questions*.json in the bank directory.
+    bank_paths = discover_banks(args.bank_dir)
+    if not bank_paths:
+        print(f"[FAIL] No Bank Variant found matching {BANK_GLOB} in {args.bank_dir}")
         sys.exit(1)
 
-    bank = load_json(QUESTIONS_PATH)
-
-    all_results = []
-    all_results.append(("--- Section 2: Schema Validation ---", None))
-    all_results.extend(validate_schema(bank))
-
-    all_results.append(("--- Section 3: Scoring Verification ---", None))
-    all_results.extend(validate_scoring(bank))
-
-    # Section 4 — LLM grounding
+    # Section 4 runs once per Bank Variant, always against the same
+    # source-language grounding corpus.
+    grounding_text = ""
+    llm_output = None
     if args.llm:
-        llm_path = os.path.join(SCRIPT_DIR, args.llm) if not os.path.isabs(args.llm) else args.llm
+        grounding_text, grounding_errors = load_grounding_corpus(args.grounding_source)
+        for err in grounding_errors:
+            print(f"[FAIL] {err}")
+            sys.exit(1)
+        llm_path = (
+            args.llm if os.path.isabs(args.llm)
+            else os.path.join(SCRIPT_DIR, args.llm)
+        )
         if not os.path.exists(llm_path):
             print(f"[FAIL] LLM output not found at {llm_path}")
             sys.exit(1)
         llm_output = load_json(llm_path)
-        all_results.append(("--- Section 4: LLM Grounding ---", None))
-        all_results.extend(validate_llm_grounding(bank, llm_output))
+
+    # The source-language bank is the reference every other Bank Variant is
+    # compared against for scoring equivalence.
+    source_bank_path = os.path.abspath(args.grounding_source)
+    source_label = os.path.basename(source_bank_path)
+    source_bank = None
+    if any(os.path.abspath(p) != source_bank_path for p in bank_paths):
+        try:
+            source_bank = load_json(source_bank_path)
+        except (OSError, ValueError) as exc:
+            print(f"[FAIL] source bank is loadable JSON: {exc}")
+            sys.exit(1)
+
+    all_results = []
+    for bank_path in bank_paths:
+        label = os.path.basename(bank_path)
+        try:
+            bank = load_json(bank_path)
+        except (OSError, ValueError) as exc:
+            all_results.append((f"[{label}] bank is loadable JSON", False))
+            all_results.append((f"[{label}] {exc}", False))
+            continue
+
+        all_results.append((f"=== Bank Variant: {label} ===", None))
+        all_results.append((f"--- Section 2: Schema Validation ({label}) ---", None))
+        all_results.extend(validate_schema(bank, label))
+
+        all_results.append((f"--- Section 3: Scoring Verification ({label}) ---", None))
+        all_results.extend(validate_scoring(bank, label))
+
+        # Section 3b: a Bank Variant must stay scoring-equivalent to the
+        # source-language bank. Schema validation alone cannot see a
+        # re-weighted Question inside a translated file.
+        if bank_path != source_bank_path:
+            all_results.append(
+                (f"--- Section 3b: Variant Equivalence ({label}) ---", None)
+            )
+            all_results.extend(
+                validate_variant_equivalence(source_bank, bank, source_label, label)
+            )
+
+        if args.llm:
+            all_results.append((f"--- Section 4: LLM Grounding ({label}) ---", None))
+            all_results.extend(
+                validate_llm_grounding(bank, llm_output, label, grounding_text)
+            )
 
     # Output
     passed = 0
     failed = 0
-    for label, result in all_results:
+    for msg, result in all_results:
         if result is None:
-            print(label)
+            print(msg)
             continue
         if result:
-            print(f"  [PASS] {label}")
+            print(f"  [PASS] {msg}")
             passed += 1
         else:
-            print(f"  [FAIL] {label}")
+            print(f"  [FAIL] {msg}")
             failed += 1
 
     total = passed + failed
     print()
+    print(
+        f"Banks validated: {len(bank_paths)} "
+        f"({', '.join(os.path.basename(p) for p in bank_paths)})"
+    )
     if failed == 0:
         print(f"Summary: {passed}/{total} checks passed. All green.")
     else:
