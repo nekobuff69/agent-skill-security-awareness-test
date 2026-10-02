@@ -104,6 +104,14 @@ exports.run = function() {
     check('llm|first-attempt: prompt carries the report and grounding',
       fakeCalls[0] && fakeCalls[0].prompt.indexOf('Per-AST Scores') !== -1 &&
       fakeCalls[0].prompt.indexOf('OWASP Source Material') !== -1);
+    // The budget is enforced on the string assemble() actually hands to
+    // App.LLMClient.generate, not only inside buildLlmPrompt.
+    check('llm|first-attempt: the prompt sent is within t(\'llm.budget\')',
+      fakeCalls[0] && fakeCalls[0].prompt.length <= I18n.t('llm.budget'),
+      (fakeCalls[0] ? fakeCalls[0].prompt.length : 'no call') + ' / ' + I18n.t('llm.budget'));
+    check('llm|first-attempt: the prompt sent keeps the Output Format intact',
+      fakeCalls[0] &&
+      fakeCalls[0].prompt.slice(-I18n.t('llm.outputFormat').length) === I18n.t('llm.outputFormat'));
     check('llm|first-attempt: proxy config forwarded',
       fakeCalls[0] && fakeCalls[0].config.proxyUrl === 'https://proxy.example');
   }));

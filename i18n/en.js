@@ -112,7 +112,12 @@
     'prompt.item.owasp': 'OWASP: {url}',
 
     /* ── LLM Path prompt ── */
-    'llm.budget': 6000,
+    // Measured, not guessed: a full normal report (5 Grounding Excerpts in
+    // full + 5 Weakest Questions) assembles to ~20.6k characters. 12000 keeps
+    // every Grounding Excerpt while trimming each field to a readable length,
+    // so the ladder only sheds material on a pathological report — which is
+    // what a guardrail is for.
+    'llm.budget': 12000,
     'llm.system': '## System Instruction\n\nYou are a security advisor analyzing a user\'s self-assessment results\non AI agent skill security, based on the OWASP Agentic Skills Top 10.\n\nYour task: generate a personalized risk assessment and action plan.\n\nRULES:\n\n- Every factual claim MUST trace to the provided OWASP source material\n- Do NOT invent attack scenarios or statistics not in the source\n- Do NOT fabricate OWASP recommendations — use only what\'s provided\n- If the source material doesn\'t cover a specific situation, say so\n- Write for a non-technical audience — plain language, no jargon\n- Tone: helpful advisor, not alarmist or condescending\n{languageRule}\n',
     'llm.languageRule': '- Write the Narrative and Actions in {language}.',
     'llm.participant.heading': '## Participant Data',
@@ -131,6 +136,9 @@
     'llm.source.mitigations': '**Mitigations:**\n{text}\n\n',
     'llm.excerpt.truncated': '[truncated for the prompt budget]',
     'llm.outputFormat': '## Output Format\n\nReturn ONLY a JSON object, no markdown fences, no commentary:\n\n{\n  "narrative": "2-4 sentence plain-language analysis of the Participant\'s blind spots,\n    referencing their own choices and the OWASP evidence above",\n  "actions": [\n    {\n      "priority": 1,\n      "title": "short imperative action title",\n      "description": "1-2 sentences: what to do and why, grounded in the source material",\n      "ast_source": "AST01"\n    }\n  ]\n}\n\nRules: 3-5 actions, most important first (priority 1 = first). Each action must be\ngrounded in the provided material: its ast_source must be an AST ID covered by the\nOWASP Source Material or Weakest Questions sections, and its description must trace\nto that material.',
+    'llm.prompt.truncated': '[source material clipped to fit the prompt budget]',
+    'llm.titleFallback': 'Unknown',
+    'llm.titleFallbackEmoji': '?',
 
     /* ── Severity labels used in the LLM prompt ── */
     'severity.critical': 'critical',

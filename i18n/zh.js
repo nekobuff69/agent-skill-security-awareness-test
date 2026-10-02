@@ -114,7 +114,8 @@
     'prompt.item.owasp': 'OWASP：{url}',
 
     /* ── LLM 路径提示词 ── */
-    'llm.budget': 6000,
+    // 与英文侧同一个实测值：正常报告会裁剪字段长度，但五段 OWASP 素材全部保留。
+    'llm.budget': 12000,
     'llm.system': '## 系统指令\n\n你在分析一份关于 AI 智能体技能安全的用户自评结果，\n依据是 OWASP Agentic Skills Top 10。\n\n你的任务：生成一份个性化的风险评估与行动计划。\n\n规则：\n\n- 每一条事实性陈述都必须能追溯到给出的 OWASP 素材\n- 不要编造素材中没有的攻击场景或统计数据\n- 不要伪造 OWASP 建议——只用给出的内容\n- 如果素材没有覆盖某个具体情形，就直说没有\n- 面向非技术读者——用大白话，不用行话\n- 语气：有帮助的顾问，不制造恐慌，也不居高临下\n{languageRule}\n',
     'llm.languageRule': '- 用 {language} 撰写 Narrative 与 actions；OWASP 证据引用保留英文原文；凡引用 OWASP 素材之处，同时给出中文释义与英文原文。',
     'llm.participant.heading': '## 参与者数据',
@@ -133,6 +134,9 @@
     'llm.source.mitigations': '**缓解措施：**\n{text}\n\n',
     'llm.excerpt.truncated': '（为控制提示词长度已截断）',
     'llm.outputFormat': '## 输出格式\n\n只返回一个 JSON 对象，不要 markdown 代码块，不要任何说明文字：\n\n{\n  "narrative": "用 2-4 句话、通俗地分析参与者的盲区，\n    结合他自己的选择与上面的 OWASP 证据",\n  "actions": [\n    {\n      "priority": 1,\n      "title": "简短的动作标题，用命令式",\n      "description": "1-2 句话：做什么、为什么，必须落在给出的素材上",\n      "ast_source": "AST01"\n    }\n  ]\n}\n\n规则：3-5 条行动，重要的排在前面（priority 1 为第一）。每条行动都必须有素材支撑：它的 ast_source 必须是在 OWASP 素材或表现最弱的题目中出现过的 AST ID，它的 description 必须能追溯到那份素材。',
+    'llm.prompt.truncated': '（为控制提示词长度，此处素材已被裁剪）',
+    'llm.titleFallback': '未知',
+    'llm.titleFallbackEmoji': '?',
 
     /* ── LLM 提示词里的 Severity 标签（结构化数据，保持英文） ── */
     'severity.critical': 'critical',
