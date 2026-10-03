@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  One assessment, two languages.
+
+  Every URL carries the full set of language alternates rather than just its
+  own, which is what tells a crawler the two pages are variants of one thing
+  and not two competing pages. This mirrors the hreflang links in both page
+  heads; if you change one, change the other.
+
+  Absolute URLs are required here — a sitemap has no page to resolve against —
+  so this file, and the og:url / og:image tags in the two page heads, are tied
+  to the production origin. Adopting a custom domain means updating all four.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://agent-security-quiz.pages.dev/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://agent-security-quiz.pages.dev/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://agent-security-quiz.pages.dev/zh/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://agent-security-quiz.pages.dev/"/>
+  </url>
+  <url>
+    <loc>https://agent-security-quiz.pages.dev/zh/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://agent-security-quiz.pages.dev/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://agent-security-quiz.pages.dev/zh/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://agent-security-quiz.pages.dev/"/>
+  </url>
+</urlset>

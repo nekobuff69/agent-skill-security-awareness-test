@@ -7,9 +7,4 @@
 User-agent: *
 Allow: /
 
-# No Sitemap directive yet. Unlike canonical and hreflang — which are
-# host-relative and therefore correct on any origin — a Sitemap directive must
-# be an absolute URL, so it cannot be written until the production origin
-# exists. Add it here at deploy time, alongside sitemap.xml:
-#
-#   Sitemap: https://<origin>/sitemap.xml
+Sitemap: https://agent-security-quiz.pages.dev/sitemap.xml
