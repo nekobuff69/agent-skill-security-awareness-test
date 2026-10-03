@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Page not found · 页面不存在</title>
+
+  <!--
+    Cloudflare Pages serves this document for ANY unmatched path, but the
+    browser's base URL is the URL that was requested — not /404.html. So every
+    asset here is an absolute path. A relative "styles.css" on a request for
+    /some/missing/page would resolve to /some/missing/styles.css and 404 in
+    turn, turning one broken link into three.
+
+    Both languages are shown side by side rather than one being guessed. A 404
+    is precisely the case where nothing is known about the visitor, and the
+    language switch is the one control that cannot be wrong.
+  -->
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/css/theme-surya.css">
+  <link rel="icon" href="data:,">
+</head>
+<body>
+  <main class="not-found">
+    <p class="not-found-code">404</p>
+
+    <h1 class="not-found-title" lang="en">That page doesn&rsquo;t exist.</h1>
+    <h1 class="not-found-title" lang="zh-Hans">该页面不存在。</h1>
+
+    <p class="not-found-body" lang="en">The assessment is two pages, one per language. Pick one:</p>
+    <p class="not-found-body" lang="zh-Hans">测评只有两个页面，每种语言一个。请选择：</p>
+
+    <nav class="not-found-actions">
+      <a class="not-found-link" href="/">English</a>
+      <a class="not-found-link" href="/zh/" lang="zh-Hans">简体中文</a>
+    </nav>
+  </main>
+
+  <style>
+    .not-found {
+      max-width: 34rem;
+      margin: 0 auto;
+      padding: 12vh var(--space-4, 24px) var(--space-8, 64px);
+      text-align: center;
+      font-family: var(--font-body, sans-serif);
+      color: var(--color-text, #1A1A1A);
+    }
+
+    .not-found-code {
+      margin: 0 0 var(--space-3, 16px);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      color: var(--color-accent, #ED682B);
+    }
+
+    .not-found-title {
+      margin: 0 0 var(--space-2, 8px);
+      font-family: var(--font-heading, serif);
+      font-size: clamp(1.75rem, 5vw, 2.5rem);
+      line-height: 1.2;
+      font-weight: 600;
+    }
+
+    .not-found-body {
+      margin: 0 0 var(--space-5, 32px);
+      color: var(--color-text-muted, #666666);
+      line-height: 1.6;
+    }
+
+    .not-found-actions {
+      display: flex;
+      gap: var(--space-3, 16px);
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .not-found-link {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.6rem 1.4rem;
+      border: 1px solid var(--color-border, #E0E0E0);
+      border-radius: 999px;
+      color: var(--color-text, #1A1A1A);
+      text-decoration: none;
+      font-weight: 500;
+      transition: border-color var(--transition-fast, 150ms ease);
+    }
+
+    .not-found-link:hover,
+    .not-found-link:focus-visible {
+      border-color: var(--color-accent, #ED682B);
+      color: var(--color-accent, #ED682B);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .not-found-link { transition: none; }
+    }
+  </style>
+</body>
+</html>
