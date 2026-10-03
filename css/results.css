@@ -46,12 +46,12 @@
    largest, most eye-catching element on the page finally says something:
    a 100% does not render in the same orange as every risk indicator.
 
-   Same tokens as the bar fills. The headline sits on the dark title card,
-   where these clear 3:1 at both ends of the gradient (worst case is red at
-   3.43:1), so large text is legible without a second token set. */
-.results-title-pct.results-green { color: var(--color-success); }
-.results-title-pct.results-amber { color: var(--color-warning); }
-.results-title-pct.results-red   { color: var(--color-error); }
+   The --color-score-* set, not the bar-fill tokens below: this sits on the
+   dark card, where the fill values would not clear 3:1. See the Score colours
+   block in css/theme-surya.css for the measurements behind both sets. */
+.results-title-pct.results-green { color: var(--color-score-green); }
+.results-title-pct.results-amber { color: var(--color-score-amber); }
+.results-title-pct.results-red   { color: var(--color-score-red); }
 
 /* ── Section wrapper ── */
 .results-section {
@@ -154,7 +154,18 @@
   text-align: right;
 }
 
-/* bar color classes */
+/* Bar fill colours.
+
+   These use --color-success/--color-warning/--color-error — the track-facing
+   set, not the --color-score-* set used by the headline above. The bars render
+   against the light --color-border track, where these clear 3:1 (3.88 / 3.37 /
+   3.77). The previous values were 2.11 / 1.23 / 2.79 and failed.
+
+   The two selector forms are both kept: js/results.js puts the class on the
+   fill itself (.results-bar-fill.results-red), while these rules also support
+   an ancestor carrying it. The compound selector is what wins over the
+   single-class .results-bar-fill rule in css/theme-surya.css, which is why the
+   bars are not all orange. */
 .results-red .results-bar-fill,
 .results-bar-fill.results-red {
   background: var(--color-error);

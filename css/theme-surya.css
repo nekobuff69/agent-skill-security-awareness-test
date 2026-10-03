@@ -18,23 +18,38 @@
   --color-text-muted: #666666;
   --color-text-light: #9E9E9E;
 
-  --color-success: #4CAF50;
-  --color-warning: #FFC107;
-  --color-error: #F44336;
+  /* ── Score colours ──
+
+     One meaning, two surfaces, two sets. The result headline sits on the dark
+     .results-title-card (a #1A1A1A -> #333 gradient); the bar fills sit on the
+     light --color-border track (#E0E0E0). A single value cannot serve both: the
+     gamut was measured and there is no amber or red that clears 3:1 against the
+     track AND the #333 end of the gradient at once. So each set is chosen for
+     the surface it actually renders on.
+
+     Headline (large text, 3:1 floor), worst case is the #333 gradient end:
+       --color-score-green   #4CAF50  6.26:1 / 4.55:1
+       --color-score-amber   #FFC107 10.68:1 / 7.75:1
+       --color-score-red     #FF6B60  6.24:1 / 4.53:1
+
+     Bar fills (non-text, 3:1 floor), measured against the track:
+       --color-success       #2E7D32  3.88:1   (was #4CAF50, 2.11:1)
+       --color-warning       #A86A00  3.37:1   (was #FFC107, 1.23:1)
+       --color-error         #D32F2F  3.77:1   (was #F44336, 2.79:1)
+
+     The old fill values were all under 3:1 against the track, so the bars
+     signalled score by hue alone at a contrast that would wash out on a bright
+     display or in print. They now clear the bar — and each bar already carries
+     a plain-language label and its percentage, so colour is reinforcement here
+     rather than the only cue. */
+  --color-score-green: #4CAF50;
+  --color-score-amber: #FFC107;
+  --color-score-red: #FF6B60;
+
+  --color-success: #2E7D32;
+  --color-warning: #A86A00;
+  --color-error: #D32F2F;
   --color-info: #2196F3;
-
-  /* These serve double duty: the result headline on the dark title card, and
-     the bar fills. Measured against both surfaces they sit on —
-       headline, dark card (#1A1A1A -> #333), large text needs 3:1:
-         green 6.26:1 / 4.55:1, amber 10.68:1 / 7.75:1, red 4.73:1 / 3.43:1
-     All pass, so the headline needs no separate token set.
-
-     The bars are a separate, weaker story: the same fills against the light
-     track measure 2.11:1 (green), 1.23:1 (amber) and 2.79:1 (red) — all below
-     the 3:1 floor for non-text content. That is pre-existing and untouched
-     here, but it means the bars are currently signalling by colour alone at a
-     contrast that will not survive a bright display or a print. Worth a
-     follow-up if the bars carry weight you want to rely on. */
 
   /* Typography */
   --font-heading: 'Fraunces', serif;
@@ -243,9 +258,6 @@ button {
   letter-spacing: -0.01em;
 }
 
-.results-bar-fill {
-  background: var(--color-accent);
-}
 
 .results-review-item {
   border: 1px solid var(--color-border);
