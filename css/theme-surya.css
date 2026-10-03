@@ -23,6 +23,23 @@
   --color-error: #F44336;
   --color-info: #2196F3;
 
+  /* Result-headline score colours.
+
+     The result percentage sits on .results-title-card, which is a dark gradient
+     (#1A1A1A -> #333), NOT on the page background — so these are the same hues
+     as the fill tokens above, and they pass comfortably there (green 6.26:1,
+     amber 10.68:1, red 4.73:1 against #1A1A1A). Only red is nudged lighter,
+     because 4.73:1 is the one value that dips toward the floor at the lighter
+     end of the gradient (#333), where it measures 3.43:1.
+
+     These are deliberately NOT the same tokens the bar fills use, because the
+     two sit on different surfaces: the bars read against a light track, where
+     --color-warning is only 1.63:1, while this headline reads against the dark
+     card. One meaning, two surfaces, two token sets. */
+  --color-score-green: #4CAF50;
+  --color-score-amber: #FFC107;
+  --color-score-red: #FF6B60;
+
   /* Typography */
   --font-heading: 'Fraunces', serif;
   --font-body: 'Manrope', sans-serif;
@@ -190,9 +207,14 @@ button {
 /* ── Results View ── */
 .results-title-card {
   text-align: left;
-  background: transparent;
+  /* The dark gradient lives in css/results.css:11-17. It was being overridden
+     to `transparent` here while `color: #fff` from that same rule survived,
+     which rendered the Progression Title and its emoji as white-on-white —
+     invisible. Restoring the gradient makes the existing white text legible
+     again and gives the score colours a dark surface to sit on. */
+  background: linear-gradient(135deg, var(--color-primary) 0%, #333 100%);
   border: none;
-  padding: 0;
+  padding: var(--space-8) var(--space-4) var(--space-6);
   margin-bottom: var(--space-10);
 }
 
@@ -209,7 +231,11 @@ button {
   font-family: var(--font-heading);
   font-size: 40px;
   font-weight: 400;
-  color: var(--color-text);
+  /* This sits on the dark .results-title-card. It was inheriting
+     --color-text (#1A1A1A) from the card's own white `color`, making the
+     Progression Title invisible — near-black on near-black. Explicitly white
+     to match the emoji and the inherited card text. */
+  color: #fff;
   margin-bottom: var(--space-4);
 }
 

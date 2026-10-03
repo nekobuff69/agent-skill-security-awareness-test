@@ -70,10 +70,24 @@
     var title = report.title;
     var frag = document.createDocumentFragment();
 
+    /* The percentage is the most eye-catching element on the results page, so it
+       has to carry the score's meaning. It previously had no score class at all
+       and inherited --color-accent from .results-title-pct — the same orange used
+       for every risk indicator in the bars and the radar — so a perfect score
+       and a failing one rendered identically, while green bars sat directly
+       beside the headline saying the opposite. scoreClass() already exists and
+       already drives the bar fills; applying it here makes the two agree.
+
+       The colours resolve in css/theme-surya.css to the *-text tokens rather
+       than the fill tokens, because the fill values do not meet the contrast
+       floor for text on a light background. */
     frag.appendChild(el('div', { className: 'results-title-card' }, [
       el('div', { className: 'results-title-emoji', textContent: title.emoji }),
       el('div', { className: 'results-title-name', textContent: title.name }),
-      el('div', { className: 'results-title-pct', textContent: report.percentage + '%' })
+      el('div', {
+        className: 'results-title-pct ' + scoreClass(report.percentage),
+        textContent: report.percentage + '%'
+      })
     ]));
 
     return frag;
