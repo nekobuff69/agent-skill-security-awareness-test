@@ -44,10 +44,14 @@
    js/results.js buildTitleCard appends results-green/amber/red alongside
    results-title-pct. These rules override the accent colour above, so the
    largest, most eye-catching element on the page finally says something:
-   a 100% does not render in the same orange as every risk indicator. */
-.results-title-pct.results-green { color: var(--color-score-green); }
-.results-title-pct.results-amber { color: var(--color-score-amber); }
-.results-title-pct.results-red   { color: var(--color-score-red); }
+   a 100% does not render in the same orange as every risk indicator.
+
+   Same tokens as the bar fills. The headline sits on the dark title card,
+   where these clear 3:1 at both ends of the gradient (worst case is red at
+   3.43:1), so large text is legible without a second token set. */
+.results-title-pct.results-green { color: var(--color-success); }
+.results-title-pct.results-amber { color: var(--color-warning); }
+.results-title-pct.results-red   { color: var(--color-error); }
 
 /* ── Section wrapper ── */
 .results-section {
