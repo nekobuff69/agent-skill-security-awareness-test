@@ -7,8 +7,16 @@ compatibility_date = "2024-01-01"
 # config, not secrets — only the key is secret.
 LLM_ENDPOINT = "https://api.deepseek.com/v1/chat/completions"
 LLM_MODEL = "deepseek-flash"
+# deepseek-flash is a reasoning model: on the real Action Plan prompt it
+# thinks ~15-30s (past the 20s upstream abort → 502 → fallback). "low"
+# answers in ~7s. Provider latency knob, server-side (ADR-0008).
+LLM_REASONING_EFFORT = "low"
 # LLM_API_KEY stored as a secret, never in config (`npx wrangler secret put LLM_API_KEY`)
 # Exact Pages origin; unset = deny all origins (ADR-0007).
 ALLOWED_ORIGIN = "https://agent-security-quiz.pages.dev"
-# UPSTREAM_TIMEOUT_MS = upstream abort budget; default 20000 (ADR-0007 amended 2026-09-10, was 8s). Raise for slow local providers.
-UPSTREAM_TIMEOUT_MS = "20000"
+# UPSTREAM_TIMEOUT_MS = upstream abort budget (ADR-0007 amended 2026-09-10, was 8s).
+# 30000, not 20000: even at reasoning_effort=low, deepseek-flash occasionally
+# thinks ~20s on the Action Plan prompt (observed 6/8/20s). Client timeout in
+# config.js (35000) stays above this so the structured 502 still reaches the
+# client before its own abort — the ADR-0007 ordering.
+UPSTREAM_TIMEOUT_MS = "30000"

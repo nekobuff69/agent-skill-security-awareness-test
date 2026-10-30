@@ -14,6 +14,8 @@ A thin proxy Worker (~40 lines) holds `LLM_ENDPOINT`, `LLM_API_KEY`, and `LLM_MO
 
 _Amended 2026-09-10: upstream budget 8s → 20s default (owner decision — hosted inference latency needs headroom; local providers per ADR-0008 are slower still). Client-side timeout (config.js) sits above the upstream abort at 25s so the Worker's structured error reaches the client before the client aborts._
 
+_Amended 2026-10-30: budgets 20s/25s → 30s/35s. First live completions against `deepseek-flash` (a reasoning model) aborted at the 20s upstream budget — 502, retry, fallback — even after pinning `reasoning_effort` server-side (an ADR-0008 provider knob), because tail latency still reached ~20s. The ordering invariant (client above upstream) is unchanged._
+
 ## Consequences
 
 - The API key never appears in any client-visible artifact — bundle, network request, URL bar, or logs.

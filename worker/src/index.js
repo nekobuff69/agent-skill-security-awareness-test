@@ -134,6 +134,14 @@ export default {
       body.model = env.LLM_MODEL;
     }
 
+    // Same reasoning, one knob over: reasoning effort is a provider-specific
+    // latency control. deepseek-flash reasons ~15-30s on the real Action Plan
+    // prompt — past UPSTREAM_TIMEOUT_MS — while effort=low answers in ~7s, so
+    // the Worker pins it rather than trusting a client that never sends it.
+    if (env.LLM_REASONING_EFFORT) {
+      body.reasoning_effort = env.LLM_REASONING_EFFORT;
+    }
+
     const controller = new AbortController();
     const upstreamTimeoutMs = parseInt(env.UPSTREAM_TIMEOUT_MS, 10) || UPSTREAM_TIMEOUT_MS_DEFAULT;
     const timer = setTimeout(() => controller.abort(), upstreamTimeoutMs);
