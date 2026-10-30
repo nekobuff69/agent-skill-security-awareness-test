@@ -286,7 +286,7 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 python3 run_tests.py
 python3 run_tests.py --llm tests/mock_llm_output.json
 node tests/js/run-tests.js
-npx wrangler deploy worker/ --name quiz-llm
+npx wrangler deploy --config worker/wrangler.toml   # Worker name `llm-proxy`, declared in that file — no --name override
 npx wrangler pages deploy ./ --project-name=agent-security-quiz
 ```
 

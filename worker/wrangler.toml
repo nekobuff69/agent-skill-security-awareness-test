@@ -3,10 +3,12 @@ main = "src/index.js"
 compatibility_date = "2024-01-01"
 
 [vars]
-LLM_ENDPOINT = ""
-LLM_MODEL = ""
+# OpenAI-compatible upstream (ADR-0008). Endpoint and model are operational
+# config, not secrets — only the key is secret.
+LLM_ENDPOINT = "https://api.deepseek.com/v1/chat/completions"
+LLM_MODEL = "deepseek-flash"
 # LLM_API_KEY stored as a secret, never in config (`npx wrangler secret put LLM_API_KEY`)
-# ALLOWED_ORIGIN = exact Pages origin (e.g. "https://agent-security-quiz.pages.dev"); unset = deny all origins (ADR-0007)
-ALLOWED_ORIGIN = ""
+# Exact Pages origin; unset = deny all origins (ADR-0007).
+ALLOWED_ORIGIN = "https://agent-security-quiz.pages.dev"
 # UPSTREAM_TIMEOUT_MS = upstream abort budget; default 20000 (ADR-0007 amended 2026-09-10, was 8s). Raise for slow local providers.
 UPSTREAM_TIMEOUT_MS = "20000"
