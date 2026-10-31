@@ -47,6 +47,28 @@ exports.run = function() {
   check('t() does not return empty string for a missing id', returned !== '',
     JSON.stringify(returned));
 
+  // --- extend() merges add-on Chrome Strings without replacing the base ---
+
+  I18n.extend('en', { 'shell.test.merged': 'Merged value' });
+  check('extend() adds a new id to a registered locale',
+    I18n.t('shell.test.merged') === 'Merged value', I18n.t('shell.test.merged'));
+  check('extend() keeps base dictionary ids after merging',
+    I18n.t('quiz.labelScenario') === 'Scenario');
+  I18n.extend('en', { 'shell.test.merged': 'Overwritten' });
+  check('extend() lets a later duplicate id win (namespacing convention)',
+    I18n.t('shell.test.merged') === 'Overwritten');
+  I18n.extend('probe', { 'shell.test.merged': 'Probe only' });
+  I18n.use('probe');
+  check('extend() registers a locale that had no base dictionary (add-on before base load never blanks a page)',
+    I18n.t('shell.test.merged') === 'Probe only', I18n.t('shell.test.merged'));
+  var probeMissingThrew = false;
+  try { I18n.t('quiz.labelScenario'); } catch (e) { probeMissingThrew = true; }
+  check('an add-on-only dictionary still throws for base ids it never provided', probeMissingThrew);
+  I18n.use('en');
+  var extendThrew = false;
+  try { I18n.extend('en', null); } catch (e) { extendThrew = true; }
+  check('extend() rejects a non-object additions argument', extendThrew);
+
   var astThrew = false;
   try {
     I18n.astName('AST99');
