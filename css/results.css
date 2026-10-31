@@ -7,36 +7,55 @@
   padding-bottom: var(--space-8);
 }
 
-/* ── Title Card ── */
-.results-title-card {
-  text-align: center;
-  padding: var(--space-8) var(--space-4) var(--space-6);
-  background: linear-gradient(135deg, var(--color-primary) 0%, #333 100%);
-  border-radius: 12px;
-  color: #fff;
+/* ── Title Card (ticket #45: .os-window idiom) ──
+
+   A Win95 program window: silver raised frame, navy title bar carrying the
+   Progression Title (emoji + name) and the drawn, DISABLED [—][□][×] marks
+   (js/results.js buildTitleCard reuses the shell's .os-titlebar* classes, so
+   css/shell.css draws the bar itself), then a sunken white client field with
+   the Overall Percentage. The tier data path is untouched. */
+
+.results-title-window {
+  background: var(--color-face);
+  border-radius: 0;
+  box-shadow: var(--bevel-raised);
+  padding: var(--space-1);
 }
 
-.results-title-emoji {
-  font-size: 3rem;
+/* The title-bar glyph rides the navy bar at chrome size. */
+.results-title-bar .results-title-emoji {
+  font-size: 14px;
   line-height: 1;
-  margin-bottom: var(--space-2);
+  margin: 0;
 }
 
-.results-title-name {
+.results-title-card {
+  text-align: left;
+  margin: var(--space-1);
+  padding: var(--space-5) var(--space-4);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: 0;
+  box-shadow: var(--bevel-sunken);
+}
+
+.results-overall-caption {
   font-family: var(--font-heading);
-  font-size: 2rem;
-  font-weight: 400;
-  letter-spacing: -0.02em;
+  font-size: 1.125rem;
+  color: var(--color-text);
   margin-bottom: var(--space-1);
 }
+
+/* .results-title-name was retired with the window idiom: the name now rides
+   the title bar via .os-titlebar-title (css/shell.css). */
 
 .results-title-pct {
   font-family: var(--font-heading);
   font-size: 4rem;
-  font-weight: 800;
+  font-weight: 400;        /* W95FA has one weight; no faux bold */
   color: var(--color-accent);
   opacity: 1;
-  margin-top: var(--space-2);
+  margin-top: var(--space-1);
 }
 
 /* The score's meaning, on the headline itself.
@@ -44,11 +63,11 @@
    js/results.js buildTitleCard appends results-green/amber/red alongside
    results-title-pct. These rules override the accent colour above, so the
    largest, most eye-catching element on the page finally says something:
-   a 100% does not render in the same orange as every risk indicator.
+   a 100% does not render in the same navy as every neutral control.
 
-   The --color-score-* set, not the bar-fill tokens below: this sits on the
-   dark card, where the fill values would not clear 3:1. See the Score colours
-   block in css/theme-retro-os.css for the measurements behind both sets. */
+   The --color-score-* set, not the bar-fill tokens below, for the headline
+   role; see the Score colours block in css/theme-retro-os.css for the
+   measurements behind both sets (the client field is white either way). */
 .results-title-pct.results-green { color: var(--color-score-green); }
 .results-title-pct.results-amber { color: var(--color-score-amber); }
 .results-title-pct.results-red   { color: var(--color-score-red); }
@@ -68,13 +87,21 @@
   margin: 0;
 }
 
-/* ── Risk Radar ── */
+/* ── Risk Radar ──
+
+   Sunken white field (skin tokens) hosting the black-on-white vector chart
+   drawn in js/results.js — no shadow, no radius; the field itself is the
+   Win95 inset. */
 .results-radar-wrap {
   display: flex;
   justify-content: center;
   max-width: 400px;
   margin: 0 auto;
   width: 100%;
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border-radius: 0;
+  box-shadow: var(--bevel-sunken);
 }
 
 .results-radar-svg {
@@ -135,14 +162,21 @@
   grid-area: track;
   height: 12px;
   background: var(--color-border);
-  border-radius: 6px;
+  border-radius: 0;      /* Win95 squares; the skin adds the dither + inset */
   overflow: hidden;
 }
 
 .results-bar-fill {
   height: 100%;
-  border-radius: 6px;
+  border-radius: 0;
   transition: width 0.6s ease;
+  /* Segmented blocks (ticket #45): same 6px-on/2px-off rhythm the skin
+     paints the Progress Fill with — the band colour below shows through
+     the transparent cells, var(--color-surface) draws the gaps. The width
+     behaviour driven by js/results.js is untouched; the reduced-motion
+     block at the foot of this file collapses the transition. */
+  background-image: repeating-linear-gradient(
+    90deg, transparent 0 6px, var(--color-surface) 6px 8px);
 }
 
 .results-bar-pct {
@@ -166,19 +200,22 @@
    an ancestor carrying it. The compound selector is what wins over the
    single-class .results-bar-fill rule in css/theme-retro-os.css, which is
    why each bar keeps its own score colour. */
+/* background-color (not the background shorthand): the shorthand resets the
+   background-image the .results-bar-fill rule above sets, which would drop
+   the segmented-block pattern. */
 .results-red .results-bar-fill,
 .results-bar-fill.results-red {
-  background: var(--color-error);
+  background-color: var(--color-error);
 }
 
 .results-amber .results-bar-fill,
 .results-bar-fill.results-amber {
-  background: var(--color-warning);
+  background-color: var(--color-warning);
 }
 
 .results-green .results-bar-fill,
 .results-bar-fill.results-green {
-  background: var(--color-success);
+  background-color: var(--color-success);
 }
 
 /* ── Action Plan ── */
@@ -201,10 +238,11 @@
 }
 
 .results-action-item {
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
-  padding: var(--space-3) var(--space-4);
-  background: #FAFAFA;
+  border: 0;
+  border-radius: 0;
+  padding: var(--space-3);
+  background: var(--color-face);
+  box-shadow: var(--bevel-raised);
 }
 
 .results-action-head {
@@ -212,7 +250,32 @@
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
-  margin-bottom: var(--space-2);
+}
+
+/* The card head paints as the dialog's title bar (same navy gradient the
+   skin draws for .os-titlebar and the expander summaries — one idiom for
+   every nested panel: Action Plan items, Narrative Expander, Deep-Dive). */
+.results-action-item .results-action-head {
+  margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-3)) var(--space-2);
+  padding: 4px var(--space-3);
+  background: linear-gradient(90deg, #000080 0%, #1084D0 100%);
+  color: #FFFFFF;
+  font-family: var(--font-heading);
+}
+
+.results-action-item .results-action-title {
+  font-family: var(--font-heading);
+  font-weight: 400;          /* W95FA carries no bold */
+  color: #FFFFFF;
+}
+
+/* Priority number: a sunken white field on the title bar, navy digit. */
+.results-action-item .results-action-priority {
+  font-family: var(--font-heading);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  border-radius: 0;
+  box-shadow: var(--bevel-sunken);
 }
 
 .results-action-priority {
@@ -239,9 +302,11 @@
   font-size: 0.6875rem;
   font-weight: 500;
   padding: 0.15em 0.5em;
-  border-radius: 3px;
-  background: #FFF5F0;
-  color: var(--color-accent);
+  border-radius: 0;
+  background: var(--color-surface);
+  color: var(--color-primary);
+  box-shadow: inset 1px 1px var(--color-secondary),
+              inset -1px -1px #FFFFFF;
   white-space: nowrap;
 }
 
@@ -252,29 +317,48 @@
   margin: 0;
 }
 
-/* ── Narrative Expander ── */
+/* ── Narrative Expander ──
+
+   Same nested-dialog idiom as the Action Plan items: silver raised panel,
+   navy title-bar summary row, content on the silver body. */
+
 .results-narrative-details {
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
+  border: 0;
+  border-radius: 0;
   overflow: hidden;
+  background: var(--color-face);
+  box-shadow: var(--bevel-raised);
 }
 
 .results-narrative-summary {
   cursor: pointer;
-  padding: var(--space-3) var(--space-4);
+  padding: 4px var(--space-3);
+  font-family: var(--font-heading);
   font-size: 0.9375rem;
-  font-weight: 500;
-  color: var(--color-accent);
-  background: #FFF5F0;
+  font-weight: 400;
+  color: #FFFFFF;
+  background: linear-gradient(90deg, #000080 0%, #1084D0 100%);
   user-select: none;
 }
 
 .results-narrative-summary:hover {
-  background: #FFEBE0;
+  background: linear-gradient(90deg, #000080 0%, #1084D0 100%);
+  color: #FFFFFF;
 }
 
-.results-narrative-details[open] .results-narrative-summary {
-  border-bottom: 1px solid var(--color-border);
+.results-narrative-details[open] > .results-narrative-summary {
+  border-bottom: 1px solid #000000;
+}
+
+/* Prose on the silver body of the open panel. */
+.results-narrative-details .results-action-narrative {
+  margin: 0;
+  padding: var(--space-3) var(--space-3) 0;
+  color: var(--color-text);
+}
+
+.results-narrative-details .results-action-narrative:last-child {
+  padding-bottom: var(--space-3);
 }
 
 /* ── Deep-Dive Prompt ── */
@@ -300,34 +384,44 @@
 }
 
 .results-prompt-details {
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
+  border: 0;
+  border-radius: 0;
   overflow: hidden;
+  background: var(--color-face);
+  box-shadow: var(--bevel-raised);
 }
 
 .results-prompt-summary {
   cursor: pointer;
-  padding: var(--space-3) var(--space-4);
+  padding: 4px var(--space-3);
+  font-family: var(--font-heading);
   font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--color-accent);
-  background: #FFF5F0;
+  font-weight: 400;
+  color: #FFFFFF;
+  background: linear-gradient(90deg, #000080 0%, #1084D0 100%);
   user-select: none;
 }
 
 .results-prompt-summary:hover {
-  background: #FFEBE0;
+  background: linear-gradient(90deg, #000080 0%, #1084D0 100%);
+  color: #FFFFFF;
+}
+
+.results-prompt-details[open] > .results-prompt-summary {
+  border-bottom: 1px solid #000000;
 }
 
 .results-prompt-pre {
   max-height: 300px;
   overflow: auto;
-  margin: 0;
-  padding: var(--space-4);
+  margin: var(--space-3);
+  padding: var(--space-3);
   font-size: 0.8125rem;
   line-height: 1.5;
-  background: #FAFAFA;
-  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--bevel-sunken);
   white-space: pre-wrap;
   word-break: break-word;
   font-family: var(--font-mono);
@@ -350,30 +444,35 @@
   background: #FFF5F0;
 }
 
-/* ── Review Accordion ── */
+/* ── Review Accordion (ticket #45: tree-style disclosure) ──
+
+   Each Question is a tree node in the Explorer idiom: a navy title-bar row
+   with a square [+]/[-] glyph toggle, and an indented sunken client panel
+   of child rows. The review text stays score-free (ADR 0005: no percentages
+   in Review). */
+
 .results-review {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .results-review-item {
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
+  border: 0;
+  border-radius: 0;
   overflow: hidden;
-}
-
-.results-review-item[open] {
-  border-color: var(--color-primary);
+  background: var(--color-face);
+  box-shadow: var(--bevel-raised);
 }
 
 .results-review-summary {
   cursor: pointer;
-  padding: var(--space-3) var(--space-4);
+  padding: 4px var(--space-3);
+  font-family: var(--font-heading);
   font-size: 0.9375rem;
-  font-weight: 500;
-  color: var(--color-text);
-  background: #FAFAFA;
+  font-weight: 400;
+  color: #FFFFFF;
+  background: linear-gradient(90deg, #000080 0%, #1084D0 100%);
   user-select: none;
   list-style: none;
 }
@@ -382,42 +481,60 @@
   display: none;
 }
 
+/* Square Explorer toggle: [+]/[-] on the title bar, no easing. */
 .results-review-summary::before {
-  content: '▸ ';
-  color: var(--color-accent);
-  font-weight: 700;
-  transition: transform 0.15s;
+  content: '[+] ';
+  color: #FFFFFF;
+  font-weight: 400;
   display: inline-block;
   margin-right: var(--space-1);
 }
 
 .results-review-item[open] > .results-review-summary::before {
-  content: '▾ ';
+  content: '[-] ';
+}
+
+.results-review-item[open] > .results-review-summary {
+  border-bottom: 1px solid #000000;
 }
 
 .results-review-summary:hover {
-  background: var(--color-border);
+  background: linear-gradient(90deg, #000080 0%, #1084D0 100%);
+  color: #FFFFFF;
 }
 
+/* On the navy title bar (the skin paints them there too). */
 .results-review-qnum {
-  font-weight: 700;
-  color: var(--color-accent);
+  font-family: var(--font-heading);
+  font-weight: 400;
+  color: #FFFFFF;
   font-size: 0.8125rem;
 }
 
+/* The client field: sunken white panel, child rows indented under the
+   disclosure row like Explorer tree children. */
 .results-review-inner {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-4);
+  margin: var(--space-1);
+  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-5);
+  background: var(--color-surface);
+  border-radius: 0;
+  box-shadow: var(--bevel-sunken);
 }
 
-.results-review-phase {
+/* #results-view prefix so this beats the skin's same-specificity
+   .results-review-phase { color: #FFFFFF } — that rule targets the summary
+   context, but the phase label renders inside the white client field, where
+   white text would vanish. */
+#results-view .results-review-inner .results-review-phase {
+  font-family: var(--font-heading);
   font-size: 0.6875rem;
-  font-weight: 600;
+  font-weight: 400;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--color-accent);
+  color: var(--color-text-light);
 }
 
 .results-review-scenario {
@@ -434,23 +551,26 @@
   margin: 0;
 }
 
+/* Child rows indent under the disclosure row (Explorer tree). */
 .results-review-option {
   font-size: 0.875rem;
   color: var(--color-text-muted);
   line-height: 1.5;
   padding: var(--space-2) var(--space-3);
+  margin-left: var(--space-3);
   border-left: 3px solid transparent;
 }
 
+/* Selection = navy highlight, white text (Win95 selected list item). */
 .results-review-option-selected {
-  border-left-color: var(--color-accent);
-  background: #FFF5F0;
-  color: var(--color-text);
+  border-left-color: #FFFFFF;
+  background: var(--color-primary);
+  color: #FFFFFF;
   font-weight: 500;
 }
 
 .results-review-option-marker {
-  color: var(--color-accent);
+  color: var(--color-primary);
   font-weight: 700;
   flex-shrink: 0;
 }
@@ -460,12 +580,14 @@
   color: var(--color-text-muted);
   line-height: 1.5;
   padding: var(--space-3);
-  background: var(--color-border);
-  border-radius: 6px;
+  margin-left: var(--space-3);
+  background: var(--color-surface);
+  border-radius: 0;
+  box-shadow: var(--bevel-sunken);
 }
 
 .results-review-feedback strong {
-  color: var(--color-accent);
+  color: var(--color-primary);
 }
 
 .results-review-best {
@@ -473,8 +595,10 @@
   color: var(--color-text-muted);
   line-height: 1.5;
   padding: var(--space-3);
-  background: #E8F5E9;
-  border-radius: 6px;
+  margin-left: var(--space-3);
+  background: var(--color-surface);
+  border-radius: 0;
+  box-shadow: var(--bevel-sunken);
 }
 
 .results-review-best strong {
@@ -483,7 +607,8 @@
 
 .results-review-link {
   font-size: 0.8125rem;
-  color: var(--color-accent);
+  margin-left: var(--space-3);
+  color: var(--color-primary);
   text-decoration: none;
 }
 
@@ -565,6 +690,16 @@
 
 .results-review-back-btn:hover {
   background: #F5F5F5;
+}
+
+/* ── Reduced motion: the Blind-Spot Bars are the only animation here ──
+   (the width fill driven by js/results.js; everything else on this view
+   paints instantly). Same gate the quiz CSS uses (css/quiz.css). */
+
+@media (prefers-reduced-motion: reduce) {
+  .results-bar-fill {
+    transition: none !important;
+  }
 }
 
 /* ── Mobile-first responsive ── */

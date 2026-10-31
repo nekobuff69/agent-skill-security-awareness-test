@@ -127,5 +127,42 @@ exports.run = function() {
   check('cjk.css override catalog re-pointed (no theme-surya refs)',
     cjk.indexOf('theme-surya') === -1);
 
+  /* ── Wireframe view tracing (issue #42) ──────────────────────────── */
+  var cssDir = fs.readdirSync(path.join(repo, 'css'));
+  var allCss = cssDir.map(function(f) { return read('css/' + f); }).join('\n');
+
+  check('no view-fade animation remains anywhere in css/',
+    !/fadeInUp|fadeIn(?![-a-zA-Z])|view-fade/i.test(allCss));
+  check('wireframe trace keyframes declared',
+    /@keyframes\s+os-wireframe-trace/.test(skin));
+  check('trace targets un-hidden views inside the shell window',
+    /\.os-window\s+#app\s*>\s*section:not\(\[hidden\]\)/.test(skin));
+  check('trace is capped at 200ms',
+    /animation:\s*os-wireframe-trace\s+200ms/.test(skin) &&
+    /animation:\s*os-view-pop\s+200ms/.test(skin));
+  check('trace is mechanical: steps() timing, no easing',
+    /steps\(/.test(skin.match(/@keyframes\s+os-wireframe-trace[\s\S]*?^\}/m) || ''));
+
+  var rmIndex = skin.lastIndexOf('prefers-reduced-motion');
+  var rmBlock = rmIndex === -1 ? '' : skin.slice(rmIndex);
+  check('reduced motion kills the wireframe trace',
+    rmIndex !== -1 &&
+    /os-window\s+#app\s*>\s*section:not\(\[hidden\]\),?[\s\S]*animation:\s*none/.test(rmBlock) &&
+    /content:\s*none/.test(rmBlock));
+  check('reduced motion kills Blind-Spot Bar width easing (historical gap)',
+    /\.results-bar-fill\s*\{\s*transition:\s*none/.test(rmBlock));
+
+  var quizCss = read('css/quiz.css');
+  var quizRmIndex = quizCss.lastIndexOf('prefers-reduced-motion');
+  var quizRmBlock = quizRmIndex === -1 ? '' : quizCss.slice(quizRmIndex);
+  check('quiz.css reduced-motion block still gates card wipes and Progress Fill',
+    quizRmIndex !== -1 &&
+    /card-wipe-in/.test(quizRmBlock) &&
+    /\.quiz-chrome-fill/.test(quizRmBlock));
+
+  var bootCss = read('css/boot.css');
+  check('boot splash gates view rendering until the reveal (one trace, not two)',
+    /\.boot-overlay:not\(\.boot-leaving\)\s*~\s*\.os-window\s+#app\s*>\s*section/.test(bootCss));
+
   return results;
 };

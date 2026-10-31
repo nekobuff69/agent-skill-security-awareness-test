@@ -2,7 +2,28 @@
    Overlay + W95 splash, assembled only from theme-retro-os.css skin
    tokens: face/navy greys, sunken bevel, W95FA chrome font, zero radii,
    Win95-instant transitions. The overlay masks — it never gates — so
-   content fetches run underneath it untouched. */
+   content fetches run underneath it untouched.
+
+   Issue #42 adds ONE exception to "never gates": the wireframe view
+   tracing. While the splash is up (the overlay exists without its
+   .boot-leaving class), the sections beneath are display:none — CSS
+   animations never run on un-rendered content, so no view fades or
+   traces under the mask. When js/boot.js adds .boot-leaving (the 0.2s
+   overlay fade at SPLASH_MS), the :not() stops matching, the views
+   re-enter rendering, and the trace in css/theme-retro-os.css fires
+   once — sweeping exactly as the splash clears. The overlay's removal
+   FADE_MS later therefore re-reveals already-traced views: the boot
+   handoff shows exactly ONE trace, never a splash+fade double
+   animation. Fetches below still run unblocked; only rendering waits. */
+
+/* Gate removed the instant .boot-leaving lands — the rule stops matching
+   and the views re-enter rendering (restart point for the trace). The
+   no-shell form (#app still a body child) is kept so the gate also works
+   before/without App.Shell's wrap. */
+.boot-overlay:not(.boot-leaving) ~ .os-window #app > section,
+.boot-overlay:not(.boot-leaving) ~ #app > section {
+  display: none;
+}
 
 .boot-overlay {
   position: fixed;

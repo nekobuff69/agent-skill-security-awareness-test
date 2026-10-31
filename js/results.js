@@ -71,6 +71,14 @@
   }
 
   /* ── Title Card ── */
+  /* Title-bar button glyphs for the Title Card window. Mirrors the shell's
+     idiom (js/shell.js): drawn, DISABLED, inert — aria-labels only, no live
+     controls on a static results document. */
+  var TITLE_BUTTON_ACTIONS = ['minimize', 'maximize', 'close'];
+  var TITLE_BUTTON_LABEL_IDS = [
+    'results.titleBtnMin', 'results.titleBtnMax', 'results.titleBtnClose'
+  ];
+
   function buildTitleCard(report) {
     var title = report.title;
     var frag = document.createDocumentFragment();
@@ -85,20 +93,107 @@
 
        The colours resolve in css/theme-retro-os.css to the *-text tokens
        rather than the fill tokens, because the fill values do not meet the
-       contrast floor for text on a light background. */
-    frag.appendChild(el('div', { className: 'results-title-card' }, [
-      el('div', { className: 'results-title-emoji', textContent: title.emoji }),
-      el('div', { className: 'results-title-name', textContent: title.name }),
+       contrast floor for text on a light background.
+
+       Ticket #45: the card is now a window in the .os-window idiom — a
+       silver raised frame with a navy title bar carrying the Progression
+       Title (emoji + name), and a sunken white client field carrying the
+       Overall Percentage. The title bar and its disabled control buttons
+       reuse the shell's classes (css/shell.css) so the two windows draw
+       identically; the tier data path (title.emoji/title.name/percentage +
+       scoreClass) is unchanged. */
+    var win = el('div', { className: 'results-title-window' });
+
+    var bar = el('div', { className: 'os-titlebar results-title-bar' });
+    bar.appendChild(el('div', {
+      className: 'os-titlebar-title results-title-caption',
+      textContent: title.emoji + ' ' + title.name
+    }));
+    var buttons = el('div', { className: 'os-titlebar-buttons' });
+    for (var b = 0; b < TITLE_BUTTON_ACTIONS.length; b++) {
+      var action = TITLE_BUTTON_ACTIONS[b];
+      var btn = el('button', { className: 'os-titlebar-btn' });
+      btn.type = 'button';
+      btn.disabled = true;
+      btn.setAttribute('data-os-button', action);
+      btn.setAttribute('aria-label', t(TITLE_BUTTON_LABEL_IDS[b]));
+      buttons.appendChild(btn);
+    }
+    bar.appendChild(buttons);
+    win.appendChild(bar);
+
+    /* Client field: .results-title-card keeps its class, so the skin's
+       sunken-white rule (css/theme-retro-os.css) paints the Win95 field. */
+    var client = el('div', { className: 'results-title-card' }, [
+      el('div', { className: 'results-overall-caption', textContent: t('results.overall') }),
       el('div', {
         className: 'results-title-pct ' + scoreClass(report.percentage),
         textContent: report.percentage + '%'
       })
-    ]));
+    ]);
+    win.appendChild(client);
+    frag.appendChild(win);
 
     return frag;
   }
 
   /* ── Risk Radar (hand-rolled SVG) ── */
+
+  /* Chrome typeface for the axis labels. The W95 skin declares the heading
+     token ('W95FA' first) in css/theme-retro-os.css; SVG text cannot inherit
+     CSS custom properties inside an <img>-decoded export either, so the stack
+     is written as a font-family attribute. Read from the computed token at
+     render time (falls back to the token's declared stack when headless,
+     where there is no document.defaultView). Same palette-constant pattern
+     as scoreColor(): the constant exists so the chart stays self-contained. */
+  var HEADING_STACK = "'W95FA', 'Segoe UI', Tahoma, 'SimSun', sans-serif";
+
+  function headingFont() {
+    try {
+      var view = document.defaultView;
+      if (view && typeof view.getComputedStyle === 'function') {
+        var v = view.getComputedStyle(document.documentElement)
+                  .getPropertyValue('--font-heading');
+        if (v && v.trim()) return v.trim();
+      }
+    } catch (e) { /* headless: no computed style — use the stack constant */ }
+    return HEADING_STACK;
+  }
+
+  /* Score-band dither: a 2×2 userSpace pattern — two dark-tint pixels on a
+     white tile (the 1px checkerboard the skin uses for graphic fills). The
+     fill colour is the band of the Participant's Overall Percentage; the
+     polygon outline is black vector linework, no shadows, square joins. */
+  function buildRadarFillPattern(color) {
+    var ns = 'http://www.w3.org/2000/svg';
+    var defs = document.createElementNS(ns, 'defs');
+    var pattern = document.createElementNS(ns, 'pattern');
+    pattern.setAttribute('id', 'results-radar-dither');
+    pattern.setAttribute('width', '2');
+    pattern.setAttribute('height', '2');
+    pattern.setAttribute('patternUnits', 'userSpaceOnUse');
+
+    var tile = document.createElementNS(ns, 'rect');
+    tile.setAttribute('x', '0');
+    tile.setAttribute('y', '0');
+    tile.setAttribute('width', '2');
+    tile.setAttribute('height', '2');
+    tile.setAttribute('fill', '#FFFFFF');
+    pattern.appendChild(tile);
+
+    for (var c = 0; c < 2; c++) {
+      var cell = document.createElementNS(ns, 'rect');
+      cell.setAttribute('x', String(c));
+      cell.setAttribute('y', String(c));
+      cell.setAttribute('width', '1');
+      cell.setAttribute('height', '1');
+      cell.setAttribute('fill', color);
+      pattern.appendChild(cell);
+    }
+    defs.appendChild(pattern);
+    return defs;
+  }
+
   function buildRadar(report, svgEl) {
     var cx = 200, cy = 200;
     var maxR = 140;         // outer ring
@@ -107,6 +202,7 @@
     var svg = svgEl || document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', '0 0 400 400');
     svg.setAttribute('class', 'results-radar-svg');
+    var font = headingFont();   // chrome face for AST-ID + percentage labels
 
     // background circle
     var bg = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -187,9 +283,9 @@
       tspan.setAttribute('y', ly - 6);
       tspan.setAttribute('text-anchor', anchor);
       tspan.setAttribute('font-size', '9');
-      tspan.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, sans-serif');
-      tspan.setAttribute('font-weight', '600');
-      tspan.setAttribute('fill', '#333');
+      tspan.setAttribute('font-family', font);
+      tspan.setAttribute('font-weight', '400');
+      tspan.setAttribute('fill', '#000000');
       tspan.textContent = astId;
 
       var tspan2 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
@@ -197,7 +293,8 @@
       tspan2.setAttribute('y', ly + 6);
       tspan2.setAttribute('text-anchor', anchor);
       tspan2.setAttribute('font-size', '8');
-      tspan2.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, sans-serif');
+      tspan2.setAttribute('font-family', font);
+      tspan2.setAttribute('font-weight', '400');
       tspan2.setAttribute('fill', scoreColor(pct));
       tspan2.textContent = pct + '%';
 
@@ -207,14 +304,16 @@
       svg.appendChild(lbl);
     }
 
-    // polygon fill
+    // polygon fill: score-band dither pattern (overall percentage band)
     var polyPts = points.map(function(p) { return p.x + ',' + p.y; }).join(' ');
     var poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
     poly.setAttribute('points', polyPts);
-    poly.setAttribute('fill', 'rgba(0, 0, 128, 0.15)');
-    poly.setAttribute('stroke', '#000080');
+    poly.setAttribute('fill', 'url(#results-radar-dither)');
+    poly.setAttribute('stroke', '#000000');
     poly.setAttribute('stroke-width', '2');
+    poly.setAttribute('stroke-linejoin', 'miter');
     svg.appendChild(poly);
+    svg.appendChild(buildRadarFillPattern(scoreColor(report.percentage)));
 
     // re-append dots on top of polygon
     for (var i = 0; i < points.length; i++) {
@@ -235,7 +334,9 @@
   function buildBars(report) {
     var wrap = el('div', { className: 'results-bars' });
 
-    // weakest-first order comes from the report (Scoring Engine owns ranking)
+    // weakest-first order comes from the report (Scoring Engine owns ranking);
+    // labels are the full localized AST display names (Chrome Strings via
+    // App.I18n.astName — ADR 0015), never the short IDs used on the radar.
     var astRanked = report.astRanked || [];
 
     for (var i = 0; i < astRanked.length; i++) {
@@ -626,5 +727,21 @@
 
   // --- Exports ---
   app.renderResults = renderResults;
+
+  /* Test seam (tests/js/test-results-retro.js, fakeEl pattern): the pure
+     DOM builders plus the two palette helpers. Not used by the page. */
+  app.resultsInternals = {
+    scoreColor: scoreColor,
+    scoreClass: scoreClass,
+    headingFont: headingFont,
+    buildTitleCard: buildTitleCard,
+    buildRadar: buildRadar,
+    buildBars: buildBars,
+    buildReview: buildReview,
+    buildDeepDive: buildDeepDive,
+    buildDownloadPng: buildDownloadPng
+  };
+
+  if (typeof module !== 'undefined') module.exports = app;
 
 })(globalThis);

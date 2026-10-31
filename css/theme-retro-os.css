@@ -657,3 +657,86 @@ button.lang-offer-dismiss:focus-visible {
     margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-3)) var(--space-3);
   }
 }
+
+/* ── Wireframe view tracing (issue #42) ───────────────────────────────
+   Every time a view enters the window (App.showView flips the [hidden]
+   attribute; the section re-enters rendering and CSS animations restart
+   on it) the window content is traced open like period CAD software: a
+   navy wireframe rectangle sweeps from the title bar downward in four
+   mechanical steps across 160ms, the content pops in behind it as one
+   step, and the ink lifts off in a fifth. Pure CSS, no JS, no easing
+   library — nothing soft. The animation names succeed the removed soft
+   view fade, which no longer exists anywhere. */
+@keyframes os-wireframe-trace {
+  0% {
+    clip-path: inset(0 0 100% 0);
+    opacity: 1;
+    /* Four discrete steps between the untraced frame and the open one. */
+    animation-timing-function: steps(4, end);
+  }
+  80% {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+    /* One last step lifts the ink off the finished rectangle. */
+    animation-timing-function: steps(1, end);
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+    opacity: 0;
+  }
+}
+
+@keyframes os-view-pop {
+  /* Content pops in a single step at the trace midpoint (100ms of the
+     200ms trace): held at 0 through the first half by steps(1, end). */
+  0% {
+    opacity: 0;
+    animation-timing-function: steps(1, end);
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.os-window #app > section:not([hidden]) {
+  position: relative;
+  /* Content pop must end exactly when the trace does: same duration. */
+  animation: os-view-pop 200ms;
+}
+
+.os-window #app > section:not([hidden])::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border: 2px solid var(--color-primary);
+  /* Parked invisible until the animation starts: the from-frame covers
+     the rectangle, so no untraced ink can flash before the trace. */
+  clip-path: inset(0 0 100% 0);
+  animation: os-wireframe-trace 200ms forwards;
+}
+
+/* ── Reduced motion contract (issue #42) ──────────────────────────────
+   The wireframe trace never draws and the view content is fully present
+   immediately. css/quiz.css's block already collapses Quiz-Chrome wipes
+   and the Progress Fill; this adds the one historical gap it missed:
+   Blind-Spot Bars (.results-bar-fill) width easing in css/results.css.
+   The two blocks gate disjoint selectors, so no !important collision. */
+@media (prefers-reduced-motion: reduce) {
+  .os-window #app > section:not([hidden]),
+  .os-window #app > section:not([hidden])::after {
+    animation: none;
+  }
+
+  .os-window #app > section:not([hidden])::after {
+    content: none;
+  }
+
+  .results-bar-fill {
+    transition: none;
+  }
+}

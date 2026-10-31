@@ -318,6 +318,83 @@
     return controller;
   }
 
+  // ── System sounds (ticket #41) ────────────────────────────────────────
+  //
+  // The pages carry no <script> tag for js/sound.js, so the shell — the
+  // Start-menu owner — injects it itself, deriving the URL from its own
+  // script tag (works on / and /zh/ alike). A load failure mounts nothing:
+  // no inert menu entry, no surfaced error. Headless (no document) this
+  // stays dormant.
+
+  var soundLoadQueue = [];
+  var soundLoading = false;
+
+  function withSoundModule(fn) {
+    var doc = global.document;
+    if (!doc || !doc.createElement) return;          // headless: dormant
+    if (app.Sound) { fn(); return; }
+    if (typeof fn !== 'function') return;
+    soundLoadQueue.push(fn);
+    if (soundLoading) return;
+    soundLoading = true;
+
+    var tags = doc.getElementsByTagName ? doc.getElementsByTagName('script') : [];
+    var src = null;
+    for (var i = 0; i < tags.length; i++) {
+      var s = tags[i].getAttribute && tags[i].getAttribute('src');
+      if (s && /(^|\/)js\/shell\.js$/.test(s)) { src = s; break; }
+    }
+    if (!src) { soundLoading = false; soundLoadQueue = []; return; }
+
+    var script = doc.createElement('script');
+    script.src = src.replace(/shell\.js$/, 'sound.js');
+    script.addEventListener('load', function() {
+      var queue = soundLoadQueue;
+      soundLoadQueue = [];
+      soundLoading = false;
+      if (app.Sound) queue.forEach(function(cb) { cb(); });
+    });
+    script.addEventListener('error', function() {
+      soundLoadQueue = [];
+      soundLoading = false;                          // silent: no entry
+    });
+    (doc.head || doc.body).appendChild(script);
+  }
+
+  /**
+   * Mount the Start-menu sound toggle: a checkable entry whose ✓ marker
+   * and aria-pressed reflect the persisted mute preference (a Preference
+   * like the Language Preference). It is inserted ahead of About — the
+   * existing menu structure is otherwise untouched.
+   */
+  function attachSoundEntry(controller) {
+    var doc = global.document;
+    var I18n = app.I18n;
+    if (!doc || !I18n || !app.Sound || controller.soundEntry) return null;
+
+    var entry = createEl(doc, 'button', 'os-start-menu-item');
+    entry.type = 'button';
+    entry.setAttribute('role', 'menuitem');
+    entry.setAttribute('data-os-menu', 'sound');
+
+    function paint() {
+      var on = !app.Sound.isMuted();
+      entry.setAttribute('aria-pressed', on ? 'true' : 'false');
+      entry.textContent = (on ? '\u2713 ' : '') + I18n.t('sound.menuItem');
+    }
+    paint();
+
+    on(entry, 'click', function() {
+      app.Sound.toggleMuted();
+      paint();
+      controller.closeMenu(false);
+    });
+
+    controller.menu.insertBefore(entry, controller.menu.firstChild);
+    controller.soundEntry = entry;
+    return entry;
+  }
+
   /**
    * Resolve the shell Chrome Strings through the active dictionary.
    * Throws loudly on a missing id, per the i18n contract.
@@ -377,11 +454,18 @@
 
     controller.stopClock = function() { global.clearInterval(timer); };
     app.Shell.controller = controller;
+
+    // System sounds (ticket #41): inject js/sound.js (no HTML tag for it),
+    // then mount the Start-menu toggle as soon as the module lands.
+    withSoundModule(function() { attachSoundEntry(controller); });
+
     return controller;
   }
 
   shell.build = build;
   shell.start = start;
+  shell.attachSoundEntry = attachSoundEntry;
+  shell.withSoundModule = withSoundModule;
   shell.formatClock = formatClock;
   shell.nextTickDelay = nextTickDelay;
   shell.pad2 = pad2;

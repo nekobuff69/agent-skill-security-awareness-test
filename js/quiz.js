@@ -313,6 +313,10 @@
     updateChrome();
     syncOptionRows(decision.answer);
 
+    // System sound (ticket #41): a mark is a mark — first fill and
+    // re-mark on a revisit both tick; a same-pick re-tap returned above.
+    if (app.Sound) app.Sound.play('click');
+
     if (decision.action === 'stay') {
       // Re-mark on a revisit, or the first fill of the last Question.
       // Either way the card does not move — picks are free until commit.
@@ -382,6 +386,9 @@
 
     var n = makeEl('div', 'quiz-notice', text);
     view.appendChild(n);
+
+    // System sound (ticket #41): the low buzz marks the banner's arrival.
+    if (app.Sound) app.Sound.play('buzz');
     setTimeout(function() {
       if (n.parentNode) n.parentNode.removeChild(n);
     }, 4000);
