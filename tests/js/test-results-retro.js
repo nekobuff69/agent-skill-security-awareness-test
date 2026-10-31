@@ -59,7 +59,6 @@ exports.run = function() {
   require('../../js/i18n.js');
   require('../../i18n/en.js');
   require('../../i18n/zh.js');
-  require('../../js/i18n-add-results.js');
   var I18n = globalThis.App.I18n;
   I18n.use('en');
 
@@ -73,7 +72,7 @@ exports.run = function() {
 
   var internals = Results.resultsInternals;
 
-  // i18n-add-results.js ids resolve in BOTH locales (ADR 0015).
+  // Retro-skin ids resolve in BOTH locales (ADR 0015).
   I18n.use('en');
   var overallEn = I18n.t('results.overall');
   I18n.use('zh');

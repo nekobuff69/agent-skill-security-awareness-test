@@ -31,6 +31,10 @@
     'error.loadBank': '题库加载失败：{message}',
     'error.retry': '重试',
 
+    /* ── 启动闪屏（issue #39） ──
+       闪屏复用落地页标题作为应用名，保证开机画面与随后的程序同名。 */
+    'boot.status': '正在启动程序……',
+
     /* ── 落地页 ── */
     'landing.titleFallback': '智能体安全意识测评',
     'landing.subtitleFallback': '',
@@ -73,6 +77,38 @@
     'review.feedbackLabel': '反馈：',
     'review.bestPracticeLabel': '最佳实践：',
     'review.viewOnOwasp': '在 OWASP 查看 ↗',
+
+    /* ── 桌面外壳（ticket #38） ──
+       窗口框架、任务栏、开始菜单与关于窗口。 */
+    'shell.windowTitle': '智能体安全意识测评',
+    'shell.minimize': '最小化',
+    'shell.maximize': '最大化',
+    'shell.close': '关闭',
+    'shell.start': '开始',
+    'shell.menuAbout': '关于……',
+    'shell.aboutTitle': '关于智能体安全意识测评',
+    'shell.aboutBody': '面向构建和运营智能体人群的安全意识测评，' +
+      '情境取材于 OWASP Top 10。',
+    'shell.aboutLink': 'OWASP 智能体应用十大风险（英文）',
+    'shell.aboutCredits': '界面字体：W95FA（作者 Alina Sava，' +
+      'SIL OFL 1.1 许可）。',
+    'shell.ok': '确定',
+
+    /* ── 开始菜单声音开关（ticket #41） ── */
+    'sound.menuItem': '声音',
+
+    /* ── 向导按钮行（ticket #40，ADR 0020） ── */
+    'wizard.back': '< 上一步',
+    'wizard.next': '下一步 >',
+    'wizard.finish': '完成',
+
+    /* ── 结果页标题卡（ticket #45） ──
+       标题与面板文案由上面的 results.* id 提供；这里是复古皮肤的新增：
+       总分小标题，以及标题卡标题栏上 [—][□][×] 的 aria-label。 */
+    'results.overall': '总分',
+    'results.titleBtnMin': '最小化',
+    'results.titleBtnMax': '最大化',
+    'results.titleBtnClose': '关闭',
 
     /* ── AST 风险名称（术语表定稿） ── */
     'ast.AST01': '恶意技能',

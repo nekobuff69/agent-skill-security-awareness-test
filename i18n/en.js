@@ -29,6 +29,11 @@
     'error.loadBank': 'Failed to load question bank: {message}',
     'error.retry': 'Retry',
 
+    /* ── Boot splash (issue #39) ──
+       The splash reuses the landing title as its app-name string so the boot
+       screen always names the program that follows it. */
+    'boot.status': 'Starting application…',
+
     /* ── Landing view ── */
     'landing.titleFallback': 'Agent Security Awareness Quiz',
     'landing.subtitleFallback': '',
@@ -71,6 +76,39 @@
     'review.feedbackLabel': 'Feedback: ',
     'review.bestPracticeLabel': 'Best Practice: ',
     'review.viewOnOwasp': 'View on OWASP ↗',
+
+    /* ── Desktop shell (ticket #38) ──
+       Window frame, taskbar, Start menu and the About window. */
+    'shell.windowTitle': 'Agent Security Awareness Quiz',
+    'shell.minimize': 'Minimize',
+    'shell.maximize': 'Maximize',
+    'shell.close': 'Close',
+    'shell.start': 'Start',
+    'shell.menuAbout': 'About…',
+    'shell.aboutTitle': 'About Agent Security Awareness Quiz',
+    'shell.aboutBody': 'A security-awareness assessment for people who ' +
+      'build and run AI agents, with scenarios drawn from the OWASP Top 10.',
+    'shell.aboutLink': 'OWASP Top 10 for Agentic Applications',
+    'shell.aboutCredits': 'Chrome typeface: W95FA by Alina Sava ' +
+      '(SIL Open Font License 1.1).',
+    'shell.ok': 'OK',
+
+    /* ── Start-menu sound toggle (ticket #41) ── */
+    'sound.menuItem': 'Sound',
+
+    /* ── Wizard Row (ticket #40, ADR 0020) ── */
+    'wizard.back': '< Back',
+    'wizard.next': 'Next >',
+    'wizard.finish': 'Finish',
+
+    /* ── Results Title Card (ticket #45) ──
+       Section headings and panel copy resolve from the results.* ids above;
+       these are the retro additions: the Overall caption and the drawn,
+       DISABLED [—][□][×] aria-labels of the Title Card title bar. */
+    'results.overall': 'Overall',
+    'results.titleBtnMin': 'Minimize',
+    'results.titleBtnMax': 'Maximize',
+    'results.titleBtnClose': 'Close',
 
     /* ── AST Risk names (ADR-0013: ids and severities stay in js/ast.js) ── */
     'ast.AST01': 'Malicious Skills',

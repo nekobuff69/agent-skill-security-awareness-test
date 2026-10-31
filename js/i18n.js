@@ -35,8 +35,8 @@
 
   /**
    * Merge extra Chrome Strings into a locale's dictionary. The seam for
-   * module add-on files (i18n-add-*.js) that contribute namespaced ids
-   * without editing the per-language dictionary: merges into whatever
+   * module-level contributions that land outside register() (tests, late
+   * modules): merges into whatever
    * register() already placed, and creates the dictionary when absent —
    * the page's locale is still verified loudly by use(), and missing ids
    * still throw in t(), so this can never mask an absent base dictionary.

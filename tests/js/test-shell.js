@@ -68,7 +68,8 @@ exports.run = function() {
 
   // ── Strings for the controller, in both locales via the real seam ─────
   require('../../js/i18n.js');
-  require('../../js/i18n-add-shell.js');
+  require('../../i18n/en.js');
+  require('../../i18n/zh.js');
   var I18n = globalThis.App.I18n;
 
   function mount(locale) {

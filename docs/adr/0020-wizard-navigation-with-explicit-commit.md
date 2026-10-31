@@ -28,7 +28,7 @@ The bank itself already enforces one Option per Question with the pick overwritt
 
 **The decision logic is a pure module.** `App.WizardNav` holds no DOM and no timers: `tapOption`, `canFinish`, `isLast`, `prev`, `next` and `createCommitGate` take state as arguments and return decisions. `js/quiz.js` consumes them; the headless test suite (`tests/js/test-wizard-nav.js`) tests them through the module seam.
 
-**The wizard row's strings are Chrome Strings** under `wizard.*` ids, registered through the `App.I18n.extend` add-on seam (`js/i18n-add-wizard.js`), in English and Simplified Chinese; the base dictionaries and the missing-id hard failure (ADR 0015) are unchanged.
+**The wizard row's strings are Chrome Strings** under `wizard.*` ids, registered in the base dictionaries (`i18n/en.js` / `i18n/zh.js`), in English and Simplified Chinese; the missing-id hard failure (ADR 0015) is unchanged.
 
 ## Consequences
 

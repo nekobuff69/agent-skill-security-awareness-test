@@ -177,7 +177,8 @@ exports.run = function() {
   // ── Chrome Strings for the Start-menu entry (both locales) ───────────
 
   require('../../js/i18n.js');
-  require('../../js/i18n-add-sound.js');
+  require('../../i18n/en.js');
+  require('../../i18n/zh.js');
   var I18n = globalThis.App.I18n;
   I18n.use('en');
   var enLabel = I18n.t('sound.menuItem');
