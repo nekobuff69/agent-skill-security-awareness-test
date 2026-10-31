@@ -18,7 +18,7 @@
     language switch is the one control that cannot be wrong.
   -->
   <link rel="stylesheet" href="/styles.css">
-  <link rel="stylesheet" href="/css/theme-surya.css">
+  <link rel="stylesheet" href="/css/theme-retro-os.css">
   <link rel="icon" href="data:,">
 </head>
 <body>
@@ -40,11 +40,16 @@
   <style>
     .not-found {
       max-width: 34rem;
-      margin: 0 auto;
-      padding: 12vh var(--space-4, 24px) var(--space-8, 64px);
+      margin: 12vh auto 0;
+      padding: var(--space-5, 32px) var(--space-4, 24px) var(--space-8, 64px);
       text-align: center;
       font-family: var(--font-body, sans-serif);
-      color: var(--color-text, #1A1A1A);
+      color: var(--color-text, #000000);
+      /* One program window standing on the teal desktop; the raised bevel
+         triad comes from the retro skin's token layer. */
+      background: var(--color-face, #C0C0C0);
+      box-shadow: inset -1px -1px #000000, inset 1px 1px #FFFFFF,
+                  inset -2px -2px #808080, inset 2px 2px #DFDFDF;
     }
 
     .not-found-code {
@@ -52,20 +57,21 @@
       font-size: 0.8125rem;
       font-weight: 600;
       letter-spacing: 0.12em;
-      color: var(--color-accent, #ED682B);
+      color: var(--color-accent, #000080);
     }
 
     .not-found-title {
       margin: 0 0 var(--space-2, 8px);
-      font-family: var(--font-heading, serif);
+      font-family: var(--font-heading, sans-serif);
       font-size: clamp(1.75rem, 5vw, 2.5rem);
       line-height: 1.2;
-      font-weight: 600;
+      font-weight: 400;
+      color: var(--color-text, #000000);
     }
 
     .not-found-body {
       margin: 0 0 var(--space-5, 32px);
-      color: var(--color-text-muted, #666666);
+      color: var(--color-text-muted, #000000);
       line-height: 1.6;
     }
 
@@ -80,18 +86,17 @@
       display: inline-flex;
       align-items: center;
       padding: 0.6rem 1.4rem;
-      border: 1px solid var(--color-border, #E0E0E0);
-      border-radius: 999px;
-      color: var(--color-text, #1A1A1A);
+      border: 0;
+      border-radius: 0;
+      color: var(--color-text, #000000);
       text-decoration: none;
-      font-weight: 500;
-      transition: border-color var(--transition-fast, 150ms ease);
+      font-weight: 400;
+      transition: none;
     }
 
     .not-found-link:hover,
     .not-found-link:focus-visible {
-      border-color: var(--color-accent, #ED682B);
-      color: var(--color-accent, #ED682B);
+      color: var(--color-text, #000000);
     }
 
     @media (prefers-reduced-motion: reduce) {

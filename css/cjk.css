@@ -1,24 +1,26 @@
 /* ── CJK Typography Overrides (Simplified Chinese) ──────────────────────────────────
 
-   Fraunces, Manrope and Fragment Mono (imported from Google Fonts in
-   css/theme-surya.css) carry no Simplified Chinese coverage, so every CJK glyph
-   currently falls through to a per-character OS fallback — a serif on Windows, a
-   different sans on macOS, another on Android — and the same page reads as three
-   different designs. This stylesheet repairs four treatments that are actively wrong
-   for Chinese:
+   css/theme-retro-os.css remaps --font-heading to W95FA, a self-hosted pixel
+   face in the MS Sans Serif tradition. It carries Latin coverage only, so a
+   Han glyph in a heading or button would fall through to a per-character OS
+   fallback — a serif on Windows, a different sans on macOS, another on
+   Android — and the same page could read as three different designs. This
+   stylesheet repairs four treatments that are actively wrong for Chinese:
 
-     1. System CJK font stack replacing the three webfont-backed --font-* tokens.
+     1. SimSun-first system CJK stacks re-pointing the three webfont-backed
+        --font-* tokens (Latin chrome still resolves to the pixel face).
      2. Negative letter-spacing neutralised (it collides adjacent CJK strokes).
      3. Uppercase micro-labels reset — text-transform is a no-op on Han characters,
         and it leaves the label mismatched against the wide tracking it was paired
         with.
      4. Raised line-height, because CJK glyphs are square and fill their em box.
 
-   LINK ORDER: this file must be linked AFTER css/theme-surya.css on every HTML page
-   that serves Chinese — zh/index.html. The English page (index.html) must not link
-   it at all, and the Google Fonts @import in css/theme-surya.css stays exactly where
-   it is: the English page keeps its webfonts. Note that `body` is a specificity tie
-   with the base body rule, so link order is what decides the CJK line-height there.
+   LINK ORDER: this file must be linked AFTER css/theme-retro-os.css on every
+   HTML page that serves Chinese — zh/index.html. The English page
+   (index.html) must not link it at all; nothing is fetched over the network —
+   the pixel face is self-hosted under fonts/ and every CJK face named below
+   is a system install. Note that `body` is a specificity tie with the base
+   body rule, so link order is what decides the CJK line-height there.
 
    SCOPE: every rule below is gated on html[lang="zh"] or html[lang^="zh-"] (e.g.
    zh-Hans, zh-CN). An html[lang="en"] document matches none of these selectors, so
@@ -27,23 +29,25 @@
    ─────────────────────────────────────────────────────────────────────────────── */
 
 
-/* ── 1. System CJK font stack ──────────────────────────────────────────────
+/* ── 1. SimSun-first CJK font stack ────────────────────────────────────
 
-   Real CJK faces are listed ahead of the generic keywords so the browser never
-   reaches for `sans-serif` while a proper CJK face is installed. Windows gets
-   Microsoft YaHei, macOS/iOS PingFang SC / Hiragino Sans GB, Android and Linux get
-   the Noto / Source Han family. Latin runs inside a Chinese page are covered by the
-   first entry on each platform, so mixed-script lines stay on one type voice.
+   SimSun first, as the era face of the Win95 idiom; the chain continues with
+   the real CJK installs per platform (Songti on macOS, YaHei on Windows,
+   Noto/Source Han on Android and Linux), so the generic keyword is never
+   reached while a proper CJK face is installed. --font-heading keeps W95FA
+   at the head: its unicode-range in the skin's @font-face is pinned to Latin,
+   so Latin chrome (digits, AST IDs, button labels' Latin runs) renders on the
+   pixel face and every Han glyph skips past it to SimSun.
    ────────────────────────────────────────────────────────────────────────── */
 
 html[lang="zh"],
 html[lang^="zh-"] {
-  --font-heading: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', '微软雅黑', 'Noto Sans CJK SC', 'Source Han Sans SC', 'Noto Sans SC', sans-serif;
-  --font-body: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', '微软雅黑', 'Noto Sans CJK SC', 'Source Han Sans SC', 'Noto Sans SC', sans-serif;
+  --font-heading: 'W95FA', 'SimSun', '宋体', 'Songti SC', 'STSong', 'Microsoft YaHei', '微软雅黑', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC', 'Source Han Sans SC', 'Noto Sans SC', sans-serif;
+  --font-body: 'SimSun', '宋体', 'Songti SC', 'STSong', 'Microsoft YaHei', '微软雅黑', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC', 'Source Han Sans SC', 'Noto Sans SC', sans-serif;
   --font-mono: 'Sarasa Mono SC', 'Noto Sans Mono CJK SC', 'Microsoft YaHei', 'PingFang SC', 'Noto Sans CJK SC', 'Source Han Sans SC', 'Noto Sans SC', monospace;
 }
 
-/* Fragments Mono carries no CJK, and the prompt/pre blocks are the one place a
+/* W95FA carries no CJK, and the prompt/pre blocks are the one place a
    Chinese run is expected inside a monospaced surface. */
 html[lang="zh"] pre,
 html[lang^="zh-"] pre,
@@ -59,12 +63,9 @@ html[lang^="zh-"] samp {
 
 /* ── 2. Neutralise negative letter-spacing ─────────────────────────────────
 
-   Overrides, in the files they originate from:
-     css/theme-surya.css:64   h1, h2, h3, h4, h5, h6   letter-spacing: -0.01em
-     css/theme-surya.css:116  #landing-view h1         letter-spacing: -0.02em
-     css/theme-surya.css:205  .results-title-pct       letter-spacing: -0.03em
-     css/theme-surya.css:221  .results-section-title   letter-spacing: -0.01em
-     css/theme-surya.css:341  #landing-view h1 (≤480px) letter-spacing: -0.01em
+   Overrides, in the files they originate from (css/theme-retro-os.css
+   declares letter-spacing: normal on every heading it touches, so it adds no
+   entry here):
      css/results.css:29       .results-title-name      letter-spacing: -0.02em
      styles.css:88            #landing-view h1         letter-spacing: -0.02em
      styles.css:148           #landing-view h1 (≤480px) letter-spacing: -0.01em
@@ -118,7 +119,6 @@ html[lang^="zh-"] a {
    Overrides, in the files they originate from:
      css/quiz.css:218-219      .quiz-label        uppercase + letter-spacing 0.06em
      css/results.css:393-394   .results-review-phase  uppercase + 0.05em
-     css/theme-surya.css:132-133  #landing-view .meta  uppercase + 0.05em
      styles.css:104-105        #landing-view .meta  uppercase + 0.05em
 
    text-transform: uppercase is a no-op on Han characters, so a translated label
@@ -154,12 +154,11 @@ html[lang^="zh-"] .results-ast-chip {
 
 /* ── 4. Line-height ───────────────────────────────────────────────────────
 
-   Tight line-heights this overrides, in the files they originate from:
-     styles.css:11 / css/theme-surya.css:57   body                 1.6
-     styles.css:86 / css/theme-surya.css:116 #landing-view h1      1.1
-     styles.css:96 / css/theme-surya.css:124 #landing-view .subtitle 1.4
-     css/theme-surya.css:67-69               h1 / h2 / h3          1.1 / 1.2 / 1.3
-     css/theme-surya.css:167                 .quiz-question        1.3
+   Tight line-heights this overrides, in the files they originate from
+   (css/theme-retro-os.css declares no line-heights of its own):
+     styles.css:11            body                 1.6
+     styles.css:86            #landing-view h1      1.1
+     styles.css:96            #landing-view .subtitle 1.4
      css/quiz.css:82                         .quiz-scenario        1.55
      css/quiz.css:91                         .quiz-question        1.4
      css/quiz.css:109                        .quiz-option-btn      1.45
@@ -312,8 +311,10 @@ html[lang^="zh-"] code {
    js/results.js buildRadar() sets a font-family presentation attribute on both
    tspans of every axis label. A presentation attribute is the weakest thing in the
    author origin — it sits below every selector-based rule — so this stylesheet rule
-   wins over it without !important. It carries the CJK-capable stack for the Chinese
-   page only; the attribute keeps applying unchanged on the English page.
+   wins over it without !important. It carries the CJK-capable heading stack for
+   the Chinese page only (Latin AST IDs and digits stay on the W95FA pixel face,
+   Han glyphs skip to SimSun); the attribute keeps applying unchanged on the
+   English page.
    ────────────────────────────────────────────────────────────────────────── */
 
 html[lang="zh"] .results-radar-svg text,
@@ -322,6 +323,6 @@ html[lang="zh"] .results-radar-svg tspan,
 html[lang^="zh-"] .results-radar-svg tspan,
 html[lang="zh"] .results-radar-svg text tspan,
 html[lang^="zh-"] .results-radar-svg text tspan {
-  font-family: var(--font-body);
+  font-family: var(--font-heading);
   letter-spacing: normal;
 }

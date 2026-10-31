@@ -218,7 +218,7 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 │   └── index.html           # Simplified Chinese page — same app, Bank Variant
 ├── config.js
 ├── styles.css
-├── design-dna-surya.json   # extracted Design DNA of the Surya reference site
+├── fonts/                  # self-hosted chrome typeface + license + provenance
 ├── questions.json           # Question Bank (English)
 ├── questions.zh.json        # Bank Variant (Simplified Chinese)
 ├── i18n/
@@ -229,7 +229,7 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 ├── css/
 │   ├── quiz.css
 │   ├── results.css
-│   ├── theme-surya.css   # editorial skin, linked last as override layer
+│   ├── theme-retro-os.css  # retro-OS (Win95) skin, linked last as override layer
 │   ├── cjk.css          # CJK typography, gated on html[lang^="zh"] (zh page only)
 │   └── lang-switch.css   # language switch + first-visit offer (ADR-0018)
 ├── js/

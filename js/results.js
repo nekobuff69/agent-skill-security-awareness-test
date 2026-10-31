@@ -17,9 +17,14 @@
   /* ── helpers ── */
 
   function scoreColor(pct) {
-    if (pct < 50) return '#F44336';
-    if (pct < 70) return '#FFC107';
-    return '#4CAF50';
+    /* Classic 16-colour system set, dark variants: these values render both
+       as SVG text (the per-axis percentages) and as graphic fills (the score
+       dots), and the text role is the binding one — dark variants clear the
+       contrast floor on the radar's white field, bright tints do not. Same
+       rationale as the Score colours block in css/theme-retro-os.css. */
+    if (pct < 50) return '#800000';
+    if (pct < 70) return '#808000';
+    return '#008000';
   }
 
   function scoreClass(pct) {
@@ -78,9 +83,9 @@
        beside the headline saying the opposite. scoreClass() already exists and
        already drives the bar fills; applying it here makes the two agree.
 
-       The colours resolve in css/theme-surya.css to the *-text tokens rather
-       than the fill tokens, because the fill values do not meet the contrast
-       floor for text on a light background. */
+       The colours resolve in css/theme-retro-os.css to the *-text tokens
+       rather than the fill tokens, because the fill values do not meet the
+       contrast floor for text on a light background. */
     frag.appendChild(el('div', { className: 'results-title-card' }, [
       el('div', { className: 'results-title-emoji', textContent: title.emoji }),
       el('div', { className: 'results-title-name', textContent: title.name }),
@@ -206,8 +211,8 @@
     var polyPts = points.map(function(p) { return p.x + ',' + p.y; }).join(' ');
     var poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
     poly.setAttribute('points', polyPts);
-    poly.setAttribute('fill', 'rgba(237, 104, 43, 0.15)');
-    poly.setAttribute('stroke', '#ED682B');
+    poly.setAttribute('fill', 'rgba(0, 0, 128, 0.15)');
+    poly.setAttribute('stroke', '#000080');
     poly.setAttribute('stroke-width', '2');
     svg.appendChild(poly);
 

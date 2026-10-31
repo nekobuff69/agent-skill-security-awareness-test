@@ -48,7 +48,7 @@
 
    The --color-score-* set, not the bar-fill tokens below: this sits on the
    dark card, where the fill values would not clear 3:1. See the Score colours
-   block in css/theme-surya.css for the measurements behind both sets. */
+   block in css/theme-retro-os.css for the measurements behind both sets. */
 .results-title-pct.results-green { color: var(--color-score-green); }
 .results-title-pct.results-amber { color: var(--color-score-amber); }
 .results-title-pct.results-red   { color: var(--color-score-red); }
@@ -164,8 +164,8 @@
    The two selector forms are both kept: js/results.js puts the class on the
    fill itself (.results-bar-fill.results-red), while these rules also support
    an ancestor carrying it. The compound selector is what wins over the
-   single-class .results-bar-fill rule in css/theme-surya.css, which is why the
-   bars are not all orange. */
+   single-class .results-bar-fill rule in css/theme-retro-os.css, which is
+   why each bar keeps its own score colour. */
 .results-red .results-bar-fill,
 .results-bar-fill.results-red {
   background: var(--color-error);
