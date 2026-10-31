@@ -1,0 +1,85 @@
+/* ── Boot splash (issue #39) ──────────────────────────────────────────
+   Overlay + W95 splash, assembled only from theme-retro-os.css skin
+   tokens: face/navy greys, sunken bevel, W95FA chrome font, zero radii,
+   Win95-instant transitions. The overlay masks — it never gates — so
+   content fetches run underneath it untouched. */
+
+.boot-overlay {
+  position: fixed;
+  inset: 0;
+  /* Above everything, including any window-shell chrome layered later. */
+  z-index: 2147483647;
+  background: #000000;              /* black full viewport, per spec */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-heading);
+}
+
+.boot-panel {
+  width: 260px;
+  text-align: center;
+}
+
+.boot-title {
+  margin: 0 0 16px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-face);        /* chrome grey text on black */
+}
+
+/* Sunken groove: Win95 recessed track, pale field inside. */
+.boot-groove {
+  padding: 4px;
+  background: var(--color-face);
+  box-shadow: var(--bevel-sunken);
+}
+
+/* Segmented navy fill: discrete blocks, stepped forward by steps() —
+   never a smooth ease (Win95 has no easing). 12 steps over 1.35s,
+   kept in sync with SPLASH_MS in js/boot.js. */
+.boot-fill {
+  height: 14px;
+  width: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--color-primary) 0 9px,    /* navy block      */
+    var(--color-face) 9px 12px     /* gap between     */
+  );
+  animation: boot-fill 1.35s steps(12, end) forwards;
+}
+
+@keyframes boot-fill {
+  from { width: 8%; }
+  to   { width: 100%; }
+}
+
+.boot-status {
+  margin: 14px 0 0;
+  font-size: 12px;
+  color: var(--color-face);
+}
+
+/* Fade-out handoff: the overlay is removed after this completes. */
+.boot-overlay.boot-leaving {
+  animation: boot-fade 0.2s linear forwards;
+}
+
+@keyframes boot-fade {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* prefers-reduced-motion: the decision in js/boot.js already returns
+   'instant' so this never renders; the rule is a CSS-side backstop that
+   parks the fill full instead of animating. */
+@media (prefers-reduced-motion: reduce) {
+  .boot-fill {
+    animation: none;
+    width: 100%;
+  }
+  .boot-overlay.boot-leaving {
+    animation: none;
+    opacity: 0;
+  }
+}

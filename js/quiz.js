@@ -21,6 +21,22 @@
   }
 
   /**
+   * Every animation in this module (beats, wipes, scroll) is instant under
+   * prefers-reduced-motion — checked at call time, not cached.
+   */
+  function reducedMotion() {
+    return !!(window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+
+  /* Timing beats (ADR 0020). The 200ms tap beat and the 400ms 100% hold
+     before hand-off are the designed ones from the original quiz; the
+     wipe runs inside them. */
+  var ADVANCE_BEAT_MS = 200;
+  var FINISH_BEAT_MS  = 400;
+  var WIPE_MS         = 160;
+
+  /**
    * The language switcher: one control, placed on the landing view and at the
    * end of the Quiz Chrome. The target URL comes from the page's data-lang-alt
    * attribute, so no path arithmetic and no auto-detection are involved — a
@@ -53,10 +69,16 @@
   var phases     = [];   // bank.phases
   var answers    = [];   // length = questions.length, null | 0-3
   var currentIdx = 0;
-  var activeBtns = [];   // DOM refs for current question's option buttons
+  var activeBtns = [];   // DOM refs for current question's radio rows
   var currentCard = null; // current visible question card DOM element
-  var advancing   = false; // true during the 180ms post-answer delay
-  var backBtnEl   = null; // current back button DOM ref (null on first card)
+  var advancing   = false; // true during a post-answer beat
+  var swapPending = false; // true while a wipe swap is queued
+  var backBtnEl   = null; // current Back control ref (absent on Q1)
+  var finishBtnEl = null; // current [Finish] control ref (last card only)
+
+  // The single-fire commit gate: the [Finish] click is the ONLY path to
+  // Completion (ADR 0020) — the wizard-navigation module owns the guard.
+  var commitGate  = app.WizardNav.createCommitGate();
 
   // Chrome bar DOM refs (built once in renderQuiz)
   var chromeFill    = null;
@@ -97,14 +119,14 @@
   /* ── Render one question card ────────────────────────────────────── */
 
   function renderQuestion(idx) {
-    // All questions answered → finish
-    if (idx >= questions.length) {
-      finishQuiz();
-      return;
-    }
+    // Bounds are WizardNav's contract (next/prev clamp); Completion never
+    // happens here — only the [Finish] click commits (ADR 0020).
+    if (idx < 0) idx = 0;
+    if (idx >= questions.length) idx = questions.length - 1;
 
     currentIdx = idx;
     advancing = false;
+    swapPending = false;
     var q = questions[idx];
     var view = byId('quiz-view');
     if (!view) return;
@@ -136,29 +158,48 @@
     card.appendChild(makeEl('span', 'quiz-label', t('quiz.labelQuestion')));
     card.appendChild(makeEl('p', 'quiz-question', q.question));
 
-    // ── Option buttons with letter badges ──
+    // ── Radio group: one radio row per Option ──
+    // role=radiogroup + role=radio rows: whole row is the tap target,
+    // arrows move between Options, space/enter marks (ADR 0020). The
+    // one-Option-per-Question invariant (ADR 0017) reads straight off
+    // aria-checked — exactly one row is true.
     var optsWrap = makeEl('div', 'quiz-options');
+    optsWrap.setAttribute('role', 'radiogroup');
+    optsWrap.setAttribute('aria-label', t('quiz.labelQuestion'));
     activeBtns = [];
     var LETTERS = 'ABCD';
 
     for (var i = 0; i < q.options.length; i++) {
       /* jshint loopfunc:true */
       (function(optIdx) {
-        var btn = makeEl('button', 'quiz-option-btn');
+        var btn = makeEl('button', 'quiz-radio-row');
+        btn.type = 'button';
+        btn.setAttribute('role', 'radio');
         btn.setAttribute('data-qid', q.id);
         btn.setAttribute('data-opt', String(optIdx));
+        btn.setAttribute('aria-checked', answers[idx] === optIdx ? 'true' : 'false');
 
+        // Etched dial glyph — the black dot is CSS-drawn (css/quiz.css).
+        btn.appendChild(makeEl('span', 'quiz-radio-mark'));
         var badge = makeEl('span', 'quiz-letter-badge', LETTERS[optIdx]);
         var label = makeEl('span', 'quiz-option-text', q.options[optIdx].text);
         btn.appendChild(badge);
         btn.appendChild(label);
 
-        if (answers[idx] === optIdx) {
-          btn.classList.add('selected');
-        }
-
         btn.addEventListener('click', function() {
           onOptionClick(idx, optIdx);
+        });
+
+        // Arrow keys move between Options like a native radio group;
+        // space/enter marks through the normal click path.
+        btn.addEventListener('keydown', function(ev) {
+          var k = ev.key;
+          if (k !== 'ArrowDown' && k !== 'ArrowRight' &&
+              k !== 'ArrowUp' && k !== 'ArrowLeft') return;
+          ev.preventDefault();
+          var step = (k === 'ArrowDown' || k === 'ArrowRight') ? 1 : -1;
+          var n = (optIdx + step + q.options.length) % q.options.length;
+          activeBtns[n].focus();
         });
 
         activeBtns.push(btn);
@@ -168,83 +209,135 @@
 
     card.appendChild(optsWrap);
 
-    // ── Back button (hidden on first card) ──
+    // ── Wizard button row: [< Back] [Next >], [Finish] on the last card ──
+    var navRow = makeEl('div', 'quiz-wizard-row');
+
     if (idx > 0) {
-      var backBtn = makeEl('button', 'quiz-back-btn', t('quiz.previous'));
+      var backBtn = makeEl('button', 'quiz-wizard-btn', t('wizard.back'));
+      backBtn.type = 'button';
       backBtn.addEventListener('click', function() {
-        renderQuestion(idx - 1);
+        gotoQuestion(app.WizardNav.prev(questions.length, idx).index);
       });
-      card.appendChild(backBtn);
+      navRow.appendChild(backBtn);
       backBtnEl = backBtn;
     } else {
       backBtnEl = null;
     }
 
+    if (app.WizardNav.isLast(questions.length, idx)) {
+      // [Finish] replaces [Next] and is enabled iff every Question has an
+      // Option selected. It is the only path to Completion (ADR 0020).
+      var finishBtn = makeEl('button', 'quiz-wizard-btn quiz-finish-btn', t('wizard.finish'));
+      finishBtn.type = 'button';
+      if (!app.WizardNav.canFinish(answers)) finishBtn.disabled = true;
+      finishBtn.addEventListener('click', function() {
+        finishQuiz();
+      });
+      navRow.appendChild(finishBtn);
+      finishBtnEl = finishBtn;
+    } else {
+      var nextBtn = makeEl('button', 'quiz-wizard-btn', t('wizard.next'));
+      nextBtn.type = 'button';
+      nextBtn.addEventListener('click', function() {
+        gotoQuestion(app.WizardNav.next(questions.length, idx).index);
+      });
+      navRow.appendChild(nextBtn);
+      finishBtnEl = null;
+    }
+
+    card.appendChild(navRow);
+
     view.appendChild(card);
     currentCard = card;
 
-    // Enter animation: slide-up + fade
-    var reducedMotion = window.matchMedia &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    if (!reducedMotion) {
-      card.classList.add('card-enter');
-      requestAnimationFrame(function() {
-        requestAnimationFrame(function() {
-          card.classList.remove('card-enter');
-        });
-      });
+    // Client-area wipe-in (ADR 0020); instant under reduced motion.
+    if (!reducedMotion()) {
+      card.classList.add('card-wipe-in');
     }
 
-    // Smooth scroll so the card is visible
-    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    // Scroll so the card is visible; instant behavior under reduced motion
+    // — the media query alone does not cover scrolling.
+    card.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'nearest' });
+
+    // Keyboard continuity: the fresh card takes focus (the dotted focus
+    // rectangle only paints for :focus-visible, so pointer users never see
+    // it), so the next Tab/Enter lands on an Option, not the page body.
+    if (activeBtns.length > 0) activeBtns[0].focus();
   }
 
-  /* ── Option click → save + auto-advance ──────────────────────────── */
+  /* ── Card swap: the client-area wipe (ADR 0020) ───────────────────── */
+
+  function gotoQuestion(idx) {
+    if (swapPending) return;
+
+    var target = idx < 0 ? 0 : idx;
+    if (target > questions.length - 1) target = questions.length - 1;
+    if (target === currentIdx) return;
+
+    if (reducedMotion() || !currentCard) {
+      renderQuestion(target);
+      return;
+    }
+
+    swapPending = true;
+    currentCard.classList.add('card-wipe-out');
+    setTimeout(function() {
+      // renderQuestion removes the old card and clears swapPending.
+      renderQuestion(target);
+    }, WIPE_MS);
+  }
+
+  /* ── Mirror answers into the radio rows ───────────────────────────── */
+
+  function syncOptionRows(optIdx) {
+    for (var i = 0; i < activeBtns.length; i++) {
+      activeBtns[i].setAttribute('aria-checked', i === optIdx ? 'true' : 'false');
+    }
+  }
+
+  /* ── Option tap → record + advance (first time), re-mark (revisit) ── */
 
   function onOptionClick(qIdx, optIdx) {
-    // Ignore clicks while advancing
+    // Ignore taps while a beat is running
     if (advancing) return;
 
-    // If already answered with the same option, no-op
+    // Same pick re-tapped: nothing to record, nothing to move
     if (answers[qIdx] === optIdx) return;
 
-    // Allow re-answer: update answer and re-advance
-    answers[qIdx] = optIdx;
+    var decision = app.WizardNav.tapOption(answers, qIdx, optIdx);
+
+    // Record the pick — one Option per Question, overwritten in place
+    // (ADR 0017); the Session save stays silent.
+    answers[qIdx] = decision.answer;
     persist();
-    advancing = true;
     updateChrome();
+    syncOptionRows(decision.answer);
 
-    // Highlight selection, de-highlight others
-    for (var i = 0; i < activeBtns.length; i++) {
-      if (i === optIdx) {
-        activeBtns[i].classList.add('selected');
-      } else {
-        activeBtns[i].classList.remove('selected');
+    if (decision.action === 'stay') {
+      // Re-mark on a revisit, or the first fill of the last Question.
+      // Either way the card does not move — picks are free until commit.
+      if (decision.finishReady) {
+        // The Progress Fill just hit 100%: enable [Finish], hold the
+        // designed beat, then focus it. Completion stays the click.
+        if (finishBtnEl) {
+          finishBtnEl.disabled = false;
+          advancing = true;
+          var finishBtn = finishBtnEl;
+          setTimeout(function() {
+            advancing = false;
+            // Identity guard: the Participant may have moved on already.
+            if (finishBtn === finishBtnEl) finishBtn.focus();
+          }, reducedMotion() ? 0 : FINISH_BEAT_MS);
+        }
       }
+      return;
     }
 
-    // Exit animation: fade + slide up
-    var reducedMotion = window.matchMedia &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    var card = currentCard;
-    var nextIdx = qIdx + 1;
-    var delay = (nextIdx >= questions.length) ? 400 : 200;
-
-    function doAdvance() {
-      renderQuestion(nextIdx);
-    }
-
-    if (reducedMotion || !card) {
-      doAdvance();
-    } else {
-      card.classList.add('card-exit');
-      setTimeout(function() {
-        card.classList.remove('card-exit');
-        doAdvance();
-      }, delay);
-    }
+    // First answer: the designed beat, then the client-area wipe.
+    advancing = true;
+    setTimeout(function() {
+      gotoQuestion(app.WizardNav.next(questions.length, qIdx).index);
+    }, reducedMotion() ? 0 : ADVANCE_BEAT_MS);
   }
 
   /* ── Persistence wrapper ─────────────────────────────────────────── */
@@ -257,15 +350,28 @@
   /* ── Quiz completion ─────────────────────────────────────────────── */
 
   function finishQuiz() {
+    // The single Completion path: the [Finish] click, gated once per
+    // Session so a double click cannot score or hand off twice (ADR 0020).
+    var verdict = commitGate.fire(answers);
+    if (!verdict.ok) return;
+
     var result = app.Scoring.computeScores(bank, answers);
-    if (!result || !result.ok) return;
-
-    global.Analytics.track('quiz_completed');
-
-    // Hand off to results view (App.renderResults, defined by results.js)
-    if (app.renderResults) {
-      app.renderResults(bank, result.report);
+    if (!result || !result.ok) {
+      // Nothing to hand off — unlock the gate so the Participant can retry.
+      commitGate.reset();
+      return;
     }
+
+    global.Analytics.track(verdict.event); // 'quiz_completed'
+
+    // The Progress Fill holds at 100% for the designed beat before the
+    // hand-off — the "it really ended" signal (spec #36).
+    setTimeout(function() {
+      // Hand off to results view (App.renderResults, defined by results.js)
+      if (app.renderResults) {
+        app.renderResults(bank, result.report);
+      }
+    }, reducedMotion() ? 0 : FINISH_BEAT_MS);
   }
 
   /* ── Non-blocking notice ─────────────────────────────────────────── */
@@ -291,7 +397,10 @@
     activeBtns = [];
     currentCard = null;
     advancing   = false;
+    swapPending = false;
     backBtnEl   = null;
+    finishBtnEl = null;
+    commitGate.reset();   // a new run is a new commit opportunity
     chromeFill = null;
     chromeCounter = null;
     chromeChip = null;
@@ -336,14 +445,13 @@
       }
     }
 
-    // Find first unanswered question
+    // Resume at the first unanswered Question; a fully answered Session
+    // resumes on the last Question with [Finish] live — Completion is the
+    // Participant's commit, never automatic (ADR 0020).
     var startIdx = 0;
     for (var j = 0; j < answers.length; j++) {
       if (answers[j] === null) { startIdx = j; break; }
-      if (j === answers.length - 1) {
-        // All answered — startIdx stays 0; finishQuiz fires on first renderQuestion call
-        startIdx = answers.length;
-      }
+      if (j === answers.length - 1) startIdx = answers.length - 1;
     }
 
     renderQuestion(startIdx);

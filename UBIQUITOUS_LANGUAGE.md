@@ -23,7 +23,7 @@ Domain vocabulary for the Agent Skills Security Self-assessment — extracted fr
 | **Participant** | The person taking the assessment                                                     | User, quiz-taker, respondent |
 | **Agent**       | The Participant's own AI coding app, where the Deep-Dive Prompt is pasted             | Assistant, bot             |
 | **Session**     | One quiz attempt persisted locally under the single key `quiz-session`, shared by every Bank Variant and versioned by the bank's structural hash — Question order, Option Scores, Severity Weights, AST Risk mappings, Phase membership — never by authored text | Saved answers, localStorage state, per-language Session |
-| **Completion**  | The moment all Questions are answered; triggers scoring and the Action Plan request  | Finish, submission         |
+| **Completion**  | The hand-off to results, committed by the Finish Commit once every Question has an Option selected; triggers scoring and the Action Plan request | Submission (bare), auto-completion    |
 | **Retake**      | The results-page control that clears the Session and returns to the landing view     | Restart, redo              |
 | **Language Preference** | The Participant's remembered language choice and the set of first-visit prompts they have dismissed, held under `quiz-lang` independently of their Session — never version-stamped, never reset by a Question Bank change | Locale setting, language cookie, per-language state |
 
@@ -36,8 +36,9 @@ Domain vocabulary for the Agent Skills Security Self-assessment — extracted fr
 | **Progress Fill**    | The thin bar showing answered questions / 20; reaches 100% before the results hand-off           | Progress bar (bare)                  |
 | **Phase Chip**       | The small in-place label in the Quiz Chrome showing the current Phase; swaps text, never appends | Phase header (retired card), badge   |
 | **Question Card**    | The one-at-a-time card: Q-number chip, labeled Scenario and Question blocks, A–D-lettered Options | Quiz card, quiz page                 |
-| **Back Navigation**  | Back-only movement: ← Previous from the second Question onward; re-answering overwrites and re-advances | Forward skip (does not exist)        |
-| **Advance Transition** | The slide-up + fade card swap on answering; disabled under prefers-reduced-motion             | Animation, transition effect         |
+| **Wizard Navigation**| Two-way movement through the Question Cards: [< Back] from the second Question onward, [Next >] between Cards, [Finish] on the last; re-answering overwrites the pick in place without advancing | Back-only navigation (retired), pager, stepper |
+| **Finish Commit**    | The [Finish] click on the last Question Card — the single trigger for Completion: enabled only when all 20 Questions are answered, `quiz_completed` fires exactly there, never automatically | Auto-finish, submit button, implicit completion |
+| **Advance Transition** | The client-area card wipe (~160ms CSS) replacing the outgoing Question Card on advance and Back; instant under prefers-reduced-motion | Animation, transition effect, slide-up + fade (retired) |
 | **Chrome String** | A translatable interface string, resolved by id from the locale dictionary (`i18n/<lang>.js`) and kept strictly separate from Question Bank content; a missing id throws rather than falling back | Copy (bare), localized string, bank copy, display data, title (bare) |
 
 ## Scoring
@@ -110,7 +111,7 @@ The ten names are a fixed terminology set per language, not text assembled per f
 
 - A **Question** belongs to exactly one **Phase** and maps to one or more **AST Risks**.
 - An **Option** belongs to exactly one **Question** and carries exactly one **Option Score**, one **Feedback**, and one letter badge (A–D).
-- A **Session** records exactly one **Option** per **Question**; a structural bank change version-stamps stale Sessions while authored-text changes do not; **Back Navigation** re-answers overwrite in place and re-advance. One **Participant** has one Session for the whole assessment — every **Bank Variant** reads and writes the same record, so switching language resumes in place rather than starting a second run, and rewriting prose never costs anyone their progress (ADR 0017).
+- A **Session** records exactly one **Option** per **Question**; a structural bank change version-stamps stale Sessions while authored-text changes do not; **Wizard Navigation** moves both ways — re-answers overwrite in place and the card stays put (no advance on a revisit), and **Finish Commit** is the single path to **Completion**. One **Participant** has one Session for the whole assessment — every **Bank Variant** reads and writes the same record, so switching language resumes in place rather than starting a second run, and rewriting prose never costs anyone their progress (ADR 0017).
 - The **Quiz Chrome** updates in place: the **Question Counter** shows the question being viewed, the **Progress Fill** shows answered/20, the **Phase Chip** swaps the Phase title — nothing stacks, nothing appends.
 - A **Completion** consumes one **Session**, produces exactly one **Progression Title** and one Action Plan request; the **Progress Fill** holds 100% for a beat before the hand-off.
 - A **Blind Spot** is one **Participant**'s low **AST Score** on one **AST Risk**; a Multi-Mapping Question feeds every mapped **AST Score**, so one bad answer can open two Blind Spots.
@@ -124,11 +125,11 @@ The ten names are a fixed terminology set per language, not text assembled per f
 
 > **Dev:** "The Participant is on question 20 and the counter says 20/20, but the results aren't showing — bug?"
 
-> **Domain expert:** "No — that's the designed beat. At the last answer the **Question Counter** holds 20/20 with the **Progress Fill** at 100% for a beat, then **Completion** hands off. The old counter counted *answered* questions, which is why people thought the quiz ended at 19."
+> **Domain expert:** "No — that's the designed gate. The first time an Option is tapped the card auto-advances on the beat; at the last answer the **Question Counter** holds 20/20 with the **Progress Fill** at 100% for a beat and **Finish** becomes enabled. **Completion** fires only on the **Finish Commit** — the old counter counted *answered* questions, which is why people thought the quiz ended at 19."
 
 > **Dev:** "They went back and changed their answer on question 3 — does the **Session** keep both answers?"
 
-> **Domain expert:** "**Back Navigation** re-answers: the new choice overwrites the stored one and auto-advances again. Save stays silent, no forward skip exists."
+> **Domain expert:** "One **Option** per **Question**, always — the new pick overwrites the stored one, the radio re-marks, and the card stays put: re-answering never auto-advances. Picks stay free until the **Finish Commit**."
 
 > **Dev:** "Where did the **Review** go? It used to sit right under the Action Plan."
 
