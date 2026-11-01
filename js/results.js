@@ -459,8 +459,11 @@
 
     if (slot.report === report && slot.narrative !== null) {
       // This Completion's plan for this locale already exists — re-render
-      // from the slot: no generation, no fetch.
+      // from the slot: no generation, no fetch. The content settles inside
+      // this very render, and the settle IS the arrival: the Action Plan
+      // window appears (or stays) with it (ticket #61).
       renderPlanContent(wrap, slot.narrative, slot.actions);
+      actionPlanSettled();
       return wrap;
     }
 
@@ -484,6 +487,11 @@
       // an evicted view.
       if (_planRenderId !== renderId) return;
       renderPlanContent(wrap, plan.narrative, plan.actions);
+      // Content settled → the window arrives. The Deterministic Fallback
+      // lands here on its microtask too, and that is the SAME rule with
+      // the same consequence: the LLM Path and the fallback are not two
+      // arrival paths (ticket #61).
+      actionPlanSettled();
     });
     return wrap;
   }
@@ -784,21 +792,22 @@
     return btn;
   }
 
-  /* ── Section mount points (ticket #59) ──────────────────────────────── */
+  /* ── Section mount points (tickets #59, #61) ────────────────────────── */
 
   /**
-   * Stable hosts for the two sections the desktop tickets (#58/#61/#62)
-   * render into their own windows: the Action Plan and the Deep-Dive
-   * Prompt. The id rides on the section wrapper itself, so a later ticket
-   * moves the section — heading and content together — into a window body
-   * without reshaping this presenter, and the presenter keeps building the
-   * identical markup here while it is mounted in place.
+   * Stable hosts for the two sections the desktop tickets render into
+   * their own windows: the Action Plan and the Deep-Dive Prompt. The id
+   * rides on the host — the results view wrapper while the section is
+   * mounted in place, the program frame's BODY once the shell has built
+   * that frame (js/shell.js gives the body the same id and marks it with
+   * data-results-mount) — so nothing about a mount point is cached and
+   * resultsMount() keeps resolving the LIVE element on every call.
    *
-   * renderResults() rebuilds the results view from scratch on every render
-   * — including the in-place language-switch re-render of issue #56 — so
-   * the ids are re-established by that same render and nothing about a
-   * mount point is cached: resultsMount() resolves the LIVE element on
-   * every call.
+   * renderResults() rebuilds everything it renders from scratch, including
+   * the in-place language-switch re-render of issue #56: the section
+   * subtree is re-MOUNTED (the host is cleared, then the fresh subtree is
+   * appended) so an in-place re-render neither duplicates a section nor
+   * leaves an orphan of the previous one behind.
    */
   var MOUNT_IDS = {
     'action-plan': 'results-mount-action-plan',
@@ -813,6 +822,69 @@
     if (typeof document === 'undefined' || !document ||
         typeof document.getElementById !== 'function') return null;
     return document.getElementById(id);
+  }
+
+  /** The desktop controller the shell wired in (null on a bare page). */
+  function desktop() {
+    return (app.Windows && app.Windows.controller) || null;
+  }
+
+  /**
+   * The host a movable section renders into, resolved through the Section
+   * Mount Point contract: the program frame's body when the desktop built
+   * it (the section then lives in ITS OWN window, not in the Quiz body),
+   * or null when there is no window — the flow stages and the headless
+   * renders, where the section mounts in place under its own id.
+   */
+  function programHost(name) {
+    var host = resultsMount(name);
+    if (!host || typeof host.getAttribute !== 'function') return null;
+    return host.getAttribute('data-results-mount') === name ? host : null;
+  }
+
+  /**
+   * Mount one section subtree: into its program window when that window
+   * exists, otherwise in place in the results view. Either way the host
+   * carries the mount id, so App.resultsMount(name) resolves the live node
+   * right after this returns.
+   */
+  function mountSection(name, section, view) {
+    var host = programHost(name);
+    if (host) {
+      host.innerHTML = '';
+      host.appendChild(section);
+      return host;
+    }
+    section.id = MOUNT_IDS[name];
+    view.appendChild(section);
+    return section;
+  }
+
+  /**
+   * The Action Plan window arrives when its content settles — the same
+   * rule on the LLM Path and on the Deterministic Fallback, and the same
+   * rule when the fallback settles inside the current render. The window
+   * manager owns the consequence: cascaded from the focused window, below
+   * it in the stacking order, no focus and no raise.
+   */
+  function actionPlanSettled() {
+    var win = desktop();
+    if (win && typeof win.actionPlanArrived === 'function') {
+      return win.actionPlanArrived();
+    }
+    return false;
+  }
+
+  /**
+   * The Deep-Dive Prompt arrives at the Finish Commit, minimized: a
+   * taskbar button and nothing else until the Participant opens it.
+   */
+  function deepDiveCommitted() {
+    var win = desktop();
+    if (win && typeof win.deepDiveArrived === 'function') {
+      return win.deepDiveArrived();
+    }
+    return false;
   }
 
   function renderResults(bank, report) {
@@ -859,23 +931,24 @@
     barsSection.appendChild(buildBars(report));
     view.appendChild(barsSection);
 
-    // Action Plan — mounted on its stable section host (#59). The id rides
-    // the wrapper, so a later ticket can move the whole section into the
-    // Action Plan window without reshaping this presenter.
-    var actionSection = el('div', { className: 'results-section' });
-    actionSection.id = MOUNT_IDS['action-plan'];
-    actionSection.appendChild(el('h2', { className: 'results-section-title', textContent: t('results.actionPlanTitle') }));
+    // Action Plan — mounted on its stable section host. The host is the
+    // Action Plan WINDOW's body when the desktop built that frame, and the
+    // section no longer renders inside the Quiz window's body (ticket #61).
     // The raw report is the slot identity; the localized prose and the
     // scoring Variant travel with it for the plan's prompt (#56).
+    var actionSection = el('div', { className: 'results-section' });
+    actionSection.appendChild(el('h2', { className: 'results-section-title', textContent: t('results.actionPlanTitle') }));
     actionSection.appendChild(buildActionPlan(report, bank, scoringBank));
-    view.appendChild(actionSection);
+    mountSection('action-plan', actionSection, view);
 
-    // Deep-Dive Prompt — mounted on its stable section host (#59)
+    // Deep-Dive Prompt — mounted on its stable section host, which is the
+    // Deep-Dive Prompt window's body on the desktop (#61). Its content is
+    // built synchronously (the Deterministic Prompt Builder), so the Finish
+    // Commit below is also its arrival.
     var ddSection = el('div', { className: 'results-section' });
-    ddSection.id = MOUNT_IDS['deep-dive'];
     ddSection.appendChild(el('h2', { className: 'results-section-title', textContent: t('results.deepDiveTitle') }));
     ddSection.appendChild(buildDeepDive(shown));
-    view.appendChild(ddSection);
+    mountSection('deep-dive', ddSection, view);
 
     // Button row: Review + Retake
     var actionBtnRow = el('div', { className: 'results-action-btn-row' });
@@ -883,9 +956,17 @@
     actionBtnRow.appendChild(buildRetake());
     view.appendChild(actionBtnRow);
 
-    // Switch views (hide quiz/landing, show results)
+    // Switch views (hide quiz/landing, show results) FIRST: the desktop
+    // stage is what the arriving windows stand on, and the Window Manager
+    // reads the stage off this DOM on every render (js/windows.js syncView).
     if (app.showView) app.showView('results-view');
     view.hidden = false;
+
+    // The Finish Commit: the desktop comes into being with this render, so
+    // this is where the Deep-Dive Prompt window opens — minimized, a
+    // taskbar button only (ticket #61). The Action Plan window arrives on
+    // its own settle, which is where a Narrative is known to be real.
+    deepDiveCommitted();
   }
 
   /**

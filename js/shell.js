@@ -7,18 +7,23 @@
   /**
    * Desktop shell (ticket #38): window frame, taskbar, Start menu, About
    * window. Ticket #43 makes the title-bar controls live; ticket #50
-   * replaces the tray clock with the two-segment language toggle.
+   * replaces the tray clock with the two-segment language toggle; ticket
+   * #61 adds the Action Plan and the Deep-Dive Prompt windows, so the
+   * shell builds THREE program frames — one chrome, one control idiom, one
+   * taskbar button each — instead of wrapping #app alone.
    *
    * Layering: the shell WRAPS the existing `#app` node at runtime (no HTML
    * edits) — a `div.os-window` with a navy title bar takes `#app` as its
-   * content, and a fixed `div.os-taskbar` pins the Start button, the program
-   * button and the language toggle to the bottom of the screen.
+   * content, and a fixed `div.os-taskbar` pins the Start button, the
+   * program buttons and the language toggle to the bottom of the screen.
    *
    * The three title-bar buttons carry `data-os-button="minimize|maximize|
    * close"` and DELEGATE to an App.Windows controller when the page wires
-   * one in (js/shell.js start() builds it from js/windows.js). Without a
-   * controller they keep the era default: drawn, disabled, inert — a
-   * landing-state application that cannot close itself. The controller
+   * one in (js/shell.js start() builds it from js/windows.js) — for the
+   * Quiz frame that is the controller's own action, for a program frame
+   * the same action bound to that program's Id. Without a controller they
+   * keep the era default: drawn, disabled, inert — a landing-state
+   * application that cannot close itself. The controller
    * re-renders their disabled state on every view change, drives the
    * minimize/maximize trace classes on the window frame, and decides what
    * [×] means: the End Program dialog on a flow view, the core's hide()
@@ -65,6 +70,32 @@
 
   var shell = {};
 
+  /**
+   * The two programs that run in their own windows (ticket #61, spec #58):
+   * the Action Plan and the Deep-Dive Prompt. `id` is the program Id the
+   * Desktop Core keys its Window Record by, `mount` the Section Mount Point
+   * name js/results.js resolves through App.resultsMount, and `titleId` the
+   * Chrome String the title bar and the taskbar button carry.
+   */
+  var PROGRAM_FRAMES = [
+    { id: 'action-plan', mount: 'action-plan', titleId: 'shell.actionPlanWindow' },
+    { id: 'deep-dive', mount: 'deep-dive', titleId: 'shell.deepDiveWindow' }
+  ];
+
+  /**
+   * The stable host id a program frame's body carries. js/results.js owns
+   * the Section Mount Point names (App.resultsMountIds); the shell adopts
+   * them so `App.resultsMount('action-plan')` resolves the ACTION PLAN
+   * WINDOW's body on the desktop — the presenter renders the section into
+   * its own program without knowing the window exists. Without results.js
+   * (a bare shell in a headless test) the same ids are derived, and the
+   * strings match: the contract is the name, not the file.
+   */
+  function programBodyId(spec) {
+    var ids = app.resultsMountIds || {};
+    return ids[spec.mount] || 'results-mount-' + spec.mount;
+  }
+
   // ── State transitions (pure; headless-testable) ────────────────────────
 
   /** Start menu: click/Enter on the Start button toggles it. */
@@ -98,28 +129,26 @@
   // ── Build ───────────────────────────────────────────────────────────────
 
   /**
-   * Build the whole shell around the given `#app` node and return a
-   * controller. `deps` supplies the collaborators so the same code runs in
-   * the page (real document + App.I18n) and in tests (fakeEl stubs +
-   * prepared strings):
+   * The frame chrome — one navy title bar with the three control buttons,
+   * plus the corner grip. Ticket #61 generalizes what used to be the one
+   * Quiz frame into a factory: every program frame is drawn with the same
+   * chrome and the same delegated buttons, so the desktop has ONE window
+   * idiom, not a per-program copy.
    *
-   *   deps.doc      - document or fakeEl document (createElement)
-   *   deps.appEl    - the existing #app node to re-parent
-   *   deps.strings  - resolved Chrome Strings map (shell.* ids → text)
-   *   deps.onOutsideClick - optional; receives the outside-click handler
+   *   opts.titleText   title-bar text (a resolved Chrome String)
+   *   opts.actions     {minimize, maximize, close} — the delegation target
+   *                    for this frame's control buttons (an App.Windows
+   *                    controller method bound to the frame's program Id);
+   *                    absent, the buttons keep the era default: drawn,
+   *                    disabled, inert.
    */
-  function build(deps) {
-    var doc = deps.doc;
-    var strings = deps.strings;
-    var appEl = deps.appEl;
-
-    // ── Window frame ─────────────────────────────────────────────────────
+  function buildFrameChrome(doc, strings, opts) {
     var windowEl = createEl(doc, 'div', 'os-window');
 
     var titleBar = createEl(doc, 'div', 'os-titlebar');
     titleBar.setAttribute('role', 'banner');
 
-    var titleText = createEl(doc, 'span', 'os-titlebar-title', strings['shell.windowTitle']);
+    var titleText = createEl(doc, 'span', 'os-titlebar-title', opts.titleText);
     titleBar.appendChild(titleText);
 
     var titleButtons = createEl(doc, 'div', 'os-titlebar-buttons');
@@ -140,8 +169,8 @@
         // Disabled buttons never fire (browser and fakeEl both).
         if (btn.disabled) return;
         if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
-        if (!deps.windows) return;
-        var fn = deps.windows[action];
+        if (!opts.actions) return;
+        var fn = opts.actions[action];
         if (typeof fn === 'function') fn();
       });
       titleButtons.appendChild(btn);
@@ -149,6 +178,56 @@
     });
     titleBar.appendChild(titleButtons);
     windowEl.appendChild(titleBar);
+
+    // Resize grip (ticket #60): the bottom-right corner handle of the
+    // positioned window. The shell builds it; the controller owns when it
+    // is live (css/shell.css shows it only while .is-windowed is on the
+    // frame, and js/windows.js refuses the write on the mobile layout and
+    // while maximized). It carries no label: [—][□][×] and the keyboard
+    // route stay the accessible controls, so the grip is presentation.
+    var resizeGrip = createEl(doc, 'div', 'os-resize-grip');
+    resizeGrip.setAttribute('aria-hidden', 'true');
+    windowEl.appendChild(resizeGrip);
+
+    return {
+      windowEl: windowEl,
+      titleBar: titleBar,
+      titleText: titleText,
+      resizeGrip: resizeGrip,
+      titleButtons: titleButtonEls
+    };
+  }
+
+  /**
+   * Build the whole shell around the given `#app` node and return a
+   * controller. `deps` supplies the collaborators so the same code runs in
+   * the page (real document + App.I18n) and in tests (fakeEl stubs +
+   * prepared strings):
+   *
+   *   deps.doc      - document or fakeEl document (createElement)
+   *   deps.appEl    - the existing #app node to re-parent
+   *   deps.strings  - resolved Chrome Strings map (shell.* ids → text)
+   *   deps.windows  - the Quiz window's control delegation (App.Windows)
+   *   deps.programWindows - { 'action-plan': {...}, 'deep-dive': {...} }
+   *                   the same three control actions bound to each program
+   *                   frame (ticket #61)
+   *   deps.onOutsideClick - optional; receives the outside-click handler
+   */
+  function build(deps) {
+    var doc = deps.doc;
+    var strings = deps.strings;
+    var appEl = deps.appEl;
+
+    // ── Window frame ─────────────────────────────────────────────────────
+    var chrome = buildFrameChrome(doc, strings, {
+      titleText: strings['shell.windowTitle'],
+      actions: deps.windows
+    });
+    var windowEl = chrome.windowEl;
+    var titleBar = chrome.titleBar;
+    var titleText = chrome.titleText;
+    var resizeGrip = chrome.resizeGrip;
+    var titleButtonEls = chrome.titleButtons;
 
     // ── Taskbar ───────────────────────────────────────────────────────────
     var taskbar = createEl(doc, 'div', 'os-taskbar');
@@ -205,9 +284,35 @@
     var programLabel = createEl(doc, 'span', 'os-program-label', strings['shell.windowTitle']);
     programBtn.appendChild(programLabel);
 
+    // ── The running-windows list (ticket #61) ────────────────────────────
+    // One button per program window, in the stable program order: the Quiz
+    // button above, then the Action Plan and the Deep-Dive Prompt. The
+    // Windows controller shows a button only while its window is RUNNING
+    // (a program that has not arrived, or one the Participant put away, has
+    // no button), presses the ACTIVE window's button, and wires the click
+    // to focus-or-restore. The buttons carry no icon: the era's bar named
+    // its programs.
+    var programsBar = createEl(doc, 'div', 'os-taskbar-programs');
+    programsBar.setAttribute('role', 'toolbar');
+    programsBar.setAttribute('aria-label', strings['shell.programs']);
+    var programBtns = {};
+    var programLabels = { quiz: programLabel };
+    PROGRAM_FRAMES.forEach(function(spec) {
+      var btn = createEl(doc, 'button', 'os-program-btn os-program-taskbar-btn');
+      btn.type = 'button';
+      btn.setAttribute('data-os-program', spec.id);
+      btn.hidden = true;                 // not running until it arrives
+      var label = createEl(doc, 'span', 'os-program-label', strings[spec.titleId]);
+      btn.appendChild(label);
+      programsBar.appendChild(btn);
+      programBtns[spec.id] = btn;
+      programLabels[spec.id] = label;
+    });
+
     taskbar.appendChild(startBtn);
     taskbar.appendChild(menu);
     taskbar.appendChild(programBtn);
+    taskbar.appendChild(programsBar);
     if (langToggle) taskbar.appendChild(langToggle);
 
     // ── About window (over a dimmed backdrop) ────────────────────────────
@@ -243,26 +348,44 @@
     aboutEl.appendChild(okBtn);
     aboutBackdrop.appendChild(aboutEl);
 
-    // Resize grip (ticket #60): the bottom-right corner handle of the
-    // positioned window. The shell builds it; the controller owns when it
-    // is live (css/shell.css shows it only while .is-windowed is on the
-    // frame, and js/windows.js refuses the write on the mobile layout and
-    // while maximized). It carries no label: [—][□][×] and the keyboard
-    // route stay the accessible controls, so the grip is presentation.
-    var resizeGrip = createEl(doc, 'div', 'os-resize-grip');
-    resizeGrip.setAttribute('aria-hidden', 'true');
+    // ── Program frames (ticket #61) ──────────────────────────────────────
+    // The Action Plan and the Deep-Dive Prompt each get a real window: the
+    // same chrome as the Quiz frame, and a body that IS the section's
+    // Mount Point host (the id js/results.js resolves through
+    // App.resultsMount rides this element). They start with no Record in
+    // the core, so the controller paints them UNSEEN: the Action Plan
+    // window does not exist until its content settles, and the Deep-Dive
+    // Prompt arrives minimized at the Finish Commit.
+    var programFrames = {};
+    PROGRAM_FRAMES.forEach(function(spec) {
+      var frame = buildFrameChrome(doc, strings, {
+        titleText: strings[spec.titleId],
+        actions: deps.programWindows && deps.programWindows[spec.id]
+      });
+      frame.windowEl.setAttribute('data-os-program', spec.id);
+      frame.bodyEl = createEl(doc, 'div', 'os-window-body os-program-body');
+      frame.bodyEl.id = programBodyId(spec);
+      frame.bodyEl.setAttribute('data-results-mount', spec.mount);
+      // Inserted before the grip so the grip stays the frame's last child.
+      frame.windowEl.insertBefore(frame.bodyEl, frame.resizeGrip);
+      programFrames[spec.id] = frame;
+    });
 
     // ── Re-parent into the live document ─────────────────────────────────
-    // All three top-level containers are built; now they enter the body and
+    // All the top-level containers are built; now they enter the body and
     // #app moves inside the window frame. The reference node (#app) stays in
     // the body until the frame is inserted, then its move re-parents it in
-    // one insert, so it never leaves the document.
+    // one insert, so it never leaves the document. The program frames enter
+    // the desktop AFTER the Quiz frame (the stack order is the core's z, not
+    // the DOM order, but the era's tab order follows the paint order).
     var body = doc.body;
     body.insertBefore(windowEl, appEl);
     body.insertBefore(taskbar, appEl);
+    PROGRAM_FRAMES.forEach(function(spec) {
+      body.insertBefore(programFrames[spec.id].windowEl, taskbar);
+    });
     body.appendChild(aboutBackdrop);
-    windowEl.appendChild(appEl);
-    windowEl.appendChild(resizeGrip);
+    windowEl.insertBefore(appEl, resizeGrip);
 
     // ── Controller (pure state + thin DOM ops) ───────────────────────────
     var menuOpen = false;
@@ -278,6 +401,10 @@
       menu: menu,
       programBtn: programBtn,
       programLabel: programLabel,
+      programsBar: programsBar,
+      programFrames: programFrames,
+      programBtns: programBtns,
+      programLabels: programLabels,
       langToggle: langToggle,
       langSegments: langSegments,
 
@@ -308,6 +435,20 @@
         aboutLink.textContent = I18n.t('shell.aboutLink');
         aboutCredits.textContent = I18n.t('shell.aboutCredits');
         okBtn.textContent = I18n.t('shell.ok');
+        // The program windows (#61): their title bars, their taskbar
+        // buttons and the bar's own label re-resolve with everything else.
+        PROGRAM_FRAMES.forEach(function(spec) {
+          var frame = programFrames[spec.id];
+          frame.titleText.textContent = I18n.t(spec.titleId);
+          if (programLabels[spec.id]) {
+            programLabels[spec.id].textContent = I18n.t(spec.titleId);
+          }
+          TITLE_BUTTON_ACTIONS.forEach(function(action) {
+            var btn = frame.titleButtons[action];
+            if (btn) btn.setAttribute('aria-label', I18n.t('shell.' + action));
+          });
+        });
+        programsBar.setAttribute('aria-label', I18n.t('shell.programs'));
         TITLE_BUTTON_ACTIONS.forEach(function(action) {
           var btn = titleButtonEls[action];
           if (btn) btn.setAttribute('aria-label', I18n.t('shell.' + action));
@@ -385,6 +526,12 @@
       /** Tear the shell DOM down (test cleanup). */
       destroy: function() {
         if (windowEl.parentNode) windowEl.parentNode.removeChild(windowEl);
+        PROGRAM_FRAMES.forEach(function(spec) {
+          var frame = programFrames[spec.id];
+          if (frame.windowEl.parentNode) {
+            frame.windowEl.parentNode.removeChild(frame.windowEl);
+          }
+        });
         if (taskbar.parentNode) taskbar.parentNode.removeChild(taskbar);
         if (aboutBackdrop.parentNode) aboutBackdrop.parentNode.removeChild(aboutBackdrop);
       }
@@ -510,6 +657,8 @@
     'shell.start', 'shell.menuAbout',
     'shell.aboutTitle', 'shell.aboutBody', 'shell.aboutLink',
     'shell.aboutCredits', 'shell.ok',
+    // The three-program desktop (ticket #61).
+    'shell.actionPlanWindow', 'shell.deepDiveWindow', 'shell.programs',
     'windows.endProgramTitle', 'windows.endProgramMessage',
     'windows.yes', 'windows.no'
   ];
@@ -642,6 +791,21 @@
           openEndProgram(win, controller.titleButtons.close);
         }
       } : null,
+      // The Action Plan and the Deep-Dive Prompt frames (ticket #61): the
+      // same three controls, bound to that program's Id. Their [×] is
+      // always the core's hide() — these windows never own the Session, so
+      // there is no End Program dialog for them.
+      programWindows: win ? (function() {
+        var actions = {};
+        PROGRAM_FRAMES.forEach(function(spec) {
+          actions[spec.id] = {
+            minimize: function() { win.minimize(spec.id); },
+            maximize: function() { win.toggleMaximize(spec.id); },
+            close: function() { win.closeProgram(spec.id); }
+          };
+        });
+        return actions;
+      })() : null,
       onOutsideClick: function(handler) {
         doc.addEventListener('click', handler);
       }
@@ -657,6 +821,19 @@
         resizeGrip: controller.resizeGrip,
         programBtn: controller.programBtn,
         buttons: controller.titleButtons
+      });
+      // Each program frame paints from its own Record: no Record, no
+      // window. The taskbar button is the way to focus or restore it.
+      PROGRAM_FRAMES.forEach(function(spec) {
+        var frame = controller.programFrames[spec.id];
+        win.attachProgram(spec.id, {
+          windowEl: frame.windowEl,
+          titleBar: frame.titleBar,
+          bodyEl: frame.bodyEl,
+          resizeGrip: frame.resizeGrip,
+          buttons: frame.titleButtons,
+          taskbarBtn: controller.programBtns[spec.id]
+        });
       });
       app.Windows.controller = win;
     }
@@ -677,6 +854,9 @@
   }
 
   shell.build = build;
+  shell.buildFrameChrome = buildFrameChrome;
+  shell.PROGRAM_FRAMES = PROGRAM_FRAMES;
+  shell.programBodyId = programBodyId;
   shell.start = start;
   shell.recordChoice = recordChoice;
   shell.switchLanguage = switchLanguage;

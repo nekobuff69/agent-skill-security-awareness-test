@@ -200,6 +200,150 @@ exports.run = function() {
     z.setActive('quiz') === true && z.setActive('plan') === false &&
     z.activeId() === 'quiz');
 
+  /* ── Ticket #61: three programs on one desktop ─────────────────────── */
+
+  var D = Desktop.DESIGN_DEFAULTS;
+  var STEP = Desktop.CASCADE;
+
+  function planCore() {
+    var p = Desktop.createCore();
+    p.setView('results-view');
+    return p;
+  }
+
+  var a = planCore();
+  check('only the Quiz program exists before anything arrives',
+    Object.keys(a.snapshot().windows).length === 1 &&
+    a.taskbarList().join(',') === 'quiz');
+  check('an unarrived program answers every query false',
+    a.hasWindow('action-plan') === false &&
+    a.isVisible('action-plan') === false && a.inTaskbar('action-plan') === false &&
+    a.canFocus('action-plan') === false && a.canMinimize('action-plan') === false &&
+    a.canMaximize('action-plan') === false && a.canClose('action-plan') === false &&
+    a.windowSnapshot('action-plan') === null);
+  check('open() refuses an unknown program',
+    a.open('spreadsheet', {}) === false && a.hasWindow('spreadsheet') === false);
+  check('open() creates the Record, in the taskbar, visible',
+    a.open('action-plan', {}) === true && a.hasWindow('action-plan') === true &&
+    a.inTaskbar('action-plan') === true && a.isVisible('action-plan') === true);
+  check('a second arrival of a running program is a no-op',
+    a.open('action-plan', {}) === false);
+  check('the taskbar lists the running windows in the stable program order',
+    a.taskbarList().join(',') === 'quiz,action-plan');
+  check('arrival NEVER takes the focus: the Quiz window stays the active one',
+    a.activeId() === 'quiz' && a.canFocus('quiz') === true &&
+    a.canFocus('action-plan') === false);
+
+  var aBelow = planCore();
+  aBelow.raise('quiz');                       // the Participant is reading the quiz
+  aBelow.open('action-plan', { below: true });
+  check('an arrival below the active window stacks under it, active stays on top',
+    aBelow.windowSnapshot('action-plan').z < aBelow.windowSnapshot('quiz').z &&
+    aBelow.windowSnapshot('quiz').z === Math.max.apply(null, aBelow.taskbarList().map(function(pid) {
+      return aBelow.windowSnapshot(pid).z;
+    })), JSON.stringify({
+      plan: aBelow.windowSnapshot('action-plan').z,
+      quiz: aBelow.windowSnapshot('quiz').z
+    }));
+
+  /* Cascade arithmetic: designed default, or 24px down-right from the
+     window the Participant is reading. */
+  var b = planCore();
+  check('a window born while another is focused cascades 24px down-right',
+    b.open('action-plan', { below: true }) === true &&
+    geoEqual(b.windowSnapshot('action-plan').geometry, {
+      x: D.quiz.x + STEP, y: D.quiz.y + STEP,
+      w: D['action-plan'].w, h: D['action-plan'].h
+    }), JSON.stringify(b.windowSnapshot('action-plan').geometry));
+  var c2 = planCore();
+  c2.minimize();                       // nothing focused on the desktop now
+  check('with no window focused a program keeps its designed geometry',
+    c2.open('action-plan', {}) === true &&
+    geoEqual(c2.windowSnapshot('action-plan').geometry, D['action-plan']),
+    JSON.stringify(c2.windowSnapshot('action-plan').geometry));
+  check('the designed Quiz default still fits 1024×768 without internal scrolling',
+    geoEqual(D.quiz, { x: 48, y: 40, w: 928, h: 644 }) &&
+    D.quiz.x + D.quiz.w <= 1024 &&
+    D.quiz.y + D.quiz.h <= 768 - 36,
+    JSON.stringify(D.quiz));
+
+  /* The Deep-Dive Prompt arrives MINIMIZED at the Finish Commit. */
+  var d2 = planCore();
+  check('a minimized arrival is a taskbar button only',
+    d2.open('deep-dive', { minimized: true }) === true &&
+    d2.windowSnapshot('deep-dive').mode === 'minimized' &&
+    d2.isVisible('deep-dive') === false && d2.inTaskbar('deep-dive') === true &&
+    d2.canFocus('deep-dive') === false && d2.activeId() === 'quiz');
+  check('a minimized arrival keeps the designed geometry for its restore',
+    geoEqual(d2.windowSnapshot('deep-dive').lastGeometry,
+      d2.windowSnapshot('deep-dive').geometry) &&
+    d2.windowSnapshot('deep-dive').lastMode === 'normal');
+  check('restoring the Deep-Dive Prompt lands on its designed geometry',
+    d2.restore('deep-dive') === true &&
+    d2.windowSnapshot('deep-dive').mode === 'normal' &&
+    geoEqual(d2.windowSnapshot('deep-dive').geometry,
+      { x: D.quiz.x + STEP, y: D.quiz.y + STEP, w: D['deep-dive'].w, h: D['deep-dive'].h }) &&
+    d2.activeId() === 'quiz', JSON.stringify(d2.windowSnapshot('deep-dive').geometry));
+  check('a minimized window can be minimized no further',
+    d2.minimize('quiz') === true && d2.minimize('quiz') === false);
+
+  /* Per-window transitions: one window's move is never another's. */
+  var e = planCore();
+  e.open('action-plan', {});
+  e.open('deep-dive', { minimized: true });
+  var quizBefore = e.windowSnapshot('quiz');
+  e.minimize('action-plan');
+  e.toggleMaximize('deep-dive');       // refused: maximized from minimized
+  check('minimizing one program leaves the others alone',
+    e.windowSnapshot('action-plan').mode === 'minimized' &&
+    e.windowSnapshot('deep-dive').mode === 'minimized' &&
+    JSON.stringify(e.windowSnapshot('quiz')) === JSON.stringify(quizBefore));
+  check('geometry writes address one window only',
+    e.applyGeometry({ x: 10, y: 10, w: 400, h: 400 }, 'quiz') === true &&
+    geoEqual(e.windowSnapshot('quiz').geometry, { x: 10, y: 10, w: 400, h: 400 }) &&
+    e.windowSnapshot('action-plan').geometry.x !== 10);
+  check('an unarrived window refuses geometry writes',
+    Desktop.createCore().applyGeometry({ x: 0, y: 0, w: 600, h: 600 }, 'deep-dive') === false);
+
+  /* Focus and stacking across the desktop. */
+  var f = planCore();
+  f.open('action-plan', { below: true });
+  check('a pointer interaction raises the window and makes it active',
+    f.raise('action-plan') === true && f.activeId() === 'action-plan' &&
+    f.windowSnapshot('action-plan').z > f.windowSnapshot('quiz').z &&
+    f.canFocus('action-plan') === true && f.canFocus('quiz') === false);
+  f.hide('action-plan');
+  check('putting the active window away hands the desktop to the window under it',
+    f.activeId() === 'quiz' && f.inTaskbar('action-plan') === false &&
+    f.taskbarList().join(',') === 'quiz');
+  check('a hidden window leaves the taskbar but is not destroyed',
+    f.hasWindow('action-plan') === true && f.restore('action-plan') === true &&
+    f.inTaskbar('action-plan') === true);
+  var fQuiz = f.windowSnapshot('quiz').geometry;
+  check('a settled re-arrival re-presents a put-away program with fresh geometry',
+    f.hide('action-plan') === true && f.open('action-plan', { below: true }) === true &&
+    f.windowSnapshot('action-plan').mode === 'normal' &&
+    geoEqual(f.windowSnapshot('action-plan').geometry, {
+      x: fQuiz.x + STEP, y: fQuiz.y + STEP, w: D['action-plan'].w, h: D['action-plan'].h
+    }), JSON.stringify(f.windowSnapshot('action-plan').geometry));
+  check('the dialog gate owns every window on the desktop',
+    f.requestClose('quiz') === true &&
+    f.minimize('action-plan') === false && f.raise('action-plan') === false &&
+    f.hide('action-plan') === false && f.applyGeometry({ x: 1, y: 1, w: 1, h: 1 }, 'quiz') === false &&
+    f.cancelClose() === true);
+
+  var g2 = planCore();
+  g2.open('action-plan', { below: true });
+  g2.raise('action-plan');
+  var zBefore = JSON.stringify(g2.snapshot().windows);
+  g2.setActive('quiz');
+  check('setActive marks a window active without raising it',
+    g2.activeId() === 'quiz' &&
+    g2.windowSnapshot('action-plan').z > g2.windowSnapshot('quiz').z &&
+    JSON.stringify(g2.snapshot().windows) === zBefore);
+  check('an active window that is not on top still owns the focus',
+    g2.canFocus('quiz') === true && g2.canFocus('action-plan') === false);
+
   /* ── js/windows.js keeps no parallel copy of the state ─────────────── */
 
   var Windows = require('../../js/windows.js');

@@ -496,6 +496,214 @@ exports.run = function() {
     clamped.x === Windows.TITLE_REACH - Windows.MIN_W && clamped.y === 0,
     JSON.stringify(clamped));
 
+  // ── Three programs on the desktop (ticket #61) ────────────────────────
+  // One Quiz frame plus the Action Plan and the Deep-Dive Prompt frames.
+  // The assertions are behaviour: what the taskbar lists, which window is
+  // active, where a newcomer stacks, what a click does, and what arrival
+  // must NOT do (focus, raise, scroll).
+
+  var VP61 = { width: 1440, height: 900, taskbar: 36 };
+
+  function programFrame() {
+    return {
+      windowEl: fakeEl('div'),
+      titleBar: fakeEl('div'),
+      bodyEl: fakeEl('div'),
+      resizeGrip: fakeEl('div'),
+      taskbarBtn: fakeEl('button'),
+      buttons: { minimize: fakeEl('button'), maximize: fakeEl('button'), close: fakeEl('button') }
+    };
+  }
+
+  var pdoc = fakeDoc();
+  var ppending = [];
+  var pctl = Windows.create({
+    doc: pdoc,
+    schedule: function(fn) { ppending.push(fn); },
+    viewport: function() { return VP61; }
+  });
+  var prefs = {
+    windowEl: fakeEl('div'),
+    titleBar: fakeEl('div'),
+    resizeGrip: fakeEl('div'),
+    programBtn: fakeEl('button'),
+    buttons: { minimize: fakeEl('button'), maximize: fakeEl('button'), close: fakeEl('button') }
+  };
+  var planRefs = programFrame();
+  var ddRefs = programFrame();
+  pctl.attach(prefs);
+  pctl.attachProgram('action-plan', planRefs);
+  pctl.attachProgram('deep-dive', ddRefs);
+  pctl.setView('landing-view');
+
+  check('before the Finish Commit no program window exists',
+    pctl.hasWindow('action-plan') === false && pctl.hasWindow('deep-dive') === false &&
+    pctl.runningPrograms().join(',') === 'quiz' &&
+    pctl.isVisible('quiz') === true);
+  check('an unarrived program frame is painted away, its taskbar button is gone',
+    planRefs.windowEl.classList.contains('is-hidden') &&
+    planRefs.taskbarBtn.hidden === true &&
+    ddRefs.taskbarBtn.hidden === true);
+
+  // ── The Deep-Dive Prompt arrives MINIMIZED at the Finish Commit ───────
+  pctl.setView('results-view');
+  var quizG0 = pctl.geometry();
+  check('the results stage positions the Quiz frame',
+    prefs.windowEl.classList.contains('is-windowed') &&
+    prefs.windowEl.style.left === quizG0.x + 'px');
+
+  check('the Deep-Dive Prompt arrives minimized: a taskbar button only',
+    pctl.deepDiveArrived() === true &&
+    pctl.getState('deep-dive').mode === 'minimized' &&
+    pctl.isVisible('deep-dive') === false && pctl.inTaskbar('deep-dive') === true &&
+    ddRefs.windowEl.classList.contains('is-minimized') &&
+    ddRefs.taskbarBtn.hidden === false &&
+    ddRefs.taskbarBtn.getAttribute('aria-pressed') === 'false');
+  check('the taskbar lists the running windows in the stable program order',
+    pctl.runningPrograms().join(',') === 'quiz,deep-dive');
+  check('the Quiz window is still the active one and the frame is still focused',
+    pctl.snapshot().active === 'quiz' && pctl.canFocus('quiz') === true &&
+    prefs.windowEl.classList.contains('is-active'));
+  while (ppending.length) ppending.shift()();
+  ddRefs.taskbarBtn.click();
+  check('its taskbar button restores it to the cascaded geometry and focuses it',
+    pctl.getState('deep-dive').mode === 'normal' &&
+    pctl.snapshot().active === 'deep-dive' &&
+    ddRefs.windowEl.classList.contains('is-windowed') &&
+    ddRefs.windowEl.style.left === (quizG0.x + 24) + 'px' &&
+    ddRefs.windowEl.style.top === (quizG0.y + 24) + 'px' &&
+    ddRefs.taskbarBtn.getAttribute('aria-pressed') === 'true' &&
+    prefs.windowEl.classList.contains('is-active') === false);
+  while (ppending.length) ppending.shift()();
+
+  // ── The Action Plan arrives below the window being read ───────────────
+  pctl.activateProgram('quiz');
+  var quizGBefore = pctl.geometry('quiz');
+  var quizZBefore = pctl.snapshot().windows.quiz.z;
+  var focusCalls = 0;
+  prefs.windowEl.focus = function() { focusCalls++; };
+
+  check('the Action Plan is not running before its content settles',
+    pctl.hasWindow('action-plan') === false &&
+    planRefs.taskbarBtn.hidden === true);
+  check('the settle opens the Action Plan window',
+    pctl.actionPlanArrived() === true && pctl.inTaskbar('action-plan') === true);
+  check('the Action Plan arrives cascaded from the focused window',
+    planRefs.windowEl.style.left === (quizGBefore.x + 24) + 'px' &&
+    planRefs.windowEl.style.top === (quizGBefore.y + 24) + 'px',
+    planRefs.windowEl.style.left + ',' + planRefs.windowEl.style.top);
+  check('it lands BELOW the active window, which stays active and unmoved',
+    pctl.snapshot().active === 'quiz' &&
+    pctl.snapshot().windows['action-plan'].z < pctl.snapshot().windows.quiz.z &&
+    pctl.geometry('quiz').x === quizGBefore.x &&
+    pctl.geometry('quiz').y === quizGBefore.y &&
+    pctl.getState('quiz').mode === 'normal' &&
+    focusCalls === 0 &&
+    planRefs.taskbarBtn.getAttribute('aria-pressed') === 'false');
+  check('the taskbar now lists all three programs in order',
+    pctl.runningPrograms().join(',') === 'quiz,action-plan,deep-dive');
+
+  // A pointer interaction inside a frame raises it and makes it active.
+  planRefs.windowEl.handlers.pointerdown({
+    target: planRefs.bodyEl, preventDefault: function() {}, pointerId: 9,
+    clientX: 400, clientY: 400, button: 0, isPrimary: true
+  });
+  check('a pointer interaction inside the Action Plan frame raises and focuses it',
+    pctl.snapshot().active === 'action-plan' &&
+    pctl.snapshot().windows['action-plan'].z > pctl.snapshot().windows.quiz.z &&
+    planRefs.windowEl.classList.contains('is-active') === true &&
+    prefs.windowEl.classList.contains('is-active') === false &&
+    planRefs.taskbarBtn.getAttribute('aria-pressed') === 'true' &&
+    prefs.programBtn.getAttribute('aria-pressed') === 'true');
+  pctl.activateProgram('quiz');
+  check('clicking the Quiz program button focuses it back',
+    pctl.snapshot().active === 'quiz' &&
+    pctl.snapshot().windows.quiz.z > pctl.snapshot().windows['action-plan'].z);
+
+  // Minimize a program: it leaves the screen, stays in the taskbar.
+  pctl.minimize('action-plan');
+  while (ppending.length) ppending.shift()();
+  check('minimizing a program keeps its button in the taskbar and unpressed',
+    pctl.inTaskbar('action-plan') === true && pctl.isVisible('action-plan') === false &&
+    planRefs.taskbarBtn.hidden === false &&
+    planRefs.taskbarBtn.getAttribute('aria-pressed') === 'false' &&
+    pctl.getState('quiz').mode === 'normal');
+  planRefs.taskbarBtn.click();
+  while (ppending.length) ppending.shift()();
+  check('its button restores and focuses the minimized window',
+    pctl.getState('action-plan').mode === 'normal' &&
+    pctl.snapshot().active === 'action-plan');
+
+  // Put-away on the desktop stage: hide(), and the button leaves the bar.
+  var quizModeBefore = pctl.getState('quiz').mode;
+  pctl.closeProgram('action-plan');
+  check("a program's [×] puts it away without a dialog",
+    pctl.getState('action-plan').mode === 'hidden' &&
+    pctl.getState('quiz').mode === quizModeBefore &&
+    pctl.getState().confirmOpen === false &&
+    planRefs.taskbarBtn.hidden === true &&
+    planRefs.windowEl.classList.contains('is-hidden'));
+  check('the put-away hands the desktop to the window under it',
+    pctl.snapshot().active !== 'action-plan' &&
+    pctl.getState('action-plan').mode === 'hidden');
+  check('a frame that is not running is inert: no raise, no focus',
+    pctl.focusWindow('action-plan') === false &&
+    pctl.snapshot().active !== 'action-plan');
+
+  // Leaving the desktop stage puts every program window away: the flow
+  // views have no desktop to stand one on.
+  pctl.setView('quiz-view');
+  check('the flow stage leaves no program window running',
+    pctl.runningPrograms().join(',') === 'quiz' &&
+    pctl.getState('action-plan').mode === 'hidden' &&
+    pctl.getState('deep-dive').mode === 'hidden' &&
+    ddRefs.windowEl.classList.contains('is-hidden'));
+  pctl.setView('results-view');
+  check('back on the desktop the settled content arrives again',
+    pctl.actionPlanArrived() === true && pctl.deepDiveArrived() === true &&
+    pctl.runningPrograms().join(',') === 'quiz,action-plan,deep-dive');
+
+  // Drag and resize address the frame that owns the handle, never another.
+  var quizBeforeDrag = pctl.geometry('quiz');
+  var planBeforeDrag = pctl.geometry('action-plan');
+  function p61(el, type, x, y) {
+    el.handlers[type]({ pointerId: 3, clientX: x, clientY: y, button: 0,
+      target: el, isPrimary: true, preventDefault: function() {} });
+  }
+  pctl.activateProgram('quiz');
+  p61(planRefs.titleBar, 'pointerdown', 500, 300);
+  p61(planRefs.titleBar, 'pointermove', 560, 340);
+  p61(planRefs.titleBar, 'pointerup', 560, 340);
+  var planAfter = pctl.geometry('action-plan');
+  check('a program frame drags its own window and no other',
+    planAfter.x === planBeforeDrag.x + 60 &&
+    planAfter.y === planBeforeDrag.y + 40 &&
+    pctl.geometry('quiz').x === quizBeforeDrag.x &&
+    pctl.geometry('quiz').y === quizBeforeDrag.y,
+    JSON.stringify(planAfter) + ' vs ' + JSON.stringify(planBeforeDrag));
+  p61(planRefs.resizeGrip, 'pointerdown', 800, 700);
+  p61(planRefs.resizeGrip, 'pointermove', 900, 780);
+  p61(planRefs.resizeGrip, 'pointerup', 900, 780);
+  check('the corner grip resizes that program frame through the core',
+    pctl.geometry('action-plan').w === planAfter.w + 100 &&
+    pctl.geometry('action-plan').h === planAfter.h + 80 &&
+    pctl.geometry('quiz').w === quizBeforeDrag.w);
+
+  // Maximize follows the same gate for every frame.
+  pctl.activateProgram('deep-dive');
+  pctl.toggleMaximize('deep-dive');
+  check('a program frame maximizes on its own Record',
+    pctl.getState('deep-dive').mode === 'maximized' &&
+    ddRefs.windowEl.classList.contains('is-maximized') &&
+    pctl.getState('quiz').mode === 'normal');
+  pctl.toggleMaximize('deep-dive');
+
+  // The Quiz window's flow-stage dialog is untouched by the new frames.
+  pctl.setView('quiz-view');
+  check('the flow stage still routes the Quiz [×] to the End Program dialog',
+    pctl.close() === 'dialog' && pctl.getState().confirmOpen === true);
+  pctl.cancelClose();
+
   // ── System dialog primitive contract ──────────────────────────────────
 
   require('../../js/i18n.js');

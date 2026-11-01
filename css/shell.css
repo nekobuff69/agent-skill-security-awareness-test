@@ -184,6 +184,42 @@ body:has(#app > #landing-view:not([hidden])) .os-window {
   display: none;
 }
 
+/* ── Program windows (ticket #61) ─────────────────────────────────────
+
+   The Action Plan and the Deep-Dive Prompt frames: the same chrome as the
+   Quiz frame, and a client area that IS the section's mount host. They are
+   painted only while their window has a Record on the desktop stage; on
+   the flow stages the frame is .is-hidden (no Record) and on the ≤768px
+   layout the media block below takes them full-screen like every other
+   frame. The body scrolls on its own — the frame keeps its fixed height,
+   the section content does not. */
+.os-window-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-4);
+  background: var(--color-face);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);   /* the same column rhythm #results-view draws */
+}
+
+/* The active window is unmistakable: the era drew the active title bar in
+   navy and every inactive one in flat gray with black type (9.9:1 on the
+   darkest step of the ramp). The Quiz frame is the active window whenever
+   the desktop is not the stage, so the flow layout never loses its navy
+   bar, and the landing splash is untouched. */
+.os-window:not(.is-active) .os-titlebar {
+  background: linear-gradient(90deg, #B0B0B0 0%, #E4E4E4 100%);
+  color: var(--color-text);
+}
+
+/* The program frames are fixed-height windows on the desktop, sized by
+   their Geometry — the same rule the Quiz frame rides (.is-windowed). */
+.os-window.is-windowed .os-window-body {
+  max-width: none;
+}
+
 /* ── Title bar ─────────────────────────────────────────────────────────
 
    Navy → lighter blue gradient, exactly like the Quiz Card header drawn in
@@ -296,12 +332,26 @@ body:has(#app > #landing-view:not([hidden])) .os-window {
 
 /* Program button: pressed state — this window is the running program. */
 
+/* The running-windows list (ticket #61): the Quiz button, then one button
+   per program window in the stable program order. The Windows controller
+   removes a button with its window's mode (an unarrived program and a
+   hidden window are both absent), so this row IS "exactly the running
+   windows" — the markup is built once, the list is painted per render. */
+.os-taskbar-programs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-right: auto;      /* the era packs its program buttons left */
+}
+
 .os-program-btn {
   flex: 0 1 auto;
   min-width: 0;
   height: calc(var(--os-taskbar-height) - 8px);
   padding: 0 var(--space-2);
-  margin-right: auto;
+  margin-right: 0;         /* the free space belongs after the bar (above) */
   font-family: var(--font-heading);
   background: var(--color-face);
   color: var(--color-text);
