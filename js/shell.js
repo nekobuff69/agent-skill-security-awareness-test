@@ -6,12 +6,13 @@
 
   /**
    * Desktop shell (ticket #38): window frame, taskbar, Start menu, About
-   * window, clock. Ticket #43 makes the title-bar controls live.
+   * window. Ticket #43 makes the title-bar controls live; ticket #50
+   * replaces the tray clock with the two-segment language toggle.
    *
    * Layering: the shell WRAPS the existing `#app` node at runtime (no HTML
    * edits) — a `div.os-window` with a navy title bar takes `#app` as its
    * content, and a fixed `div.os-taskbar` pins the Start button, the program
-   * button and the clock to the bottom of the screen.
+   * button and the language toggle to the bottom of the screen.
    *
    * The three title-bar buttons carry `data-os-button="minimize|maximize|
    * close"` and DELEGATE to an App.Windows controller when the page wires
@@ -22,39 +23,14 @@
    * Program dialog on [×] away from the landing view, and drives the
    * minimize/maximize trace classes on the window frame.
    *
-   * Pure logic (clock formatting, tick cadence, menu/About state
-   * transitions) is exposed on App.Shell and runs headless with fakeEl
-   * stubs; DOM wiring is guarded so `require()` in Node (no `document`)
-   * still loads.
+   * Pure logic (menu/About state transitions) is exposed on App.Shell and
+   * runs headless with fakeEl stubs; DOM wiring is guarded so `require()`
+   * in Node (no `document`) still loads.
    */
 
   var TITLE_BUTTON_ACTIONS = ['minimize', 'maximize', 'close'];
 
   var shell = {};
-
-  // ── Clock ───────────────────────────────────────────────────────────────
-
-  /** Pad a single digit to two, Win95 taskbar style. */
-  function pad2(n) {
-    return (n < 10 ? '0' : '') + n;
-  }
-
-  /**
-   * Format a clock label. 24-hour HH:MM in BOTH locales (era-correct for a
-   * system tray clock with 24-hour settings), single digits padded.
-   */
-  function formatClock(date) {
-    return pad2(date.getHours()) + ':' + pad2(date.getMinutes());
-  }
-
-  /**
-   * Milliseconds until the next minute boundary — the 1-minute cadence
-   * decision, derived from the clock so wall-clock drift cannot accumulate:
-   * every tick re-derives its own target.
-   */
-  function nextTickDelay(nowMs) {
-    return 60000 - (nowMs % 60000);
-  }
 
   // ── State transitions (pure; headless-testable) ────────────────────────
 
@@ -161,29 +137,29 @@
     aboutItem.setAttribute('role', 'menuitem');
     menu.appendChild(aboutItem);
 
-    // ── Tray language indicator + Start-menu language entry (ticket #44) ─
-    // Both surfaces share one action (deps.trayLang.onClick / deps.
-    // langMenuItem.onClick): record the Language Preference, then navigate
-    // the declared alternate — the same action the inline Quiz Chrome
-    // switcher used. Built only when the page declares a data-lang-alt,
-    // so a page without an alternate shows neither surface.
-    var trayLang = null;
+    // ── Tray language toggle (ticket #50) ─────────────────────────────────
+    // Two segments name both languages: the page's own renders pressed
+    // (aria-pressed=true), the declared alternate flat. Both segments run
+    // one action (deps.trayLang.onClick): record the Language Preference,
+    // then navigate the declared alternate — the same action the inline
+    // Quiz Chrome switcher used. Built only when the page declares a
+    // data-lang-alt, so a page without an alternate shows no toggle.
+    var langToggle = null;
+    var langSegments = null;
     if (deps.trayLang) {
-      trayLang = createEl(doc, 'button', 'os-tray-lang', deps.trayLang.label);
-      trayLang.type = 'button';
-      setAttrs(trayLang, {
-        title: deps.trayLang.title,
-        'aria-label': deps.trayLang.title
+      langToggle = createEl(doc, 'div', 'os-lang-toggle');
+      langToggle.setAttribute('role', 'group');
+      langToggle.setAttribute('aria-label', deps.trayLang.title);
+      langSegments = {};
+      [['self', deps.trayLang.self, 'true'],
+       ['other', deps.trayLang.other, 'false']].forEach(function(spec) {
+        var seg = createEl(doc, 'button', 'os-lang-seg', spec[1].label);
+        seg.type = 'button';
+        seg.setAttribute('aria-pressed', spec[2]);
+        if (spec[1].title) seg.setAttribute('title', spec[1].title);
+        langToggle.appendChild(seg);
+        langSegments[spec[0]] = seg;
       });
-    }
-
-    var langItem = null;
-    if (deps.langMenuItem) {
-      langItem = createEl(doc, 'button', 'os-start-menu-item', deps.langMenuItem.label);
-      langItem.type = 'button';
-      langItem.setAttribute('role', 'menuitem');
-      langItem.setAttribute('data-os-menu', 'language');
-      menu.appendChild(langItem);
     }
 
     // ── Program button (pressed: this window is the running program) ─────
@@ -193,14 +169,10 @@
     var programLabel = createEl(doc, 'span', 'os-program-label', strings['shell.windowTitle']);
     programBtn.appendChild(programLabel);
 
-    var clockEl = createEl(doc, 'span', 'os-clock');
-    clockEl.setAttribute('role', 'timer');
-
     taskbar.appendChild(startBtn);
     taskbar.appendChild(menu);
     taskbar.appendChild(programBtn);
-    if (trayLang) taskbar.appendChild(trayLang);
-    taskbar.appendChild(clockEl);
+    if (langToggle) taskbar.appendChild(langToggle);
 
     // ── About window (over a dimmed backdrop) ────────────────────────────
     var aboutBackdrop = createEl(doc, 'div', 'os-about-backdrop');
@@ -253,16 +225,14 @@
       menu: menu,
       programBtn: programBtn,
       programLabel: programLabel,
-      clockEl: clockEl,
-      trayLang: trayLang,
-      langItem: langItem,
+      langToggle: langToggle,
+      langSegments: langSegments,
       aboutBackdrop: aboutBackdrop,
       aboutEl: aboutEl,
       okBtn: okBtn,
 
       isMenuOpen: function() { return menuOpen; },
       isAboutOpen: function() { return aboutOpen; },
-      clockText: function() { return clockEl.textContent; },
 
       openMenu: function() {
         menuOpen = true;
@@ -293,13 +263,6 @@
         aboutOpen = closeAbout();
         aboutBackdrop.classList.remove('open');
         return aboutOpen;
-      },
-
-      /** Paint the clock from a Date; returns the rendered label. */
-      refreshClock: function(date) {
-        var label = formatClock(date);
-        clockEl.textContent = label;
-        return label;
       },
 
       /** Document-level outside click: closes the menu (focus stays put). */
@@ -339,15 +302,11 @@
 
     // ── Wiring ───────────────────────────────────────────────────────────
     on(startBtn, 'click', function() { controller.toggleMenu(); });
-    if (trayLang) {
-      on(trayLang, 'click', function() {
-        if (typeof deps.trayLang.onClick === 'function') deps.trayLang.onClick();
-      });
-    }
-    if (langItem) {
-      on(langItem, 'click', function() {
-        controller.closeMenu(false);
-        if (typeof deps.langMenuItem.onClick === 'function') deps.langMenuItem.onClick();
+    if (langSegments) {
+      [langSegments.self, langSegments.other].forEach(function(seg) {
+        on(seg, 'click', function() {
+          if (typeof deps.trayLang.onClick === 'function') deps.trayLang.onClick();
+        });
       });
     }
     on(aboutItem, 'click', function() {
@@ -516,7 +475,7 @@
     }
   }
 
-  /** The tray chip and the Start-menu entry both route through here. */
+  /** Both tray-toggle segments route through here. */
   function switchLanguage() {
     var doc = global.document;
     if (!doc || !doc.documentElement) return false;
@@ -525,7 +484,7 @@
 
   /**
    * Start the shell on the live page. Safe to call once; builds the frame,
-   * re-parents #app, starts the clock and wires document-level handlers.
+   * re-parents #app and wires document-level handlers.
    */
   function start() {
     var doc = global.document;
@@ -545,9 +504,11 @@
     // attach() afterwards gives the controller the DOM to render onto.
     var win = app.Windows ? app.Windows.create({ doc: doc }) : null;
 
-    // Language surfaces (ticket #44): the tray chip and the Start-menu
-    // entry reflect the page's own locale and both run the switch action
-    // above. Only pages declaring a data-lang-alt get either surface.
+    // Language surfaces (ticket #50): the tray toggle shows the page's own
+    // language pressed (lang.selfName) and the declared alternate flat
+    // (lang.otherName); the group label reuses lang.offerTitle ("Language"),
+    // and both segments run the switch action above. Only pages declaring a
+    // data-lang-alt get the tray control.
     var langAlt = doc.documentElement.getAttribute('data-lang-alt');
     var langAction = langAlt ? switchLanguage : null;
 
@@ -556,12 +517,12 @@
       appEl: appEl,
       strings: resolveStrings(I18n, STRING_IDS),
       trayLang: langAction ? {
-        label: I18n.t('lang.selfName'),
-        title: I18n.t('lang.switchLabel'),
-        onClick: langAction
-      } : null,
-      langMenuItem: langAction ? {
-        label: I18n.t('lang.menuItem', { language: I18n.t('lang.otherName') }),
+        title: I18n.t('lang.offerTitle'),
+        self: { label: I18n.t('lang.selfName') },
+        other: {
+          label: I18n.t('lang.otherName'),
+          title: I18n.t('lang.switchLabel')
+        },
         onClick: langAction
       } : null,
       windows: win ? {
@@ -597,14 +558,6 @@
       controller.handleKeydown(ev.key);
     });
 
-    // Clock: paint immediately, then re-derive the delay to the next minute
-    // boundary on every tick.
-    controller.refreshClock(new Date());
-    var timer = global.setInterval(function() {
-      controller.refreshClock(new Date());
-    }, nextTickDelay(Date.now()));
-
-    controller.stopClock = function() { global.clearInterval(timer); };
     app.Shell.controller = controller;
 
     // System sounds (ticket #41): inject js/sound.js (no HTML tag for it),
@@ -621,9 +574,6 @@
   shell.attachSoundEntry = attachSoundEntry;
   shell.withSoundModule = withSoundModule;
   shell.openEndProgram = openEndProgram;
-  shell.formatClock = formatClock;
-  shell.nextTickDelay = nextTickDelay;
-  shell.pad2 = pad2;
   shell.toggleMenu = toggleMenu;
   shell.closeMenu = closeMenu;
   shell.closeAbout = closeAbout;
