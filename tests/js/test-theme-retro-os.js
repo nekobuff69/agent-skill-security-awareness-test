@@ -131,7 +131,7 @@ exports.run = function() {
 
   /* ── Retro idiom components ── */
   check('Progress Fill is segmented navy blocks (gradient trick)',
-    /\.quiz-chrome-fill/.test(skin) &&
+    /\.quiz-status-fill/.test(skin) &&
     /repeating-linear-gradient\(\s*90deg,\s*var\(--color-primary\)/.test(skin));
   check('bevels drawn from the classic triad (highlight/face/shadow)',
     /--bevel-raised:/.test(skin) && /--bevel-sunken:/.test(skin) &&
@@ -237,7 +237,7 @@ exports.run = function() {
   check('quiz.css reduced-motion block still gates card wipes and Progress Fill',
     quizRmIndex !== -1 &&
     /card-wipe-in/.test(quizRmBlock) &&
-    /\.quiz-chrome-fill/.test(quizRmBlock));
+    /\.quiz-status-fill/.test(quizRmBlock));
 
   var bootCss = read('css/boot.css');
   check('boot splash gates view rendering until the reveal (one trace, not two)',

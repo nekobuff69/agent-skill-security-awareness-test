@@ -1,66 +1,117 @@
-/* ── Quiz view ──────────────────────────────────────────────────────── */
+/* ── Quiz view ────────────────────────────────────────────────────────
+   Fixed-height column inside the window client area (ticket #52): the
+   body scrolls, the footer and status bar are pinned panes. */
 
 #quiz-view {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
-  padding-bottom: var(--space-8);
-}
-
-/* ── Sticky chrome bar ──────────────────────────────────────────────── */
-
-.quiz-chrome {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-1);
-  background: var(--color-bg);
-  border-bottom: 1px solid var(--color-border);
-}
-
-/* Progress track + fill ──────────────────────────────────────────────── */
-
-.quiz-chrome-track {
-  flex: 1 1 auto;
-  height: 4px;
-  background: var(--color-border);
-  border-radius: 2px;
+  gap: 0;
   overflow: hidden;
 }
 
-.quiz-chrome-fill {
+/* ── Scrollable body ────────────────────────────────────────────────
+   The only part of the quiz view that scrolls; long Scenario/Option
+   content moves this pane, never the page (css/shell.css). */
+
+.quiz-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+}
+
+/* ── Window footer: [< Back] [Next >] / [Finish] (ADR 0020) ──────────
+   Pinned to the bottom of the window with a 1px separator (ticket #52).
+   Buttons are built once per run and only their state changes per card
+   (js/quiz.js). */
+
+.quiz-footer {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--color-border);
+  /* Era sunken separator line above the raised bar face. */
+  box-shadow: inset 0 1px #FFFFFF;
+}
+
+/* ── Status bar (answering screen only, ticket #52) ──────────────────
+   Left field = phase name (Phase Chip text, swapped in place); right
+   field = segmented Progress Fill (answered/total) + Question Counter
+   (position being viewed). Built with the quiz view, hidden with it. */
+
+.quiz-statusbar {
+  flex: none;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--color-face);
+  box-shadow: inset 0 1px var(--color-border);
+}
+
+.quiz-status-field {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 0 var(--space-2);
+  font-family: var(--font-heading);
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  color: var(--color-text);
+  /* Sunken chrome field, Win95 idiom (skin tokens; base fallback). */
+  box-shadow: var(--bevel-sunken,
+                   inset -1px -1px #FFFFFF, inset 1px 1px #808080,
+                   inset -2px -2px #DFDFDF, inset 2px 2px #000000);
+}
+
+/* Phase name: one line, ellipsis when the window is narrow. */
+.quiz-status-phase {
+  flex: 1 1 auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Right pane: Progress Fill + Question Counter, never wraps. */
+.quiz-status-progress {
+  flex: none;
+  gap: var(--space-2);
+}
+
+/* Progress track + segmented fill: answered / total (never position). */
+.quiz-status-track {
+  flex: none;
+  width: 96px;
+  height: 10px;
+  padding: 2px;
+  background: var(--color-surface);
+  border-radius: 0;
+  overflow: hidden;
+  /* Light sunken field: a full bevel would swallow a 10px track. */
+  box-shadow: inset 1px 1px var(--color-secondary), inset -1px -1px #FFFFFF;
+}
+
+.quiz-status-fill {
   height: 100%;
   width: 0;
   background: var(--color-accent);
-  border-radius: 2px;
+  border-radius: 0;
   transition: width 0.35s ease;
 }
 
-/* Counter: "1 / 20" ──────────────────────────────────────────────────── */
-
-.quiz-chrome-counter {
-  flex: 0 0 auto;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--color-text-muted);
+/* Question Counter: "N / 20", the position being viewed. */
+.quiz-status-counter {
+  flex: none;
+  font-family: var(--font-heading);
+  font-size: 0.6875rem;
   white-space: nowrap;
+  color: var(--color-text);
   letter-spacing: 0.02em;
-}
-
-/* Phase chip ─────────────────────────────────────────────────────────── */
-
-.quiz-chrome-chip {
-  flex: 0 0 auto;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--color-accent);
-  background: #FFF5F0;
-  border-radius: 100px;
-  padding: 0.2rem 0.65rem;
-  white-space: nowrap;
 }
 
 /* ── Scenario card ──────────────────────────────────────────────────── */
@@ -69,11 +120,11 @@
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--border-radius);
-  padding: var(--space-5) var(--space-4);
+  padding: var(--space-3);
   box-shadow: 0 2px 4px rgba(0,0,0,0.02);
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .quiz-scenario {
@@ -81,7 +132,7 @@
   color: var(--color-text-muted);
   line-height: 1.55;
   border-left: 3px solid var(--color-border);
-  padding-left: var(--space-3);
+  padding-left: var(--space-2);
 }
 
 .quiz-question {
@@ -102,14 +153,16 @@
 .quiz-radio-row {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   width: 100%;
   text-align: left;
   font-family: var(--font-body);   /* Option prose stays readable        */
   font-size: 0.9375rem;
   line-height: 1.45;
-  padding: var(--space-3) var(--space-4);
-  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  /* Tightened for the fixed window (ticket #52): the touch minimum of
+     44px returns in the ≤400px block below, where thumbs are the target. */
+  min-height: 34px;
   border: 0;
   border-radius: 0;
   background: var(--color-surface);
@@ -198,19 +251,17 @@
 /* ── Mobile (≤ 400 px) ─────────────────────────────────────────────── */
 
 @media (max-width: 400px) {
-  #quiz-view {
-    gap: var(--space-4);
-    padding-bottom: var(--space-5);
+  .quiz-body {
+    gap: var(--space-1);
+    padding: var(--space-2);
   }
 
-  .quiz-chrome {
-    gap: var(--space-2);
-    padding: var(--space-2) var(--space-1);
+  .quiz-footer {
+    padding: var(--space-2);
   }
 
-  .quiz-chrome-chip {
-    font-size: 0.6875rem;
-    padding: 0.15rem 0.5rem;
+  .quiz-status-phase {
+    font-size: 0.625rem;
   }
 
   .quiz-card {
@@ -218,6 +269,7 @@
     border-radius: 8px;
   }
 
+  /* Touch minimum returns at thumb widths (44px, the ADR 0021 floor). */
   .quiz-radio-row {
     font-size: 0.875rem;
     padding: var(--space-3);
@@ -286,15 +338,8 @@
   flex: 1;
 }
 
-/* ── Wizard row: [< Back] [Next >] / [Finish] (ADR 0020) ───────────── */
-
-.quiz-wizard-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-top: var(--space-2);
-}
+/* ── Footer buttons: [< Back] [Next >] / [Finish] (ADR 0020) ─────────
+   Rendered once into the pinned .quiz-footer (js/quiz.js). */
 
 .quiz-wizard-btn {
   font-family: var(--font-heading);  /* Chrome Strings on the pixel face */
@@ -397,7 +442,7 @@
     transform: none;
   }
 
-  .quiz-chrome-fill {
+  .quiz-status-fill {
     transition: none !important;
   }
 }

@@ -6,7 +6,7 @@
    typeface come from the skin's tokens — no new palette here.
 
    Layering (z-index ladder):
-     .quiz-chrome (sticky, 10)  <  .os-window (0)
+     .os-window (0)
        <  .os-taskbar (1000)  <  .os-start-menu (1100)
        <  .os-about-backdrop (1200)
        <  .os-dialog-backdrop (1300)
@@ -24,32 +24,68 @@
 
 body {
   padding-bottom: var(--os-taskbar-height);
+  /* The window owns all scrolling (ticket #52): long views scroll inside
+     the client area, never the page. */
+  overflow: hidden;
 }
 
 /* ── Window frame ──────────────────────────────────────────────────────
 
    Wraps #app at runtime (js/shell.js). Transparent background: the skin's
    teal desktop shows wherever the window does not cover, and #app keeps its
-   own chrome face inside the frame. Overflow stays visible so the sticky
-   Quiz Chrome inside #app pins against the viewport top, which equals the
-   content top of the window. */
+   own chrome face inside the frame. The window is FIXED HEIGHT on every
+   view (ticket #52): it fills the desktop above the taskbar, the title bar
+   and the client area flex inside it, and overflow stays clipped so only
+   the view bodies scroll. */
 
 .os-window {
+  display: flex;
+  flex-direction: column;
   max-width: var(--max-width);
+  height: calc(100vh - var(--os-taskbar-height));
   margin: 0 auto;
   background: transparent;
   box-shadow: var(--bevel-raised);
   border-radius: 0;
-  overflow: visible;
+  overflow: hidden;
   z-index: 0;
 }
 
-/* #app no longer draws its own window bevel — the shell frame does. Its
-   min-height now accounts for title bar and taskbar so the Landing view
-   still fits above the fold with the taskbar height reserved. */
+/* The title bar is the window's fixed chrome: flex:none keeps it from
+   being squeezed by the client area below it. */
+.os-titlebar {
+  flex: none;
+}
+
+/* #app no longer draws its own window bevel — the shell frame does. It
+   now fills the window below the title bar (flex, min-height 0) instead of
+   carrying a min-height of its own; the views inside own their padding and
+   their scrolling (ticket #52). */
 .os-window #app {
   box-shadow: none;
-  min-height: calc(100vh - var(--os-titlebar-height) - var(--os-taskbar-height));
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  margin: 0;
+  max-width: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* View frame: every visible view fills the client area. */
+.os-window #app > section:not([hidden]) {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* All views except the quiz scroll as a whole, with a modest edge inset
+   (the old #app padding, tightened per ticket #52). The quiz pins its
+   footer and status bar and scrolls only .quiz-body — css/quiz.css. */
+.os-window #app > section:not([hidden]):not(#quiz-view) {
+  overflow-y: auto;
+  padding-left: var(--space-4);
+  padding-right: var(--space-4);
 }
 
 /* ── Title bar ─────────────────────────────────────────────────────────

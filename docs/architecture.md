@@ -39,11 +39,12 @@ questions.json — or a Bank Variant, e.g. questions.zh.json (each loaded once)
     ├─→ Quiz Renderer
     │     reads: meta, phases[], questions[]
     │     renders: landing stats (meta.total_questions + meta.time_estimate),
-    │              quiz chrome (Progress Fill + Question Counter + Phase Chip,
-    │              all updating in place), question cards (Q-number chip,
-    │              labeled Scenario/Question blocks, A–D-lettered Options),
-    │              Wizard row ([< Back]/[Next >]; [Finish] on the last,
-    │              re-answer overwrites in place) — ADR-0020
+    │              quiz status bar (phase name + Progress Fill + Question
+    │              Counter, all updating in place), question cards (Q-number
+    │              chip, labeled Scenario/Question blocks, A–D-lettered
+    │              Options), pinned window footer ([< Back]/[Next >];
+    │              [Finish] on the last, re-answer overwrites in place)
+    │              — ADR-0020
     │     collects: option selections → answers: option_index, one per Question
     │     stores: localStorage quiz-session {v: structural-hash, answers} —
     │            one Session per Participant, shared by every Bank Variant,
@@ -107,15 +108,16 @@ questions.json — or a Bank Variant, e.g. questions.zh.json (each loaded once)
 │  Phase 1: "Should I Install This?"                      │
 │  7 questions — trust, verification, pre-install checks  │
 │                                                         │
-│  ┌─ Quiz Chrome (sticky) ─────────────┐                  │
-│  │  [▓▓░░ fill]  Question 3 / 20      │                  │
-│  │  [Phase 1 · Should I Install This?]│                  │
-│  └────────────────────────────────────┘                  │
 │  Q3 ┌ [Scenario] ──────────────┐                         │
 │     └ [Question]               ┘                         │
 │  [A] Option  [B] Option  [C] Option  [D] Option          │
 │  select → silent save → card wipe advance               │
-│  [< Back] [Next >]  ([Finish] on the last card)           │
+│  ┌─ footer (pinned) ────────────┐                        │
+│  │  [< Back] [Next >]  ([Finish] on the last card)       │
+│  └──────────────────────────────┘                        │
+│  ┌─ status bar (pinned) ─────────────────────┐           │
+│  │  Phase 1 · Should I Install This? [▓▓░░] 3 / 20       │
+│  └───────────────────────────────────────────┘           │
 └─────────────────────┬───────────────────────────────────┘
                       ↓
 ┌─────────────────────────────────────────────────────────┐
@@ -177,8 +179,8 @@ questions.json — or a Bank Variant, e.g. questions.zh.json (each loaded once)
 
 - **Three real screens.** Landing, quiz, and results are separate views — the `hidden` attribute actually hides (styles.css enforces it over author display rules).
 - **No per-question Feedback during the quiz.** Option saved silently. Momentum preserved.
-- **Auto-advance on the first answer only (ADR 0020).** Select → save → the **Advance Transition** (client-area card wipe, ~160 ms inside the 200 ms beat; instant under prefers-reduced-motion). A revisit re-marks in place and never moves the card. The **wizard row** moves both ways: [< Back] from Q2, [Next >] between cards, and [Finish] — enabled exactly at 20/20 — is the sole Completion trigger.
-- **The Quiz Chrome never stacks.** One sticky bar: Progress Fill + Question Counter (the question being *viewed*) + Phase Chip updating in place. No phase header cards near the Question.
+- **Auto-advance on the first answer only (ADR 0020).** Select → save → the **Advance Transition** (client-area card wipe, ~160 ms inside the 200 ms beat; instant under prefers-reduced-motion). A revisit re-marks in place and never moves the card. The **pinned window footer** moves both ways: [< Back] from Q2, [Next >] between cards, and [Finish] — enabled exactly at 20/20 — is the sole Completion trigger.
+- **The Quiz Chrome never stacks.** One status bar, pinned inside the window below the scrolling body: Progress Fill + Question Counter (the question being *viewed*) + phase name updating in place. No phase header cards near the Question.
 - **Review is voluntary, on its own screen.** Reached from the results page; navigate back freely; skip it entirely if you want.
 - **The Deep-Dive Prompt is the hero artifact.** The thing the Participant takes away and uses.
 - **The radar is the shareable moment.** PNG download + Web Share API — results travel without a backend. Severity never renders on the charts; score-band colors alone encode performance.
@@ -257,7 +259,7 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 │   ├── ast.js            # AST Risk registry — canonical ids + severities; display names are Chrome Strings (ADR-0013, ADR-0015)
 │   ├── i18n.js          # Chrome String resolution — dictionary select by lang, t(), throws on missing id (ADR-0015)
 │   ├── main.js           # app bootstrap, view router
-│   ├── quiz.js           # quiz chrome, question cards, back nav, localStorage
+│   ├── quiz.js           # quiz status bar + pinned footer, question cards, back nav, localStorage
 │   ├── scoring.js        # deterministic scoring, title lookup, ranked views
 │   ├── session-store.js  # one Session per Participant, structural-hash versioned (ADR-0017)
 │   ├── lang-pref.js      # remembered language choice + prompt dismissals (ADR-0018)

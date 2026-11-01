@@ -1,0 +1,372 @@
+exports.name = 'QuizView';
+
+exports.run = function() {
+  var results = [];
+
+  function check(desc, pass, extra) {
+    var msg = desc;
+    if (extra) msg += ' — ' + extra;
+    results.push({ pass: !!pass, message: msg });
+  }
+
+  var fs = require('fs');
+  var path = require('path');
+  var repo = path.join(__dirname, '..', '..');
+
+  function read(rel) {
+    return fs.readFileSync(path.join(repo, rel), 'utf8');
+  }
+
+  /* ── fake DOM (pattern from test-shell.js / test-lang-routing.js) ──── */
+
+  function fakeEl(tag) {
+    var el = {
+      tagName: String(tag || 'div').toUpperCase(),
+      style: {}, children: [], parentNode: null,
+      className: '', type: '', href: '',
+      disabled: false, hidden: false,
+      attrs: {}, handlers: {}, classes: {},
+      setAttribute: function(n, v) { el.attrs[n] = v; },
+      getAttribute: function(n) {
+        return Object.prototype.hasOwnProperty.call(el.attrs, n) ? el.attrs[n] : null;
+      },
+      appendChild: function(c) { el.children.push(c); c.parentNode = el; return c; },
+      insertBefore: function(node, ref) {
+        if (!ref) { el.children.push(node); }
+        else {
+          var i = el.children.indexOf(ref);
+          el.children.splice(i < 0 ? el.children.length : i, 0, node);
+        }
+        node.parentNode = el;
+        return node;
+      },
+      removeChild: function(c) {
+        el.children = el.children.filter(function(x) { return c !== x; });
+        c.parentNode = null;
+        return c;
+      },
+      addEventListener: function(evt, fn) { el.handlers[evt] = fn; },
+      click: function() {
+        if (el.disabled) return;               // disabled buttons don't fire
+        if (el.handlers.click) el.handlers.click({ target: el, preventDefault: function() {} });
+      },
+      focus: function() { el.focused = true; },
+      scrollIntoView: function() {}
+    };
+    el.classList = {
+      add: function(c) { el.classes[c] = true; },
+      remove: function(c) { delete el.classes[c]; },
+      contains: function(c) { return !!el.classes[c]; }
+    };
+    Object.defineProperty(el, 'textContent', {
+      get: function() { return el._text || ''; },
+      set: function(v) { el._text = String(v); }
+    });
+    Object.defineProperty(el, 'firstChild', {
+      get: function() { return el.children.length ? el.children[0] : null; }
+    });
+    // innerHTML = '' is the module's view reset; clearing children is the
+    // only use the code makes of it.
+    Object.defineProperty(el, 'innerHTML', {
+      get: function() { return ''; },
+      set: function(v) {
+        if (v !== '') throw new Error('fake innerHTML only supports the clear path');
+        el.children.forEach(function(c) { c.parentNode = null; });
+        el.children = [];
+      }
+    });
+    return el;
+  }
+
+  function walk(el, fn) {
+    fn(el);
+    el.children.forEach(function(c) { walk(c, fn); });
+  }
+
+  function byClass(root, cls) {
+    var found = [];
+    walk(root, function(el) {
+      if (String(el.className || '').split(/\s+/).indexOf(cls) !== -1) found.push(el);
+    });
+    return found;
+  }
+
+  /* ── Install page globals, then load the module ─────────────────────── */
+
+  var store = {};
+  globalThis.localStorage = {
+    get length() { return Object.keys(store).length; },
+    key: function(i) { return Object.keys(store)[i]; },
+    getItem: function(k) {
+      return Object.prototype.hasOwnProperty.call(store, k) ? store[k] : null;
+    },
+    setItem: function(k, v) { store[k] = String(v); },
+    removeItem: function(k) { delete store[k]; }
+  };
+
+  var views = {
+    'landing-view': fakeEl('section'),
+    'quiz-view': fakeEl('section'),
+    'results-view': fakeEl('section'),
+    'review-view': fakeEl('section')
+  };
+  globalThis.document = {
+    getElementById: function(id) { return views[id] || null; },
+    createElement: function(tag) { return fakeEl(tag); }
+  };
+
+  // prefers-reduced-motion: TRUE — every beat collapses to a 0ms timer,
+  // and the test swaps setTimeout for a synchronous rung below.
+  globalThis.window = globalThis;
+  globalThis.matchMedia = function() { return { matches: true }; };
+
+  var realSetTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = function(fn) { fn(); return 0; };
+
+  var tracked = [];
+  globalThis.Analytics = { track: function(ev) { tracked.push(ev); } };
+
+  require('../../js/i18n.js');
+  require('../../i18n/en.js');
+  require('../../js/wizard-nav.js');
+  require('../../js/session-store.js');
+  require('../../js/quiz.js');
+
+  var App = globalThis.App;
+  App.I18n.use('en');
+  // Stubs for this test — the originals are restored at the end (module
+  // globals are shared across the suite's files).
+  var realScoring = App.Scoring;
+  var realRenderResults = App.renderResults;
+  var realAnalytics = globalThis.Analytics;
+  App.Scoring = {
+    computeScores: function() { return { ok: true, report: { stub: true } }; }
+  };
+  var handedOff = [];
+  App.renderResults = function(bank, report) { handedOff.push({ bank: bank, report: report }); };
+
+  /* ── Fixture: 3 Questions, two Phases ───────────────────────────────── */
+
+  function q(id, phase) {
+    return {
+      id: id, phase: phase,
+      scenario: 'Scenario for ' + id,
+      question: 'Question text for ' + id + '?',
+      options: ['a', 'b', 'c', 'd'].map(function(l) {
+        return { text: id + ' option ' + l };
+      })
+    };
+  }
+
+  var bank = {
+    meta: { title: 'Fixture', total_questions: 3 },
+    phases: [
+      { id: 'p1', title: 'Phase One' },
+      { id: 'p2', title: 'Phase Two' }
+    ],
+    questions: [q('q1', 'p1'), q('q2', 'p1'), q('q3', 'p2')]
+  };
+
+  /* ── Other views: no status bar of their own ────────────────────────── */
+
+  App.renderLanding(bank);
+  check('landing view carries no status bar or footer',
+    byClass(views['landing-view'], 'quiz-statusbar').length === 0 &&
+    byClass(views['landing-view'], 'quiz-footer').length === 0);
+
+  /* ── Scaffolding: body + footer + status bar, in order ──────────────── */
+
+  App.renderQuiz(bank);
+  var quiz = views['quiz-view'];
+  var body = quiz.children[0];
+  var footer = quiz.children[1];
+  var statusbar = quiz.children[2];
+
+  check('quiz view is [body, footer, statusbar] — pinned panes, one scroll body',
+    quiz.children.length === 3 &&
+    String(body.className) === 'quiz-body' &&
+    String(footer.className) === 'quiz-footer' &&
+    String(statusbar.className) === 'quiz-statusbar',
+    quiz.children.map(function(c) { return c.className; }).join(' | '));
+
+  check('renderQuiz rebuilds cleanly: exactly one status bar per run',
+    byClass(quiz, 'quiz-statusbar').length === 1);
+
+  App.renderQuiz(bank);
+  quiz = views['quiz-view'];
+  body = quiz.children[0];
+  footer = quiz.children[1];
+  statusbar = quiz.children[2];
+  check('a second renderQuiz leaves exactly one status bar (no accumulation)',
+    byClass(views['quiz-view'], 'quiz-statusbar').length === 1 &&
+    views['quiz-view'].children.length === 3);
+
+  check('the sticky Quiz Chrome bar is gone from the DOM',
+    byClass(quiz, 'quiz-chrome').length === 0);
+
+  var phasePane = byClass(statusbar, 'quiz-status-phase')[0];
+  var progressPane = byClass(statusbar, 'quiz-status-progress')[0];
+  var track = byClass(statusbar, 'quiz-status-track')[0];
+  var fill = byClass(statusbar, 'quiz-status-fill')[0];
+  var counter = byClass(statusbar, 'quiz-status-counter')[0];
+
+  check('status bar: left phase pane, right pane = track > fill + counter',
+    !!phasePane && !!progressPane && !!track && !!fill && !!counter &&
+    statusbar.children[0] === phasePane &&
+    statusbar.children[1] === progressPane &&
+    progressPane.children[0] === track &&
+    track.children[0] === fill &&
+    progressPane.children[1] === counter);
+
+  var back = footer.children[0];
+  var next = footer.children[1];
+  var finish = footer.children[2];
+
+  check('footer carries Back / Next / Finish, built once',
+    footer.children.length === 3 &&
+    back.textContent === App.I18n.t('wizard.back') &&
+    next.textContent === App.I18n.t('wizard.next') &&
+    finish.textContent === App.I18n.t('wizard.finish'));
+
+  /* ── Initial state (Question 1) ─────────────────────────────────────── */
+
+  function card() {
+    return byClass(body, 'quiz-card')[0];
+  }
+
+  function optionRow(i) {
+    return byClass(card(), 'quiz-radio-row')[i];
+  }
+
+  check('initial counter is the position: 1 / 3',
+    counter.textContent === '1 / 3', counter.textContent);
+  check('initial fill is answered/total: 0%',
+    fill.style.width === '0%', fill.style.width);
+  check('phase pane shows the current phase name',
+    phasePane.textContent === 'Phase 1 · Phase One', phasePane.textContent);
+  check('Back disabled on the first Question; Finish disabled until 3/3',
+    back.disabled === true && finish.disabled === true);
+  check('Next is present between cards',
+    next.hidden === false);
+
+  /* ── Answer Q1 → auto-advance; fill counts answered, counter moves ─── */
+
+  var q1card = card();               // captured: the beat swaps the card
+  optionRow(0).click();
+
+  check('first answer advances to Question 2 (counter 2 / 3)',
+    counter.textContent === '2 / 3', counter.textContent);
+  check('fill = answered/total (1 of 3), not position',
+    Math.abs(parseFloat(fill.style.width) - 100 / 3) < 0.001 &&
+    fill.style.width.slice(-1) === '%', fill.style.width);
+  check('Back enabled from Question 2 onward', back.disabled === false);
+  check('one Option per Question mirrored in aria-checked (ADR 0017)',
+    byClass(q1card, 'quiz-radio-row')[0].getAttribute('aria-checked') === 'true');
+
+  /* ── Back to Q1: counter follows position, fill does not regress ───── */
+
+  back.click();
+  check('Back returns to Question 1 (counter 1 / 3)',
+    counter.textContent === '1 / 3', counter.textContent);
+  check('fill still counts answered (1 of 3) while viewing Question 1',
+    Math.abs(parseFloat(fill.style.width) - 100 / 3) < 0.001, fill.style.width);
+
+  next.click();
+  check('Next returns to Question 2 (counter 2 / 3)',
+    counter.textContent === '2 / 3', counter.textContent);
+
+  /* ── Last card: Next hides, Finish gates on canFinish ──────────────── */
+
+  next.click();
+  check('counter reaches 3 / 3 on the last card',
+    counter.textContent === '3 / 3', counter.textContent);
+  check('phase pane swaps to the second phase',
+    phasePane.textContent === 'Phase 2 · Phase Two', phasePane.textContent);
+  check('Next hidden on the last card (Finish takes its place)',
+    next.hidden === true);
+  check('Finish stays disabled while any Question is unanswered',
+    finish.disabled === true);
+
+  finish.click();
+  check('a disabled Finish commits nothing',
+    tracked.length === 0 && handedOff.length === 0);
+
+  // Fill the last Question first: Q2 is still empty, so Finish must stay
+  // disabled (ADR 0020: enabled only when every Question is answered).
+  optionRow(1).click();
+  check('fill counts answered (2 of 3) even on the last card',
+    Math.abs(parseFloat(fill.style.width) - 200 / 3) < 0.001, fill.style.width);
+  check('…and Finish stays disabled with gaps elsewhere',
+    finish.disabled === true);
+
+  back.click();                       // → Q2
+  optionRow(2).click();               // answer Q2 → auto-advance → Q3
+  check('answering Q2 lands on the last card again (3 / 3)',
+    counter.textContent === '3 / 3', counter.textContent);
+  check('Finish enabled once every Question has an Option selected',
+    finish.disabled === false);
+
+  /* ── Re-answer in place: one Option per Question, no card move ─────── */
+
+  while (back.disabled === false) back.click();      // walk back to Q1
+  check('walking back reaches Question 1 (counter 1 / 3)',
+    counter.textContent === '1 / 3', counter.textContent);
+  optionRow(2).click();               // re-mark Q1 with a different Option
+  check('re-answer overwrites in place: card stays on Question 1',
+    counter.textContent === '1 / 3', counter.textContent);
+  check('the new Option is checked, the old one released',
+    optionRow(2).getAttribute('aria-checked') === 'true' &&
+    optionRow(0).getAttribute('aria-checked') === 'false');
+  check('fill unaffected by a re-answer (still 100%)',
+    fill.style.width === '100%', fill.style.width);
+
+  /* ── Finish Commit fires exactly once, from the footer ─────────────── */
+
+  while (next.hidden === false) next.click();        // walk forward to Q3
+  check('forward walk reaches the last card (3 / 3)',
+    counter.textContent === '3 / 3' && next.hidden === true);
+
+  finish.click();
+  check('Finish Commit fires quiz_completed and hands off to results',
+    tracked.length === 1 && tracked[0] === 'quiz_completed' &&
+    handedOff.length === 1 && handedOff[0].report && handedOff[0].report.stub,
+    JSON.stringify(tracked) + '/' + handedOff.length);
+
+  finish.click();
+  check('the commit gate refuses a second Finish click',
+    tracked.length === 1 && handedOff.length === 1);
+
+  /* ── Layout contracts in the stylesheets (ticket #52) ──────────────── */
+
+  var quizCss = read('css/quiz.css');
+  var shellCss = read('css/shell.css');
+
+  check('quiz.css: no sticky chrome left behind',
+    !/position:\s*sticky/.test(quizCss));
+  check('quiz.css: only .quiz-body scrolls (footer/statusbar pinned flex:none)',
+    /\.quiz-body\s*\{[^}]*overflow-y:\s*auto/.test(quizCss) &&
+    /\.quiz-footer\s*\{[^}]*flex:\s*none/.test(quizCss) &&
+    /\.quiz-statusbar\s*\{[^}]*flex:\s*none/.test(quizCss));
+  check('quiz.css: footer is separated by a 1px rule',
+    /\.quiz-footer\s*\{[^}]*border-top:\s*1px/.test(quizCss));
+
+  check('shell.css: window is fixed height above the taskbar',
+    /\.os-window\s*\{[^}]*height:\s*calc\(100vh - var\(--os-taskbar-height\)\)/.test(shellCss));
+  check('shell.css: the page itself never scrolls',
+    /body\s*\{[^}]*overflow:\s*hidden/.test(shellCss));
+  check('shell.css: every view scrolls internally except the quiz',
+    /:not\(#quiz-view\)/.test(shellCss) &&
+    /\.os-window\s+#app\s*>\s*section:not\(\[hidden\]\):not\(#quiz-view\)\s*\{[^}]*overflow-y:\s*auto/.test(shellCss));
+
+  /* ── Restore globals for the rest of the suite ─────────────────────── */
+
+  globalThis.setTimeout = realSetTimeout;
+  delete globalThis.document;
+  delete globalThis.window;
+  delete globalThis.matchMedia;
+  App.Scoring = realScoring;              // scoring.js owns the global
+  App.renderResults = realRenderResults;
+  globalThis.Analytics = realAnalytics;
+
+  return results;
+};

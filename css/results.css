@@ -3,8 +3,11 @@
 #results-view {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
-  padding-bottom: var(--space-8);
+  gap: var(--space-3);
+  /* Vertical inset inside the fixed window (ticket #52); the horizontal
+     edge inset comes from css/shell.css's view rule. */
+  padding-top: var(--space-3);
+  padding-bottom: var(--space-4);
 }
 
 /* ── Title Card (ticket #45: .os-window idiom) ──
@@ -32,7 +35,7 @@
 .results-title-card {
   text-align: left;
   margin: var(--space-1);
-  padding: var(--space-5) var(--space-4);
+  padding: var(--space-3);
   background: var(--color-surface);
   color: var(--color-text);
   border-radius: 0;
@@ -98,7 +101,7 @@
   max-width: 400px;
   margin: 0 auto;
   width: 100%;
-  padding: var(--space-4);
+  padding: var(--space-3);
   background: var(--color-surface);
   border-radius: 0;
   box-shadow: var(--bevel-sunken);
@@ -644,7 +647,7 @@
   display: flex;
   gap: var(--space-3);
   justify-content: center;
-  margin-top: var(--space-4);
+  margin-top: var(--space-3);
 }
 
 .results-review-btn {
@@ -667,7 +670,9 @@
 #review-view {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  padding-bottom: var(--space-4);
 }
 
 .results-review-header {

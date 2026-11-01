@@ -31,10 +31,10 @@ Domain vocabulary for the Agent Skills Security Self-assessment — extracted fr
 
 | Term                 | Definition                                                                                     | Aliases to avoid                     |
 | -------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------ |
-| **Quiz Chrome**      | The sticky top bar during the quiz: Progress Fill, Question Counter, and Phase Chip together    | Header (overloaded), toolbar, HUD    |
+| **Quiz Chrome**      | The in-window status bar during the quiz (ticket #52): phase name in the left pane, segmented Progress Fill + Question Counter in the right pane | Header (overloaded), toolbar, HUD    |
 | **Question Counter** | The "N / 20" text showing the question currently being viewed, 1-indexed                         | Progress text, answered count        |
 | **Progress Fill**    | The thin bar showing answered questions / 20; reaches 100% before the results hand-off           | Progress bar (bare)                  |
-| **Phase Chip**       | The small in-place label in the Quiz Chrome showing the current Phase; swaps text, never appends | Phase header (retired card), badge   |
+| **Phase Chip**       | The phase name in the Quiz Chrome's left pane showing the current Phase; swaps text, never appends | Phase header (retired card), badge   |
 | **Question Card**    | The one-at-a-time card: Q-number chip, labeled Scenario and Question blocks, A–D-lettered Options | Quiz card, quiz page                 |
 | **Wizard Navigation**| Two-way movement through the Question Cards: [< Back] from the second Question onward, [Next >] between Cards, [Finish] on the last; re-answering overwrites the pick in place without advancing | Back-only navigation (retired), pager, stepper |
 | **Finish Commit**    | The [Finish] click on the last Question Card — the single trigger for Completion: enabled only when all 20 Questions are answered, `quiz_completed` fires exactly there, never automatically | Auto-finish, submit button, implicit completion |
