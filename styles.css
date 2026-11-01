@@ -201,6 +201,7 @@ html[lang^="zh"] #landing-view .wizard-body {
   font-family: var(--font-body);
   font-size: 14px;
   line-height: 1.6;
+  max-width: 100%;
 }
 
 /* Responsive — Tablet */
