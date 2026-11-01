@@ -94,6 +94,15 @@
       'SIL OFL 1.1 许可）。',
     'shell.ok': '确定',
 
+    /* ── 结束程序对话框（ticket #43） ──
+       措辞对应 Win95 的“结束程序”确认框：标题栏点名被结束的程序，
+       正文只问一个问题。可复用原语 App.Windows.openSystemDialog 在打开时
+       通过 I18n.t() 解析这些 id；#44 与 #47 复用该原语时传入各自的 id。 */
+    'windows.endProgramTitle': '结束程序 - 智能体安全意识测评',
+    'windows.endProgramMessage': '确定要结束这个程序吗？',
+    'windows.yes': '是',
+    'windows.no': '否',
+
     /* ── 开始菜单声音开关（ticket #41） ── */
     'sound.menuItem': '声音',
 

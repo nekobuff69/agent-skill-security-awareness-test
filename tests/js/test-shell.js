@@ -143,24 +143,21 @@ exports.run = function() {
   });
   check('title-bar buttons disabled on the zh page too', zhAllDisabled);
 
+  // Delegation surface for ticket #43: the handler fires only while the
+  // button is enabled; live behavior through an App.Windows controller is
+  // covered in tests/js/test-windows.js.
   var prevented = 0;
   var fakeEv = { preventDefault: function() { prevented++; } };
-  en.ctl.titleButtons.close.handlers.click(fakeEv);
-  check('title-bar button handlers are inert no-ops while disabled',
-    prevented === 0, 'prevented=' + prevented);
-
-  // Hook surface for ticket #43: the handler is a guarded no-op — it only
-  // runs once BOTH the disabled attribute and the enable flag are lifted.
-  Shell.titleBarButtonsEnabled = true;
-  en.ctl.titleButtons.close.click();           // still disabled: no fire
+  en.ctl.titleButtons.close.click();           // disabled: no fire
+  check('disabled title-bar button never fires', prevented === 0,
+    'prevented=' + prevented);
   en.ctl.titleButtons.close.disabled = false;
   en.ctl.titleButtons.close.handlers.click(fakeEv);
-  check('hook surface: enabled flag + re-enabled button executes the handler',
-    prevented === 1, 'prevented=' + prevented);
+  check('enabled title-bar button executes the handler', prevented === 1,
+    'prevented=' + prevented);
   en.ctl.titleButtons.close.disabled = true;
   en.ctl.titleButtons.close.handlers.click(fakeEv);
-  check('hook surface: re-disabled button is inert again', prevented === 1);
-  Shell.titleBarButtonsEnabled = false;
+  check('re-disabled button is inert again', prevented === 1);
 
   // ── Program button reflects the window title ─────────────────────────
 

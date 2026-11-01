@@ -6,20 +6,21 @@
 
   /**
    * Desktop shell (ticket #38): window frame, taskbar, Start menu, About
-   * window, clock.
+   * window, clock. Ticket #43 makes the title-bar controls live.
    *
    * Layering: the shell WRAPS the existing `#app` node at runtime (no HTML
    * edits) — a `div.os-window` with a navy title bar takes `#app` as its
    * content, and a fixed `div.os-taskbar` pins the Start button, the program
    * button and the clock to the bottom of the screen.
    *
-   * The three title-bar buttons are DRAWN but disabled, era-correct for a
-   * landing-state application that cannot close itself. The live controls
-   * arrive with ticket #43: the hook surface is stable — the buttons carry
-   * `data-os-button="minimize|maximize|close"`, are marked
-   * `disabled = true`, and their click handler is a guarded no-op that
-   * checks the `titleBarButtonsEnabled` flag before doing anything. Toggling
-   * that one flag later activates them without touching this structure.
+   * The three title-bar buttons carry `data-os-button="minimize|maximize|
+   * close"` and DELEGATE to an App.Windows controller when the page wires
+   * one in (js/shell.js start() builds it from js/windows.js). Without a
+   * controller they keep the era default: drawn, disabled, inert — a
+   * landing-state application that cannot close itself. The controller
+   * re-renders their disabled state on every view change, opens the End
+   * Program dialog on [×] away from the landing view, and drives the
+   * minimize/maximize trace classes on the window frame.
    *
    * Pure logic (clock formatting, tick cadence, menu/About state
    * transitions) is exposed on App.Shell and runs headless with fakeEl
@@ -29,10 +30,7 @@
 
   var TITLE_BUTTON_ACTIONS = ['minimize', 'maximize', 'close'];
 
-  var shell = {
-    /** True when the title-bar buttons perform actions (ticket #43 flips this). */
-    titleBarButtonsEnabled: false
-  };
+  var shell = {};
 
   // ── Clock ───────────────────────────────────────────────────────────────
 
@@ -124,12 +122,17 @@
         'data-os-button': action,
         'aria-label': strings['shell.' + action]
       });
-      // Era-correct disabled state: drawn, gray, inert (ticket #43).
+      // Era default until an App.Windows controller refines it via render():
+      // landing state draws [×][□] gray (a program that cannot close
+      // itself) and live [—]; away from landing all three are live.
       btn.disabled = true;
       on(btn, 'click', function(ev) {
-        // Hook surface for ticket #43: stays a no-op while disabled.
-        if (btn.disabled || !shell.titleBarButtonsEnabled) return;
+        // Disabled buttons never fire (browser and fakeEl both).
+        if (btn.disabled) return;
         if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
+        if (!deps.windows) return;
+        var fn = deps.windows[action];
+        if (typeof fn === 'function') fn();
       });
       titleButtons.appendChild(btn);
       titleButtonEls[action] = btn;
@@ -284,9 +287,15 @@
         return menuOpen;
       },
 
-      /** Document-level keydown: Escape closes About first, then the menu. */
+      /** Document-level keydown: Escape closes About first, then the menu.
+       *  A system dialog owns Escape while it is open (its own keydown
+       *  handler cancels it), so the menu/About handlers step aside. */
       handleKeydown: function(key) {
         if (key !== 'Escape') return { menu: menuOpen, about: aboutOpen };
+        if (app.Windows && app.Windows.isDialogOpen &&
+            app.Windows.isDialogOpen()) {
+          return { menu: menuOpen, about: aboutOpen };
+        }
         if (aboutOpen) controller.closeAbout();
         else if (menuOpen) controller.closeMenu(true);
         return { menu: menuOpen, about: aboutOpen };
@@ -409,8 +418,39 @@
     'shell.windowTitle', 'shell.minimize', 'shell.maximize', 'shell.close',
     'shell.start', 'shell.menuAbout',
     'shell.aboutTitle', 'shell.aboutBody', 'shell.aboutLink',
-    'shell.aboutCredits', 'shell.ok'
+    'shell.aboutCredits', 'shell.ok',
+    'windows.endProgramTitle', 'windows.endProgramMessage',
+    'windows.yes', 'windows.no'
   ];
+
+  /**
+   * Open the End Program dialog over the given App.Windows controller.
+   * Wording mirrors the Win95 confirmation (Chrome Strings resolved at open
+   * time by the dialog primitive, so locale switches are honored). No /
+   * Escape keeps the current view and Session; Yes returns to the landing
+   * view — js/session-store.js owns the answers and is never touched, so a
+   * mid-quiz close can never cost progress (issue #36 story 17).
+   */
+  function openEndProgram(win, opener) {
+    if (!app.Windows || !app.Windows.openSystemDialog) return null;
+    return app.Windows.openSystemDialog({
+      icon: 'warn',
+      titleId: 'windows.endProgramTitle',
+      messageId: 'windows.endProgramMessage',
+      dangerous: true,
+      opener: opener,
+      onOk: function() {
+        // Show landing FIRST: the controller's render() re-syncs the view
+        // gating from the DOM, so the landing rules must already be on
+        // screen when it runs.
+        if (typeof app.showView === 'function') app.showView('landing-view');
+        win.confirmClose();
+      },
+      onCancel: function() {
+        win.cancelClose();
+      }
+    });
+  }
 
   /**
    * Start the shell on the live page. Safe to call once; builds the frame,
@@ -429,15 +469,41 @@
       I18n.use(I18n.baseLocale(doc.documentElement.lang || 'en'));
     }
 
+    // The window manager (ticket #43): pure state machine rendered onto the
+    // frame built below. The facade hands build() the three click actions;
+    // attach() afterwards gives the controller the DOM to render onto.
+    var win = app.Windows ? app.Windows.create({ doc: doc }) : null;
+
     var controller = build({
       doc: doc,
       appEl: appEl,
       strings: resolveStrings(I18n, STRING_IDS),
+      windows: win ? {
+        minimize: function() { win.minimize(); },
+        maximize: function() { win.toggleMaximize(); },
+        close: function() {
+          if (!win.requestClose()) return;
+          // The opener explicitly: requestClose() renders all three
+          // controls disabled, which blurs the focused [×] before the
+          // dialog could read doc.activeElement.
+          openEndProgram(win, controller.titleButtons.close);
+        }
+      } : null,
       onOutsideClick: function(handler) {
         doc.addEventListener('click', handler);
       }
     });
     appEl.setAttribute('data-shell-mounted', 'true');
+    if (win) {
+      // Landing rules first: [×][□] gray, [—] live; the program-button
+      // click handler (restore when minimized) is wired here too.
+      win.attach({
+        windowEl: controller.windowEl,
+        programBtn: controller.programBtn,
+        buttons: controller.titleButtons
+      });
+      app.Windows.controller = win;
+    }
 
     // Escape closes the About window or the Start menu; focus returns to
     // the Start button on menu close.
@@ -466,6 +532,7 @@
   shell.start = start;
   shell.attachSoundEntry = attachSoundEntry;
   shell.withSoundModule = withSoundModule;
+  shell.openEndProgram = openEndProgram;
   shell.formatClock = formatClock;
   shell.nextTickDelay = nextTickDelay;
   shell.pad2 = pad2;

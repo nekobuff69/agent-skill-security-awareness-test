@@ -275,6 +275,170 @@ body {
   font-family: var(--font-heading);
 }
 
+/* ── Window controls (ticket #43) ───────────────────────────────────────
+
+   Minimize/restore reuse the wireframe trace idiom (css/theme-retro-os.css,
+   200ms, discrete steps): the frame collapses toward the taskbar and
+   re-opens from it. The controller (js/windows.js) swaps .is-minimizing
+   for .is-minimized on a timer; under prefers-reduced-motion the delay is
+   0ms in JS and the animations below are off, so the state lands instantly. */
+
+@keyframes os-minimize-trace {
+  from { clip-path: inset(0 0 0 0); }
+  to   { clip-path: inset(100% 0 0 0); }
+}
+
+@keyframes os-restore-trace {
+  from { clip-path: inset(100% 0 0 0); }
+  to   { clip-path: inset(0 0 0 0); }
+}
+
+.os-window.is-minimizing {
+  animation: os-minimize-trace 200ms steps(4, end) forwards;
+}
+
+.os-window.is-restoring {
+  animation: os-restore-trace 200ms steps(4, end);
+}
+
+.os-window.is-minimized {
+  display: none;
+}
+
+/* Maximized: full-viewport above the taskbar, no frame bevel, its own
+   scroll (ticket #46 tunes the mobile variant). */
+.os-window.is-maximized {
+  position: fixed;
+  inset: 0 0 var(--os-taskbar-height) 0;
+  max-width: none;
+  margin: 0;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.os-window.is-maximized #app {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* Program button: sunken (pressed) while the window is shown, raised
+   (unpressed) while it is minimized — the era's taskbar state flip. */
+.os-program-btn[aria-pressed='true'] {
+  box-shadow: var(--bevel-sunken);
+}
+
+.os-program-btn[aria-pressed='false'] {
+  box-shadow: var(--bevel-raised);
+  font-weight: bold;
+}
+
+/* ── System dialog (ticket #43) ────────────────────────────────────────
+
+   Reusable primitive (App.Windows.openSystemDialog): navy title bar from
+   the shared .os-titlebar classes, sunken icon field, beveled command
+   buttons. The backdrop dims the desktop but is inert — a real modal only
+   closes via its buttons or Escape. */
+
+.os-dialog-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1300;              /* above .os-about-backdrop (1200) */
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.os-dialog-backdrop.open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.os-dialog {
+  width: min(440px, calc(100vw - 2 * var(--space-3)));
+  background: var(--color-face);
+  box-shadow: var(--bevel-raised);
+  font-family: var(--font-body);
+}
+
+.os-dialog-body {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3);
+}
+
+/* Era icon: flat circle, drawn glyph. warn = red circle + white cross
+   (the "this ends the program" mark); info = navy circle + white glyph. */
+.os-dialog-icon {
+  flex: none;
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.os-dialog-icon[data-icon='warn'] {
+  background: #FF0000;
+}
+
+.os-dialog-icon[data-icon='info'] {
+  background: #000080;
+}
+
+/* The white cross: two 16x4 bars, rotated ±45°. */
+.os-dialog-icon::before,
+.os-dialog-icon::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  height: 4px;
+  margin: -2px 0 0 -8px;
+  background: #FFFFFF;
+}
+
+.os-dialog-icon::before { transform: rotate(45deg); }
+.os-dialog-icon::after  { transform: rotate(-45deg); }
+
+.os-dialog-message {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.os-dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: 0 var(--space-3) var(--space-3);
+}
+
+.os-dialog-btn {
+  min-width: 75px;
+  padding: var(--space-1) var(--space-3);
+  font-family: var(--font-heading);
+}
+
+/* Focus ring: era dotted rectangle (matches the skin's button focus). */
+.os-dialog-btn:focus-visible,
+.os-titlebar-btn:focus-visible,
+.os-program-btn:focus-visible {
+  outline: 1px dotted var(--color-text);
+  outline-offset: -4px;
+}
+
+/* ── Reduced motion (ticket #43 extension of the #42 contract) ─────────
+   Traces never draw; the state classes land instantly (JS delay is 0ms).
+   The dialog has no animation of its own, so it appears instantly by
+   construction. */
+@media (prefers-reduced-motion: reduce) {
+  .os-window.is-minimizing,
+  .os-window.is-restoring {
+    animation: none;
+  }
+}
+
 /* ── Responsive ──────────────────────────────────────────────────────── */
 
 @media (max-width: 480px) {

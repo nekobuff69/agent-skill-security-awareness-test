@@ -93,6 +93,17 @@
       '(SIL Open Font License 1.1).',
     'shell.ok': 'OK',
 
+    /* ── End Program dialog (ticket #43) ──
+       Wording mirrors the Win95 "End Program" confirmation: the title bar
+       names the program being ended, the message asks the single question.
+       The reusable primitive (App.Windows.openSystemDialog) resolves these
+       ids through I18n.t() at open time; tickets #44 and #47 reuse the
+       primitive with their own ids. */
+    'windows.endProgramTitle': 'End Program - Agent Security Awareness Quiz',
+    'windows.endProgramMessage': 'Are you sure you want to end this program?',
+    'windows.yes': 'Yes',
+    'windows.no': 'No',
+
     /* ── Start-menu sound toggle (ticket #41) ── */
     'sound.menuItem': 'Sound',
 
