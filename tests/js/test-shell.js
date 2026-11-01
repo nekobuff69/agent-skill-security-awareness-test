@@ -1,6 +1,8 @@
 exports.name = 'Shell';
 
 exports.run = function() {
+  var fs = require('fs');
+  var path = require('path');
   var results = [];
 
   function check(desc, pass, extra) {
@@ -403,6 +405,157 @@ exports.run = function() {
   else globalThis.localStorage = savedStorage;
   if (savedLocation === undefined) delete globalThis.location;
   else globalThis.location = savedLocation;
+
+  // ── Desktop shortcuts (ticket #62) ───────────────────────────────────
+  // A top-left column with one shortcut per program, glyph over a localized
+  // label, ALWAYS present — running or not. Double-click, Enter and Space
+  // launch through the ONE launch action; a single click never does.
+
+  var launches = [];
+  var preventions = 0;
+  function fakeLaunch(id) { launches.push(id); }
+  function keyEvent(key) {
+    return { key: key, preventDefault: function() { preventions++; } };
+  }
+  function clickEvent() {
+    return { preventDefault: function() { preventions++; } };
+  }
+
+  function mountWithLaunch(locale) {
+    I18n.use(locale);
+    var doc = fakeDoc();
+    var appEl = fakeEl('div');
+    appEl.setAttribute('id', 'app');
+    doc.body.appendChild(appEl);
+    var ctl = Shell.build({
+      doc: doc,
+      appEl: appEl,
+      strings: Shell.resolveStrings(I18n, Shell.STRING_IDS),
+      launchProgram: fakeLaunch
+    });
+    return { doc: doc, appEl: appEl, ctl: ctl };
+  }
+
+  var sEn = mountWithLaunch('en');
+  var sZh = mountWithLaunch('zh');
+  var ORDER = ['quiz', 'action-plan', 'deep-dive'];
+
+  check('the shortcut column carries one shortcut per program, in the stable order',
+    ORDER.every(function(id, i) {
+      var item = sEn.ctl.shortcutBar.children[i];
+      return item && item.getAttribute('data-os-shortcut') === id;
+    }) && sEn.ctl.shortcutBar.children.length === 3,
+    sEn.ctl.shortcutBar.children.map(function(c) {
+      return c.getAttribute('data-os-shortcut');
+    }).join(','));
+
+  check('every shortcut is a keyboard-reachable button with a drawn glyph',
+    ORDER.every(function(id) {
+      var item = sEn.ctl.shortcutEls[id];
+      return item.tagName === 'BUTTON' && item.type === 'button' &&
+        item.children.length === 2 &&
+        item.children[0].innerHTML.indexOf('<svg') === 0 &&
+        item.children[0].getAttribute('aria-hidden') === 'true' &&
+        item.children[1].textContent.length > 0;
+    }));
+
+  check('shortcut labels come from the en dictionary',
+    sEn.ctl.shortcutLabels['quiz'].textContent === 'Agent Security Awareness Quiz' &&
+    sEn.ctl.shortcutLabels['action-plan'].textContent === 'Action Plan' &&
+    sEn.ctl.shortcutLabels['deep-dive'].textContent === 'Deep-Dive Prompt',
+    [sEn.ctl.shortcutLabels['quiz'].textContent,
+     sEn.ctl.shortcutLabels['action-plan'].textContent,
+     sEn.ctl.shortcutLabels['deep-dive'].textContent].join('|'));
+
+  check('shortcut labels come from the zh dictionary',
+    sZh.ctl.shortcutLabels['quiz'].textContent === '智能体安全意识测评' &&
+    sZh.ctl.shortcutLabels['action-plan'].textContent === '行动计划' &&
+    sZh.ctl.shortcutLabels['deep-dive'].textContent === '深度提问',
+    [sZh.ctl.shortcutLabels['quiz'].textContent,
+     sZh.ctl.shortcutLabels['action-plan'].textContent,
+     sZh.ctl.shortcutLabels['deep-dive'].textContent].join('|'));
+
+  check('the shortcuts mount on the desktop surface (one column in the body)',
+    sEn.ctl.shortcutBar.parentNode === sEn.doc.body &&
+    sEn.doc.body.children.filter(function(c) {
+      return c === sEn.ctl.shortcutBar;
+    }).length === 1);
+
+  check('the shortcut column is built even with no launch action (drawn, inert)',
+    (function() {
+      var plain = mount('en');
+      var item = plain.ctl.shortcutEls['quiz'];
+      return !!item && !item.handlers.dblclick && !item.handlers.keydown;
+    })());
+
+  // Launch gestures: double-click, Enter, Space. One click: nothing.
+  launches = [];
+  sEn.ctl.shortcutEls['deep-dive'].handlers.dblclick(clickEvent());
+  check('double-clicking a shortcut launches that program',
+    launches.join(',') === 'deep-dive', 'launches=' + launches.join(','));
+
+  launches = [];
+  sEn.ctl.shortcutEls['quiz'].click();
+  check('a single click launches nothing (it only selects, as on a real desktop)',
+    launches.length === 0, 'launches=' + launches.join(','));
+
+  launches = [];
+  preventions = 0;
+  sEn.ctl.shortcutEls['action-plan'].handlers.keydown(keyEvent('Enter'));
+  check('Enter on a focused shortcut launches it',
+    launches.join(',') === 'action-plan' && preventions === 1,
+    'launches=' + launches.join(',') + ' prevented=' + preventions);
+
+  launches = [];
+  preventions = 0;
+  sEn.ctl.shortcutEls['quiz'].handlers.keydown(keyEvent(' '));
+  check('Space on a focused shortcut launches it (and never scrolls)',
+    launches.join(',') === 'quiz' && preventions === 1,
+    'launches=' + launches.join(',') + ' prevented=' + preventions);
+
+  launches = [];
+  sEn.ctl.shortcutEls['quiz'].handlers.keydown(keyEvent('a'));
+  sEn.ctl.shortcutEls['quiz'].handlers.keydown(keyEvent('Tab'));
+  check('any other key launches nothing', launches.length === 0);
+
+  // An in-place language switch re-resolves the labels (#55 contract).
+  I18n.use('en');
+  var swEn = mountWithLaunch('en');
+  I18n.use('zh');
+  swEn.ctl.refreshLang();
+  check('refreshLang re-resolves the shortcut labels in place',
+    swEn.ctl.shortcutLabels['action-plan'].textContent === '行动计划' &&
+    swEn.ctl.shortcutEls['action-plan'].getAttribute('title') === '行动计划',
+    swEn.ctl.shortcutLabels['action-plan'].textContent);
+
+  // The mobile rule: no shortcut column at ≤768px (presentation, exactly
+  // like the #46 maximized-by-default rule — the state model stays blind).
+  var shellCss = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'css', 'shell.css'), 'utf8');
+  var mobileBlock = (function() {
+    var at = shellCss.indexOf('@media (max-width: 768px)');
+    return at < 0 ? '' : shellCss.slice(at);
+  })();
+  check('css: the shortcut column disappears at ≤768px',
+    /\.os-shortcuts\s*\{[^}]*display:\s*none/.test(
+      mobileBlock.slice(0, mobileBlock.indexOf('@media (max-width: 480px'))));
+  check('css: the desktop column is a top-left stack of icons',
+    /\.os-shortcuts\s*\{[^}]*position:\s*fixed/.test(shellCss) &&
+    /\.os-shortcuts\s*\{[^}]*flex-direction:\s*column/.test(shellCss) &&
+    /\.os-shortcuts\s*\{[^}]*left:\s*var\(--space-2\)/.test(shellCss) &&
+    /\.os-shortcuts\s*\{[^}]*top:\s*var\(--space-2\)/.test(shellCss));
+  check('css: the icons stay above the windows and below the bar (always visible)',
+    (function() {
+      var shortcutZ = Number(
+        (shellCss.match(/\.os-shortcuts\s*\{[^}]*z-index:\s*(\d+)/) || [])[1]);
+      var taskbarZ = Number(
+        (shellCss.match(/\.os-taskbar\s*\{[^}]*z-index:\s*(\d+)/) || [])[1]);
+      var dialogZ = Number(
+        (shellCss.match(/\.os-dialog-backdrop\s*\{[^}]*z-index:\s*(\d+)/) || [])[1]);
+      return shortcutZ > 0 && shortcutZ < taskbarZ && shortcutZ < dialogZ &&
+        taskbarZ === 1000;
+    })(),
+    'shortcuts above the window rung, under 1000');
 
   return results;
 };

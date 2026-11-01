@@ -10,7 +10,11 @@
    * replaces the tray clock with the two-segment language toggle; ticket
    * #61 adds the Action Plan and the Deep-Dive Prompt windows, so the
    * shell builds THREE program frames — one chrome, one control idiom, one
-   * taskbar button each — instead of wrapping #app alone.
+   * taskbar button each — instead of wrapping #app alone. Ticket #62 puts
+   * the desktop's own icons on the screen: a top-left SHORTCUT COLUMN —
+   * Quiz, Action Plan, Deep-Dive Prompt — always present (running or not),
+   * launched by double-click or Enter/Space, and absent on the ≤768px
+   * layout where the taskbar is the only switcher.
    *
    * Layering: the shell WRAPS the existing `#app` node at runtime (no HTML
    * edits) — a `div.os-window` with a navy title bar takes `#app` as its
@@ -80,6 +84,31 @@
   var PROGRAM_FRAMES = [
     { id: 'action-plan', mount: 'action-plan', titleId: 'shell.actionPlanWindow' },
     { id: 'deep-dive', mount: 'deep-dive', titleId: 'shell.deepDiveWindow' }
+  ];
+
+  /**
+   * The desktop shortcuts (ticket #62, spec #58): one per program, in the
+   * STABLE PROGRAM ORDER, always present on the desktop whether or not the
+   * program is running. `titleId` is the SAME Chrome String the program's
+   * title bar and taskbar button carry — a shortcut never invents a second
+   * name for a program. `glyph` is drawn (currentColor, aria-hidden) so no
+   * new codepoint enters either dictionary and the CJK font subset stays
+   * untouched.
+   */
+  var SHORTCUTS = [
+    { id: 'quiz', titleId: 'shell.windowTitle', glyph:
+      '<svg class="os-shortcut-glyph" width="24" height="24" viewBox="0 0 12 12" aria-hidden="true">' +
+      '<rect x="1" y="1" width="10" height="10" fill="none" stroke="currentColor"/>' +
+      '<path d="M3.6 4.6c0-1.1 1-1.9 2.2-1.9 1.3 0 2.2.8 2.2 1.9 0 1-.6 1.5-1.5 2-.7.4-1 .8-1 1.4" ' +
+      'fill="none" stroke="currentColor"/></svg>' },
+    { id: 'action-plan', titleId: 'shell.actionPlanWindow', glyph:
+      '<svg class="os-shortcut-glyph" width="24" height="24" viewBox="0 0 12 12" aria-hidden="true">' +
+      '<rect x="1" y="1" width="10" height="10" fill="none" stroke="currentColor"/>' +
+      '<path d="M3 4h6M3 6h6M3 8h4" fill="none" stroke="currentColor"/></svg>' },
+    { id: 'deep-dive', titleId: 'shell.deepDiveWindow', glyph:
+      '<svg class="os-shortcut-glyph" width="24" height="24" viewBox="0 0 12 12" aria-hidden="true">' +
+      '<circle cx="5.2" cy="5.2" r="3.2" fill="none" stroke="currentColor"/>' +
+      '<path d="M7.6 7.6 10.4 10.4" fill="none" stroke="currentColor"/></svg>' }
   ];
 
   /**
@@ -211,6 +240,11 @@
    *   deps.programWindows - { 'action-plan': {...}, 'deep-dive': {...} }
    *                   the same three control actions bound to each program
    *                   frame (ticket #61)
+   *   deps.launchProgram - optional fn(programId): the desktop shortcut's
+   *                   launch action (ticket #62), wired to the App.Windows
+   *                   controller's launchProgram. Without it the shortcuts
+   *                   stay drawn and inert, exactly like the title-bar
+   *                   controls before a controller exists.
    *   deps.onOutsideClick - optional; receives the outside-click handler
    */
   function build(deps) {
@@ -315,6 +349,37 @@
     taskbar.appendChild(programsBar);
     if (langToggle) taskbar.appendChild(langToggle);
 
+    // ── Desktop shortcuts (ticket #62) ───────────────────────────────────
+    // The top-left column: one shortcut per program, glyph above label,
+    // ALWAYS present — running or not, arrived or not. The column is built
+    // once and painted by no mode: a window never takes the icons away,
+    // and the stylesheet keeps them visible even while a window is
+    // maximized over them (css/shell.css: the shortcut rung sits above
+    // the windows and below the taskbar). The ≤768px layout removes the
+    // column entirely. Double-click or Enter/Space launches through
+    // deps.launchProgram; a single click only moves focus, as on a real
+    // desktop icon. Labels are the SAME Chrome Strings the title bars and
+    // taskbar buttons carry, so no second name exists for a program.
+    var shortcutBar = createEl(doc, 'div', 'os-shortcuts');
+    shortcutBar.setAttribute('aria-label', strings['shell.programs']);
+    var shortcutEls = {};
+    var shortcutLabels = {};
+    SHORTCUTS.forEach(function(spec) {
+      var item = createEl(doc, 'button', 'os-shortcut');
+      item.type = 'button';
+      item.setAttribute('data-os-shortcut', spec.id);
+      item.setAttribute('title', strings[spec.titleId]);
+      var glyph = createEl(doc, 'span', 'os-shortcut-glyph');
+      glyph.innerHTML = spec.glyph;
+      glyph.setAttribute('aria-hidden', 'true');
+      var label = createEl(doc, 'span', 'os-shortcut-label', strings[spec.titleId]);
+      item.appendChild(glyph);
+      item.appendChild(label);
+      shortcutBar.appendChild(item);
+      shortcutEls[spec.id] = item;
+      shortcutLabels[spec.id] = label;
+    });
+
     // ── About window (over a dimmed backdrop) ────────────────────────────
     var aboutBackdrop = createEl(doc, 'div', 'os-about-backdrop');
     var aboutEl = createEl(doc, 'div', 'os-about-window');
@@ -381,6 +446,7 @@
     var body = doc.body;
     body.insertBefore(windowEl, appEl);
     body.insertBefore(taskbar, appEl);
+    body.insertBefore(shortcutBar, windowEl);
     PROGRAM_FRAMES.forEach(function(spec) {
       body.insertBefore(programFrames[spec.id].windowEl, taskbar);
     });
@@ -407,6 +473,10 @@
       programLabels: programLabels,
       langToggle: langToggle,
       langSegments: langSegments,
+      // Desktop shortcuts (ticket #62): the column, its items and labels.
+      shortcutBar: shortcutBar,
+      shortcutEls: shortcutEls,
+      shortcutLabels: shortcutLabels,
 
       /**
        * Re-resolve every Chrome String on the shell after an in-place
@@ -449,6 +519,15 @@
           });
         });
         programsBar.setAttribute('aria-label', I18n.t('shell.programs'));
+        // The desktop shortcuts (#62): label and tooltip re-resolve from
+        // the same Chrome Strings; the launch wiring is language-blind.
+        SHORTCUTS.forEach(function(spec) {
+          var item = shortcutEls[spec.id];
+          if (!item) return;
+          var text = I18n.t(spec.titleId);
+          shortcutLabels[spec.id].textContent = text;
+          item.setAttribute('title', text);
+        });
         TITLE_BUTTON_ACTIONS.forEach(function(action) {
           var btn = titleButtonEls[action];
           if (btn) btn.setAttribute('aria-label', I18n.t('shell.' + action));
@@ -533,6 +612,9 @@
           }
         });
         if (taskbar.parentNode) taskbar.parentNode.removeChild(taskbar);
+        if (shortcutBar.parentNode) {
+          shortcutBar.parentNode.removeChild(shortcutBar);
+        }
         if (aboutBackdrop.parentNode) aboutBackdrop.parentNode.removeChild(aboutBackdrop);
       }
     };
@@ -551,6 +633,27 @@
       controller.openAbout();
     });
     on(okBtn, 'click', function() { controller.closeAbout(); });
+
+    // Desktop shortcut launch (ticket #62): the era's icon gestures —
+    // DOUBLE-click with the pointer, Enter or Space from the keyboard.
+    // A single click does nothing (it only moves focus, as on a real
+    // desktop). One launch action per program, so the SAME route serves
+    // pointer and keyboard: the controller raises a running window,
+    // restores a put-away one, and never opens a second copy.
+    if (typeof deps.launchProgram === 'function') {
+      SHORTCUTS.forEach(function(spec) {
+        var item = shortcutEls[spec.id];
+        var launch = function(ev) {
+          if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
+          deps.launchProgram(spec.id);
+        };
+        on(item, 'dblclick', launch);
+        on(item, 'keydown', function(ev) {
+          var key = ev && ev.key;
+          if (key === 'Enter' || key === ' ') launch(ev);
+        });
+      });
+    }
 
     if (typeof deps.onOutsideClick === 'function') {
       deps.onOutsideClick(function(ev) {
@@ -779,10 +882,11 @@
         minimize: function() { win.minimize(); },
         maximize: function() { win.toggleMaximize(); },
         close: function() {
-          // One decision (js/windows.js): on the desktop stage the window
+          // One decision (js/windows.js): on the DESKTOP layout the window
           // is PUT AWAY (core hide(), no dialog — the program keeps its
-          // results and the taskbar button brings the window back); a flow
-          // stage asks the End Program confirmation first.
+          // results and its desktop shortcut brings the window back,
+          // ticket #62); a flow stage — and the ≤768px layout, where no
+          // shortcut column exists — asks the End Program confirmation.
           var decision = win.close();
           if (decision !== 'dialog') return;
           // The opener explicitly: requestClose() renders all three
@@ -806,6 +910,21 @@
         });
         return actions;
       })() : null,
+      // The desktop shortcuts (ticket #62): every launch — pointer
+      // double-click or Enter/Space — goes through the controller, which
+      // raises a running window, restores a put-away one at its last mode
+      // and geometry, and opens an unarrived program at its designed
+      // arrangement. One Record per program: never a second window. When
+      // the keyboard floor's trigger ledger exists (#67), the shortcut
+      // records itself as the control that opened the window so Escape
+      // hands focus back here instead of the taskbar fallback.
+      launchProgram: win ? function(id) {
+        var item = controller.shortcutEls && controller.shortcutEls[id];
+        if (item && typeof win.recordTrigger === 'function') {
+          win.recordTrigger(id, item);
+        }
+        return win.launchProgram(id);
+      } : null,
       onOutsideClick: function(handler) {
         doc.addEventListener('click', handler);
       }
@@ -813,8 +932,9 @@
     appEl.setAttribute('data-shell-mounted', 'true');
     if (win) {
       // Landing rules first: [×][□] gray, [—] live; the program-button
-      // click handler (restore when minimized OR hidden) and the title-bar
-      // drag / corner-grip resize handles are wired in there too.
+      // click handler (which restores a MINIMIZED window and focuses a
+      // visible one — a hidden window has no button, ticket #62) and the
+      // title-bar drag / corner-grip resize handles are wired in there too.
       win.attach({
         windowEl: controller.windowEl,
         titleBar: controller.titleBar,
@@ -856,6 +976,7 @@
   shell.build = build;
   shell.buildFrameChrome = buildFrameChrome;
   shell.PROGRAM_FRAMES = PROGRAM_FRAMES;
+  shell.SHORTCUTS = SHORTCUTS;
   shell.programBodyId = programBodyId;
   shell.start = start;
   shell.recordChoice = recordChoice;

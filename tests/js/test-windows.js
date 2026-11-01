@@ -434,15 +434,30 @@ exports.run = function() {
     !drefs.windowEl.classList.contains('is-windowed'));
   check('a hidden window has nothing to close: [×] renders disabled',
     drefs.buttons.close.disabled === true && dctl.canClose() === false);
+  // ── The put-away Quiz window leaves the taskbar (ticket #62) ──────────
+  // The #61 bridge — the Quiz button kept alive for a hidden window — is
+  // gone: the running-windows-only rule now covers all three programs, and
+  // the desktop shortcut is the way back.
+  check('a hidden Quiz window has no taskbar button either',
+    drefs.programBtn.hidden === true &&
+    dctl.inTaskbar('quiz') === false &&
+    dctl.runningPrograms().join(',') === '');
   drefs.programBtn.click();
   while (dpending.length) dpending.shift()();
+  check('the taskbar button no longer resurrects a hidden window',
+    dctl.getState().mode === 'hidden' && drefs.programBtn.hidden === true);
   var gBack = dctl.geometry();
-  check('the taskbar program button restores a hidden window to its arrangement',
+  check('launchProgram brings the put-away window back at its arrangement',
+    dctl.launchProgram('quiz') === true &&
     dctl.getState().mode === 'normal' &&
     !drefs.windowEl.classList.contains('is-hidden') &&
     drefs.windowEl.classList.contains('is-windowed') &&
     gBack.x === gClose.x && gBack.w === gClose.w &&
-    drefs.windowEl.style.left === gClose.x + 'px', JSON.stringify(gBack));
+    drefs.windowEl.style.left === gClose.x + 'px' &&
+    drefs.programBtn.hidden === false &&
+    drefs.programBtn.getAttribute('aria-pressed') === 'true',
+    JSON.stringify(gBack));
+  while (dpending.length) dpending.shift()();
 
   // Minimized restore still routes through the same program button.
   dctl.minimize();
@@ -481,10 +496,20 @@ exports.run = function() {
   pointer(drefs.resizeGrip, 'pointermove', 600, 600);
   check('mobile ignores the drag and resize handles',
     dctl.geometry().x === gMobile.x && dctl.geometry().w === gMobile.w);
-  // Close on mobile keeps working — hide() is a mode, not a geometry.
-  check('close still puts the window away on the mobile layout',
-    dctl.close() === 'hidden' && dctl.getState().mode === 'hidden');
+  // Close on mobile (ticket #62): this layout has no desktop to stand a
+  // put-away window on and no shortcut column to bring it back, so the
+  // Quiz [×] keeps ticket #43's answer — the End Program confirmation —
+  // and every window stays reachable.
+  check('the mobile Quiz [×] asks the End Program question instead of hiding',
+    dctl.close() === 'dialog' && dctl.getState().mode === 'normal' &&
+    dctl.getState().confirmOpen === true &&
+    drefs.programBtn.hidden === false &&
+    dctl.runningPrograms().join(',') === 'quiz');
   drefs.programBtn.click();
+  while (dpending.length) dpending.shift()();
+  check('the mobile taskbar keeps no restore bridge (nothing is hidden to restore)',
+    dctl.getState().mode === 'normal');
+  dctl.cancelClose();
   while (dpending.length) dpending.shift()();
   delete globalThis.matchMedia;
 
@@ -703,6 +728,134 @@ exports.run = function() {
   check('the flow stage still routes the Quiz [×] to the End Program dialog',
     pctl.close() === 'dialog' && pctl.getState().confirmOpen === true);
   pctl.cancelClose();
+
+  // ── Desktop shortcut launches (ticket #62) ────────────────────────────
+  // One gesture per shortcut: a visible window raises, a minimized or
+  // put-away window comes back at its LAST mode and Geometry, and no
+  // launch ever duplicates a window. The assertions are behaviour: which
+  // mode the launch lands in, which arrangement it wears, what the taskbar
+  // lists, and how many Records exist.
+  pctl.setView('results-view');
+  pctl.actionPlanArrived();
+  pctl.deepDiveArrived();            // both records reborn on the desktop
+  pctl.activateProgram('action-plan');
+  var planMoved = { x: 300, y: 200, w: 500, h: 400 };
+  check('a program window takes a moved arrangement',
+    pctl.applyGeometry(planMoved, 'action-plan') === true &&
+    pctl.geometry('action-plan').x === 300 &&
+    pctl.geometry('action-plan').w === 500);
+  pctl.toggleMaximize('action-plan');
+  pctl.closeProgram('action-plan');        // put away WHILE maximized
+  check('a hidden program leaves the taskbar: the bar lists the running two',
+    pctl.getState('action-plan').mode === 'hidden' &&
+    planRefs.taskbarBtn.hidden === true &&
+    pctl.runningPrograms().join(',') === 'quiz,deep-dive' &&
+    planRefs.windowEl.classList.contains('is-hidden'));
+  var recordsBefore = Object.keys(pctl.snapshot().windows).length;
+  pctl.activateProgram('quiz');
+  check('the shortcut brings a hidden window back at its LAST mode',
+    pctl.launchProgram('action-plan') === true &&
+    pctl.getState('action-plan').mode === 'maximized' &&
+    planRefs.windowEl.classList.contains('is-maximized') &&
+    planRefs.windowEl.classList.contains('is-hidden') === false &&
+    planRefs.taskbarBtn.hidden === false &&
+    pctl.runningPrograms().join(',') === 'quiz,action-plan,deep-dive');
+  check('and at its LAST geometry, not a fresh designed arrangement',
+    pctl.geometry('action-plan').x === planMoved.x &&
+    pctl.geometry('action-plan').w === planMoved.w);
+  check('launching a running program never opens a second window',
+    Object.keys(pctl.snapshot().windows).length === recordsBefore);
+  var quizZBefore = pctl.snapshot().windows['quiz'].z;
+  check('a launch on a visible program raises it and makes it active',
+    pctl.launchProgram('action-plan') === true &&
+    pctl.snapshot().active === 'action-plan' &&
+    pctl.snapshot().windows['action-plan'].z > quizZBefore &&
+    planRefs.windowEl.classList.contains('is-active') === true &&
+    Object.keys(pctl.snapshot().windows).length === recordsBefore);
+  while (ppending.length) ppending.shift()();
+
+  // A minimized program is running: it keeps its button, and the shortcut
+  // restores it (the same launch gesture, the core's restore).
+  pctl.minimize('deep-dive');
+  while (ppending.length) ppending.shift()();
+  check('a minimized program stays in the taskbar',
+    ddRefs.taskbarBtn.hidden === false && pctl.inTaskbar('deep-dive') === true);
+  check('the shortcut restores and focuses the minimized window',
+    pctl.launchProgram('deep-dive') === true &&
+    pctl.getState('deep-dive').mode === 'normal' &&
+    pctl.snapshot().active === 'deep-dive' &&
+    ddRefs.windowEl.classList.contains('is-windowed') &&
+    ddRefs.taskbarBtn.getAttribute('aria-pressed') === 'true');
+  while (ppending.length) ppending.shift()();
+
+  // An unarrived program has no Record yet — the shortcut exists anyway
+  // and opens it ONCE, on the desktop, focused.
+  var ldoc = fakeDoc();
+  var lpending = [];
+  var lctl = Windows.create({
+    doc: ldoc,
+    schedule: function(fn) { lpending.push(fn); },
+    viewport: function() { return VP61; }
+  });
+  var lrefs = {
+    windowEl: fakeEl('div'),
+    titleBar: fakeEl('div'),
+    resizeGrip: fakeEl('div'),
+    programBtn: fakeEl('button'),
+    buttons: { minimize: fakeEl('button'), maximize: fakeEl('button'), close: fakeEl('button') }
+  };
+  var lplan = programFrame();
+  lctl.attach(lrefs);
+  lctl.attachProgram('action-plan', lplan);
+  lctl.setView('results-view');
+  check('the shortcut opens a program that has not arrived yet',
+    lctl.hasWindow('action-plan') === false &&
+    lctl.launchProgram('action-plan') === true &&
+    lctl.hasWindow('action-plan') === true &&
+    lctl.getState('action-plan').mode === 'normal' &&
+    lctl.snapshot().active === 'action-plan' &&
+    lplan.windowEl.classList.contains('is-windowed') &&
+    lplan.taskbarBtn.hidden === false);
+  lctl.launchProgram('action-plan');
+  check('a second launch raises the SAME window — one Record per program',
+    Object.keys(lctl.snapshot().windows).length === 2 &&
+    lctl.snapshot().active === 'action-plan');
+  check('an unknown program Id launches nothing',
+    lctl.launchProgram('no-such-program') === false &&
+    lctl.hasWindow('no-such-program') === false);
+  lctl.launchProgram('quiz');
+  check('launching Quiz through its shortcut raises the app window and keeps its button',
+    lctl.getState('quiz').mode === 'normal' &&
+    lctl.snapshot().active === 'quiz' &&
+    lrefs.programBtn.hidden === false &&
+    lrefs.programBtn.getAttribute('aria-pressed') === 'true');
+  while (lpending.length) lpending.shift()();
+
+  // The ≤768px layout has no shortcut column, so the put-away gesture is
+  // refused there: hiding a program would drop its button out of the
+  // taskbar (the running-windows-only rule) with nothing left to bring it
+  // back. The taskbar switcher is the only way between programs there.
+  globalThis.matchMedia = function(query) {
+    return {
+      matches: query.indexOf('max-width') >= 0,
+      addEventListener: function() {}, addListener: function() {}
+    };
+  };
+  lctl.render();
+  check('mobile grays a program frame [×] and refuses its put-away',
+    lplan.buttons.close.disabled === true &&
+    lctl.closeProgram('action-plan') === false &&
+    lctl.getState('action-plan').mode === 'normal' &&
+    lplan.taskbarBtn.hidden === false &&
+    lctl.runningPrograms().join(',') === 'quiz,action-plan');
+  check('mobile keeps the Quiz [×] live — it asks the End Program question (#43)',
+    lrefs.buttons.close.disabled === false &&
+    lctl.close() === 'dialog' && lctl.getState().confirmOpen === true);
+  lctl.cancelClose();
+  delete globalThis.matchMedia;
+  lctl.render();
+  while (lpending.length) lpending.shift()();
+  while (ppending.length) ppending.shift()();
 
   // ── System dialog primitive contract ──────────────────────────────────
 
