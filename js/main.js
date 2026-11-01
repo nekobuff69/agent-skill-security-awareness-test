@@ -173,6 +173,17 @@
         });
 
       app.activateBank(data);
+      // The first Bank Variant has landed: the language toggle may swap.
+      if (app.LangSwitch && typeof app.LangSwitch.ready === 'function') {
+        app.LangSwitch.ready();
+      }
+    }, function(err) {
+      showError(t('error.loadBank', { message: err.message }));
+      // A failed first load still leaves a working page to switch away
+      // from — the toggle must not stay disabled behind it.
+      if (app.LangSwitch && typeof app.LangSwitch.ready === 'function') {
+        app.LangSwitch.ready();
+      }
     });
   }
 
@@ -186,6 +197,12 @@
     // assessment content and should not wait on it.
     if (app.LangRouting && typeof app.LangRouting.init === 'function') {
       app.LangRouting.init();
+    }
+    // Instant language switch (#55): capture the page locale, wire
+    // Back/Forward, and prefetch the alternate dictionary and Bank Variant
+    // while the browser is idle.
+    if (app.LangSwitch && typeof app.LangSwitch.start === 'function') {
+      app.LangSwitch.start();
     }
     loadBank();
   });

@@ -246,13 +246,15 @@ body:has(#app > #landing-view:not([hidden])) .os-window {
   text-align: left;
 }
 
-/* ── Tray language toggle (ticket #50) ───────────────────────────────
+/* ── Tray language toggle (tickets #50, #55) ──────────────────────────
 
-   A two-segment sunken tray field naming both languages: the page's own
-   pressed (white field, 1px inset), the declared alternate flat. Both
-   segments run one action (js/shell.js switchLanguage): record the
-   Language Preference, then navigate the declared alternate. Replaces
-   the taskbar clock. */
+   A two-segment sunken tray field naming both languages: the active
+   language pressed (white field, 1px inset), the other flat. Both
+   segments run one action (js/shell.js switchLanguage → js/lang-switch.js):
+   swap the dictionary and Bank Variant in place on the splash and
+   answering screens (#55), recording the Language Preference; other views
+   record it and navigate the declared alternate. Replaces the taskbar
+   clock. */
 
 .os-lang-toggle {
   flex: none;

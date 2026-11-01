@@ -169,7 +169,7 @@ exports.run = function() {
   // Spot-check the id set the UI modules depend on, so a rename in the
   // dictionary surfaces here rather than as a runtime throw.
   var requiredIds = [
-    'doc.title', 'lang.name',
+    'doc.title', 'lang.name', 'lang.switchUnavailable',
     'loading.bank', 'error.loadBank', 'error.retry',
     'landing.headline1', 'landing.headline2', 'landing.titleFallback',
     'landing.body', 'landing.meta',

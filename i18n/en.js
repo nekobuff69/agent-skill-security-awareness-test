@@ -25,6 +25,7 @@
     'lang.offerDismiss': 'Not now',
     'lang.offerTitle': 'Language',
     'lang.selfName': 'EN',
+    'lang.switchUnavailable': 'Switching to {language} isn\'t available right now.',
 
     /* ── Loading & errors ── */
     'loading.bank': 'Loading…',
