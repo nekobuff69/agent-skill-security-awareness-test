@@ -106,7 +106,7 @@
       "levels": {
         "low": "--bevel-sunken: inset -1px -1px #FFFFFF, inset 1px 1px #000000, inset -2px -2px #DFDFDF, inset 2px 2px #808080 (fields, tracks, pressed buttons)",
         "medium": "--bevel-raised: inset -1px -1px #000000, inset 1px 1px #FFFFFF, inset -2px -2px #808080, inset 2px 2px #DFDFDF (buttons, window frames, dialog faces)",
-        "high": "desktop z-ladder: quiz chrome 10 < os-window 0 < taskbar 1000 < start menu 1100 < about/dialog 1200, over dims rgba(0,0,0,0.25)"
+        "high": "desktop z-ladder: os-window 0 < taskbar 1000 < start menu 1100 < about/dialog 1200, over dims rgba(0,0,0,0.25)"
       },
       "depth_cues": "flat layering: background never eases; pressed state flips raised → sunken; taskbar state flips program button sunken/raised"
     },
@@ -134,8 +134,8 @@
       "taskbar (start button + program button + clock tray; pressed-state flip on minimize)",
       "start menu popup and about/system dialog primitive (js/windows.js App.Windows.openSystemDialog: backdrop dims desktop 25%, one dialog at a time, closes only by button/Escape)",
       "boot splash (sunken groove, segmented navy stepped fill, status line)",
-      "quiz chrome (sticky: segmented navy Progress Fill + question counter + phase chip; segmented = repeating gradient trick)",
-      "question card / wizard (sunken scenario field, radiogroup rows with etched dial glyphs, [< Previous] [Next >] / [Finish] row)",
+      "quiz status bar (pinned inside the window, quiz view only: segmented navy Progress Fill + question counter + phase name; segmented = repeating gradient trick)",
+      "question card / wizard (sunken scenario field, radiogroup rows with etched dial glyphs; pinned footer [< Back] [Next >] / [Finish])",
       "title card (results window: navy bar + sunken white client field, percentage in --color-score-*)",
       "risk radar (sunken white field, black-on-white vector chart)",
       "blind-spot bars (sunken dithered track — 1px repeating-conic dither, graphics-only; square dark fills)",

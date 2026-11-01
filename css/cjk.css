@@ -140,10 +140,10 @@ html[lang^="zh-"] #landing-view .meta {
 /* The remaining chips and counters carry wide positive tracking for the same
    Latin-micro-label reason; reset the tracking so a Chinese label is not stranded
    mid-air, but leave text-transform alone since these never declare one. */
-html[lang="zh"] .quiz-chrome-chip,
-html[lang^="zh-"] .quiz-chrome-chip,
-html[lang="zh"] .quiz-chrome-counter,
-html[lang^="zh-"] .quiz-chrome-counter,
+html[lang="zh"] .quiz-status-phase,
+html[lang^="zh-"] .quiz-status-phase,
+html[lang="zh"] .quiz-status-counter,
+html[lang^="zh-"] .quiz-status-counter,
 html[lang="zh"] .quiz-number-chip,
 html[lang^="zh-"] .quiz-number-chip,
 html[lang="zh"] .results-ast-chip,

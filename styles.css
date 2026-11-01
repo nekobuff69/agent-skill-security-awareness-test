@@ -76,7 +76,9 @@ button:hover {
   align-items: flex-start;
   text-align: left;
   flex: 1;
-  padding-top: var(--space-10);
+  /* Tightened for the fixed-height window (ticket #52): this 96px sat
+     under the old 64px #app client padding, which the shell now removes. */
+  padding-top: var(--space-6);
 }
 
 #landing-view h1 {

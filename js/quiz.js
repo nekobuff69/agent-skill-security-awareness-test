@@ -47,35 +47,39 @@
   var currentCard = null; // current visible question card DOM element
   var advancing   = false; // true during a post-answer beat
   var swapPending = false; // true while a wipe swap is queued
-  var backBtnEl   = null; // current Back control ref (absent on Q1)
-  var finishBtnEl = null; // current [Finish] control ref (last card only)
 
   // The single-fire commit gate: the [Finish] click is the ONLY path to
   // Completion (ADR 0020) — the wizard-navigation module owns the guard.
   var commitGate  = app.WizardNav.createCommitGate();
 
-  // Chrome bar DOM refs (built once in renderQuiz)
-  var chromeFill    = null;
-  var chromeCounter = null;
-  var chromeChip    = null;
+  // Pinned quiz-view DOM refs (built once per renderQuiz, ticket #52):
+  // the scroll body, the footer's three wizard buttons, and the status
+  // bar's three panes.
+  var quizBody      = null;
+  var footerBack    = null;
+  var footerNext    = null;
+  var footerFinish  = null;
+  var statusFill    = null;
+  var statusCounter = null;
+  var statusPhase   = null;
 
-  /* ── Chrome bar: progress + counter + phase chip ─────────────────── */
+  /* ── Status bar: phase + Progress Fill + Question Counter ───────────── */
 
-  function updateChrome() {
-    if (!chromeFill || !chromeCounter || !chromeChip) return;
+  function updateStatusBar() {
+    if (!statusFill || !statusCounter || !statusPhase) return;
 
-    // Fill: answered / total
+    // Fill: answered / total (never position).
     var answered = 0;
     for (var i = 0; i < answers.length; i++) {
       if (answers[i] !== null) answered++;
     }
     var pct = (answered / questions.length) * 100;
-    chromeFill.style.width = pct + '%';
+    statusFill.style.width = pct + '%';
 
-    // Counter: 1-indexed question currently being viewed
-    chromeCounter.textContent = (currentIdx + 1) + ' / ' + questions.length;
+    // Counter: 1-indexed question currently being viewed.
+    statusCounter.textContent = (currentIdx + 1) + ' / ' + questions.length;
 
-    // Phase chip: swap text in place — never append
+    // Phase: swap text in place — never append.
     var q = questions[currentIdx];
     var data = null;
     for (var p = 0; p < phases.length; p++) {
@@ -86,7 +90,7 @@
       if (phases[c].id === q.phase) { chipNum = c + 1; break; }
     }
     if (data) {
-      chromeChip.textContent = t('quiz.phaseChip', { number: chipNum, title: data.title });
+      statusPhase.textContent = t('quiz.phaseChip', { number: chipNum, title: data.title });
     }
   }
 
@@ -103,9 +107,9 @@
     swapPending = false;
     var q = questions[idx];
     var view = byId('quiz-view');
-    if (!view) return;
+    if (!view || !quizBody) return;
 
-    updateChrome();
+    updateStatusBar();
 
     // Remove previous card
     if (currentCard && currentCard.parentNode) {
@@ -183,45 +187,17 @@
 
     card.appendChild(optsWrap);
 
-    // ── Wizard button row: [< Back] [Next >], [Finish] on the last card ──
-    var navRow = makeEl('div', 'quiz-wizard-row');
+    // ── Pinned window footer (ticket #52): the wizard actions live in
+    //    .quiz-footer, built once per run (buildView); only their state
+    //    changes per card — Back disabled on the first Question, [Next]
+    //    hidden on the last, [Finish] enabled only when every Question
+    //    has an Option selected (the single path to Completion, ADR 0020).
+    footerBack.disabled = (idx === 0);
+    footerNext.hidden = app.WizardNav.isLast(questions.length, idx);
+    footerFinish.disabled = !(app.WizardNav.isLast(questions.length, idx) &&
+                              app.WizardNav.canFinish(answers));
 
-    if (idx > 0) {
-      var backBtn = makeEl('button', 'quiz-wizard-btn', t('wizard.back'));
-      backBtn.type = 'button';
-      backBtn.addEventListener('click', function() {
-        gotoQuestion(app.WizardNav.prev(questions.length, idx).index);
-      });
-      navRow.appendChild(backBtn);
-      backBtnEl = backBtn;
-    } else {
-      backBtnEl = null;
-    }
-
-    if (app.WizardNav.isLast(questions.length, idx)) {
-      // [Finish] replaces [Next] and is enabled iff every Question has an
-      // Option selected. It is the only path to Completion (ADR 0020).
-      var finishBtn = makeEl('button', 'quiz-wizard-btn quiz-finish-btn', t('wizard.finish'));
-      finishBtn.type = 'button';
-      if (!app.WizardNav.canFinish(answers)) finishBtn.disabled = true;
-      finishBtn.addEventListener('click', function() {
-        finishQuiz();
-      });
-      navRow.appendChild(finishBtn);
-      finishBtnEl = finishBtn;
-    } else {
-      var nextBtn = makeEl('button', 'quiz-wizard-btn', t('wizard.next'));
-      nextBtn.type = 'button';
-      nextBtn.addEventListener('click', function() {
-        gotoQuestion(app.WizardNav.next(questions.length, idx).index);
-      });
-      navRow.appendChild(nextBtn);
-      finishBtnEl = null;
-    }
-
-    card.appendChild(navRow);
-
-    view.appendChild(card);
+    quizBody.appendChild(card);
     currentCard = card;
 
     // Client-area wipe-in (ADR 0020); instant under reduced motion.
@@ -284,7 +260,7 @@
     // (ADR 0017); the Session save stays silent.
     answers[qIdx] = decision.answer;
     persist();
-    updateChrome();
+    updateStatusBar();
     syncOptionRows(decision.answer);
 
     // System sound (ticket #41): a mark is a mark — first fill and
@@ -295,17 +271,18 @@
       // Re-mark on a revisit, or the first fill of the last Question.
       // Either way the card does not move — picks are free until commit.
       if (decision.finishReady) {
-        // The Progress Fill just hit 100%: enable [Finish], hold the
+        // The Progress Fill just hit 100%: enable [Finish] iff every
+        // Question now has an Option selected (ADR 0020), hold the
         // designed beat, then focus it. Completion stays the click.
-        if (finishBtnEl) {
-          finishBtnEl.disabled = false;
-          advancing = true;
-          var finishBtn = finishBtnEl;
-          setTimeout(function() {
-            advancing = false;
-            // Identity guard: the Participant may have moved on already.
-            if (finishBtn === finishBtnEl) finishBtn.focus();
-          }, reducedMotion() ? 0 : FINISH_BEAT_MS);
+        if (footerFinish) {
+          footerFinish.disabled = !app.WizardNav.canFinish(answers);
+          if (!footerFinish.disabled) {
+            advancing = true;
+            setTimeout(function() {
+              advancing = false;
+              footerFinish.focus();
+            }, reducedMotion() ? 0 : FINISH_BEAT_MS);
+          }
         }
       }
       return;
@@ -359,13 +336,73 @@
     if (!view) return;
 
     var n = makeEl('div', 'quiz-notice', text);
-    view.appendChild(n);
+    // Inside the scroll body, above the card (ticket #52).
+    if (quizBody) quizBody.insertBefore(n, quizBody.firstChild);
+    else view.appendChild(n);
 
     // System sound (ticket #41): the low buzz marks the banner's arrival.
     if (app.Sound) app.Sound.play('buzz');
     setTimeout(function() {
       if (n.parentNode) n.parentNode.removeChild(n);
     }, 4000);
+  }
+
+  /* ── View scaffolding (ticket #52) ────────────────────────────────────
+
+     Built once per renderQuiz and reused across every card swap: a
+     scrollable .quiz-body, a pinned .quiz-footer carrying the three
+     wizard actions, and a .quiz-statusbar whose panes update in place
+     (phase left; segmented fill + counter right). The status bar lives
+     inside #quiz-view, so it exists only while the answering screen is
+     shown. */
+
+  function buildView(view) {
+    quizBody = makeEl('div', 'quiz-body');
+    view.appendChild(quizBody);
+
+    var footer = makeEl('div', 'quiz-footer');
+
+    footerBack = makeEl('button', 'quiz-wizard-btn', t('wizard.back'));
+    footerBack.type = 'button';
+    footerBack.disabled = true;   // until renderQuestion proves otherwise
+    footerBack.addEventListener('click', function() {
+      gotoQuestion(app.WizardNav.prev(questions.length, currentIdx).index);
+    });
+    footer.appendChild(footerBack);
+
+    footerNext = makeEl('button', 'quiz-wizard-btn', t('wizard.next'));
+    footerNext.type = 'button';
+    footerNext.addEventListener('click', function() {
+      gotoQuestion(app.WizardNav.next(questions.length, currentIdx).index);
+    });
+    footer.appendChild(footerNext);
+
+    footerFinish = makeEl('button', 'quiz-wizard-btn quiz-finish-btn', t('wizard.finish'));
+    footerFinish.type = 'button';
+    footerFinish.disabled = true;
+    footerFinish.addEventListener('click', function() {
+      finishQuiz();
+    });
+    footer.appendChild(footerFinish);
+
+    view.appendChild(footer);
+
+    var statusbar = makeEl('div', 'quiz-statusbar');
+
+    statusPhase = makeEl('div', 'quiz-status-field quiz-status-phase');
+    statusbar.appendChild(statusPhase);
+
+    var progress = makeEl('div', 'quiz-status-field quiz-status-progress');
+    var track = makeEl('div', 'quiz-status-track');
+    statusFill = makeEl('div', 'quiz-status-fill');
+    track.appendChild(statusFill);
+    progress.appendChild(track);
+
+    statusCounter = makeEl('span', 'quiz-status-counter');
+    progress.appendChild(statusCounter);
+    statusbar.appendChild(progress);
+
+    view.appendChild(statusbar);
   }
 
   /* ── renderQuiz (public) ─────────────────────────────────────────── */
@@ -379,35 +416,21 @@
     currentCard = null;
     advancing   = false;
     swapPending = false;
-    backBtnEl   = null;
-    finishBtnEl = null;
     commitGate.reset();   // a new run is a new commit opportunity
-    chromeFill = null;
-    chromeCounter = null;
-    chromeChip = null;
+    quizBody      = null;
+    footerBack    = null;
+    footerNext    = null;
+    footerFinish  = null;
+    statusFill    = null;
+    statusCounter = null;
+    statusPhase   = null;
 
     var view = byId('quiz-view');
     if (!view) return;
     view.innerHTML = '';
 
-    // ── Sticky chrome bar: progress + counter + phase chip ──
-    var chrome = makeEl('div', 'quiz-chrome');
-
-    // Progress track + fill
-    var track = makeEl('div', 'quiz-chrome-track');
-    chromeFill = makeEl('div', 'quiz-chrome-fill');
-    track.appendChild(chromeFill);
-    chrome.appendChild(track);
-
-    // Counter: "N / 20"
-    chromeCounter = makeEl('span', 'quiz-chrome-counter');
-    chrome.appendChild(chromeCounter);
-
-    // Phase chip: "Phase 1 · Should I Install This?"
-    chromeChip = makeEl('span', 'quiz-chrome-chip');
-    chrome.appendChild(chromeChip);
-
-    view.appendChild(chrome);
+    // ── Pinned view: body + footer + status bar (ticket #52) ──
+    buildView(view);
 
     // Session resume — one Session per Participant, shared by every Bank
     // Variant, so a Participant who switches language mid-assessment returns
