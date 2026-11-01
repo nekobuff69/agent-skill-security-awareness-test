@@ -45,6 +45,22 @@
    * Crossing the 768px boundary re-renders the controls via a matchMedia
    * change listener, so [□] re-enables at desktop widths.
    *
+   * Desktop regime (ticket #60): on the results and review stages the Quiz
+   * program IS a positioned window — the frame moves and sizes with the
+   * core's Geometry, drags by its title bar and resizes from a bottom-right
+   * corner grip. Landing and quiz keep the layout-flow regime (the desktop
+   * does not exist before the Finish Commit). Every geometry write goes
+   * through the core's applyGeometry, which refuses maximized windows; the
+   * controller adds the two refusals the viewport-blind core must never
+   * model: the mobile layout (≤768px, ticket #46) and clamping — a minimum
+   * size that keeps the score header readable, and a title bar that can
+   * never be dragged fully under the taskbar. Close on this stage is the
+   * core's hide(): the window leaves the screen, the bare desktop and the
+   * taskbar stay, and the program button brings it back (hidden and
+   * minimized alike) — no End Program dialog for a gesture that only puts
+   * the window away. Flow stages keep the dialog exactly as ticket #43
+   * built it.
+   *
    * Layering: js/desktop-core.js is the pure transition table (no DOM, no
    * timers, fully headless-testable). create() wraps it with the DOM
    * rendering (button disabled states, trace classes, program-button bevel)
@@ -125,6 +141,9 @@
       confirmClose: core.confirmClose,
       cancelClose: core.cancelClose,
       applyGeometry: core.applyGeometry,
+      /** The Record's current Geometry — a fresh copy (ticket #60: the
+       *  controller paints and clamps it, the core owns it). */
+      geometry: function() { return core.windowSnapshot(core.soleId).geometry; },
       setView: core.setView,
       setActive: core.setActive,
       raise: core.raise,
@@ -177,6 +196,63 @@
     }
   }
 
+  // ── Desktop regime (ticket #60) ──────────────────────────────────────
+
+  /**
+   * The windowed views (spec #58): the Quiz program's finished work. On
+   * these the frame is positioned by the core's Geometry and can be
+   * dragged and resized; the landing and quiz views keep the layout-flow
+   * regime — the desktop does not exist before the Finish Commit.
+   */
+  var WINDOWED_VIEWS = { 'results-view': true, 'review-view': true };
+
+  /**
+   * Chrome metrics the clamping mirrors from css/shell.css: the taskbar
+   * and title-bar heights are those tokens' DESKTOP values (the ≤768px
+   * mobile values never reach the clamp — the controller refuses geometry
+   * on that layout, and the core itself stays viewport-blind).
+   */
+  var TASKBAR_H = 36;      // --os-taskbar-height
+  var TITLEBAR_H = 30;     // --os-titlebar-height
+
+  /**
+   * Minimum window size: the merged header panel (Progression Title +
+   * Overall Percentage) plus one section heading must stay readable — the
+   * 360×320 floor keeps the score header and its caption on screen at the
+   * skin's body sizes. A window can never be resized below this.
+   */
+  var MIN_W = 360;
+  var MIN_H = 320;
+
+  /**
+   * Reachability rule: a strip of the title bar (the drag handle) must
+   * always stay on the desktop — horizontally at least this much of it,
+   * vertically its whole height above the taskbar.
+   */
+  var TITLE_REACH = 60;
+
+  function isWindowedView(view) {
+    return !!WINDOWED_VIEWS[view];
+  }
+
+  /**
+   * Clamp a Geometry to the desktop: the size floor and ceiling, the
+   * title-bar reachability, and the ban on dragging the window fully
+   * under the taskbar. Pure — the controller owns the viewport reading
+   * (the core must never learn about it, desktop-core header).
+   */
+  function clampGeometry(g, vp) {
+    var desktopH = vp.height - vp.taskbar;
+    var w = Math.max(MIN_W, Math.min(g.w, vp.width));
+    var h = Math.max(MIN_H, Math.min(g.h, desktopH));
+    return {
+      x: Math.max(TITLE_REACH - w, Math.min(g.x, vp.width - TITLE_REACH)),
+      y: Math.max(0, Math.min(g.y, desktopH - TITLEBAR_H)),
+      w: w,
+      h: h
+    };
+  }
+
   // ── Controller: core + rendering ─────────────────────────────────────
 
   /**
@@ -185,8 +261,13 @@
    *             DOM before rendering; optional in pure-state tests
    *   schedule  fn(fn, ms) — injected so headless tests run traces
    *             synchronously; defaults to setTimeout
+   *   viewport  fn() → { width, height, taskbar } — the desktop metrics
+   *             the drag/resize clamp reads (ticket #60); defaults to the
+   *             live window.innerWidth/innerHeight with the CSS taskbar
+   *             height, and headless tests inject their own
    * attach(refs) supplies the built shell DOM:
-   *   windowEl, programBtn, buttons {minimize, maximize, close}
+   *   windowEl, titleBar, resizeGrip, programBtn,
+   *   buttons {minimize, maximize, close}
    */
   function create(deps) {
     deps = deps || {};
@@ -213,6 +294,54 @@
       if (visible && visible.id) machine.setView(visible.id);
     }
 
+    /**
+     * Viewport metrics for the clamp: the desktop area the window lives
+     * in. Injected through deps.viewport for headless tests; live pages
+     * read window.innerWidth/innerHeight. Absent metrics (headless with no
+     * injection) fall back to no clamp ceiling — the min-size floor and
+     * the title-bar reach still apply against the fallback viewport.
+     */
+    function viewport() {
+      if (typeof deps.viewport === 'function') return deps.viewport();
+      var w = typeof global.innerWidth === 'number' ? global.innerWidth : 1024;
+      var h = typeof global.innerHeight === 'number' ? global.innerHeight : 768;
+      return { width: w, height: h, taskbar: TASKBAR_H };
+    }
+
+    /** The windowed regime: results/review at a desktop viewport. */
+    function isWindowed() {
+      return isWindowedView(machine.getState().view) && !mobileMaximized();
+    }
+
+    /**
+     * Paint the frame from the core's Geometry (ticket #60). The class is
+     * the layout-regime switch (css/shell.css positions the frame only
+     * with .is-windowed); the inline styles carry the numbers. Flow views
+     * and the mobile layout keep the frame exactly as tickets #52/#53/#46
+     * draw it — no inline geometry at all.
+     */
+    function paintGeometry(state) {
+      if (!dom || !dom.windowEl || !dom.windowEl.style) return;
+      var win = dom.windowEl;
+      if (state.mode === 'hidden') win.classList.add('is-hidden');
+      else win.classList.remove('is-hidden');
+      var positioned = isWindowed() && state.mode === 'normal';
+      if (!positioned) {
+        win.classList.remove('is-windowed');
+        win.style.left = '';
+        win.style.top = '';
+        win.style.width = '';
+        win.style.height = '';
+        return;
+      }
+      win.classList.add('is-windowed');
+      var g = clampGeometry(machine.geometry(), viewport());
+      win.style.left = g.x + 'px';
+      win.style.top = g.y + 'px';
+      win.style.width = g.w + 'px';
+      win.style.height = g.h + 'px';
+    }
+
     function render() {
       syncView();
       var state = machine.getState();
@@ -229,6 +358,7 @@
           // The drawn form comes from the core's mode, never a local copy.
           if (state.mode === 'maximized') dom.windowEl.classList.add('is-maximized');
           else dom.windowEl.classList.remove('is-maximized');
+          paintGeometry(state);
         }
         if (dom.programBtn) {
           // Pressed = the window is on the desktop; the core derives that
@@ -290,6 +420,18 @@
       return true;
     }
 
+    /**
+     * Close on the desktop stage (ticket #60): the core's hide() — the
+     * window leaves the screen, the bare desktop and taskbar stay, and the
+     * arrangement is exactly what restore() comes back to. No dialog: the
+     * gesture puts the window away, it never ends the program's work.
+     */
+    function hide() {
+      if (!machine.hide()) return false;
+      render();
+      return true;
+    }
+
     function confirmClose() {
       if (!machine.confirmClose()) return false;
       render();
@@ -300,6 +442,123 @@
       if (!machine.cancelClose()) return false;
       render();
       return true;
+    }
+
+    /**
+     * The [×] decision, in ONE place: 'hidden' when the windowed stage put
+     * the window away, 'dialog' when a flow stage asked for the End Program
+     * confirmation, false when the gesture was refused (the disabled
+     * button never reaches this). js/shell.js opens the dialog on 'dialog'.
+     */
+    function close() {
+      syncView();   // the decision follows what is actually on screen
+      if (isWindowedView(machine.getState().view)) {
+        return hide() ? 'hidden' : false;
+      }
+      return requestClose() ? 'dialog' : false;
+    }
+
+    // ── Geometry writes + pointer drag/resize (ticket #60) ─────────────
+
+    /**
+     * The controller's geometry write: refuse the mobile layout (the
+     * viewport-blind core never models it — ticket #46's rule), clamp to
+     * the desktop, then hand the clamped Geometry to the core, which
+     * refuses maximized/minimized/hidden windows and a dialog that owns
+     * the desktop. Paint only on a successful write.
+     */
+    function applyGeometry(geometry) {
+      if (!isWindowed()) return false;
+      var clamped = clampGeometry(geometry, viewport());
+      if (!machine.applyGeometry(clamped)) return false;
+      render();
+      return true;
+    }
+
+    /** The Geometry the core holds — fresh copy. */
+    function geometry() {
+      return machine.geometry();
+    }
+
+    /**
+     * One live gesture: 'move' (title bar) or 'resize' (corner grip), with
+     * the pointer id and the Geometry the gesture started from — deltas
+     * are always measured against that origin, never against a clamped
+     * intermediate, so dragging into a wall and back stays true.
+     */
+    var drag = null;
+
+    function beginDrag(kind, ev, handle) {
+      if (!isWindowed()) return false;
+      // A secondary pointer (the second finger of a pinch) never hijacks a
+      // live gesture; a new primary gesture replaces a stale one, which is
+      // what a dropped pointerup leaves behind when pointer capture is
+      // unavailable.
+      if (drag && ev && ev.isPrimary === false) return false;
+      if (!ev || (ev.button != null && ev.button !== 0)) return false;
+      if (machine.getState().mode !== 'normal') return false;
+      drag = {
+        kind: kind,
+        pointerId: ev.pointerId,
+        startX: ev.clientX,
+        startY: ev.clientY,
+        origin: machine.geometry()
+      };
+      // Capture keeps the move/up stream on the handle even when the
+      // pointer runs off the title bar or the window edge.
+      if (handle && ev.pointerId !== undefined &&
+          typeof handle.setPointerCapture === 'function') {
+        try { handle.setPointerCapture(ev.pointerId); } catch (e) { /* no capture */ }
+      }
+      if (dom && dom.windowEl && dom.windowEl.classList) {
+        dom.windowEl.classList.add(kind === 'move' ? 'is-dragging' : 'is-resizing');
+      }
+      return true;
+    }
+
+    function moveDrag(ev) {
+      if (!drag || (ev && ev.pointerId !== undefined && ev.pointerId !== drag.pointerId)) {
+        return false;
+      }
+      var dx = ev.clientX - drag.startX;
+      var dy = ev.clientY - drag.startY;
+      var o = drag.origin;
+      var next = drag.kind === 'move'
+        ? { x: o.x + dx, y: o.y + dy, w: o.w, h: o.h }
+        : { x: o.x, y: o.y, w: o.w + dx, h: o.h + dy };
+      return applyGeometry(next);
+    }
+
+    function endDrag(ev) {
+      if (!drag || (ev && ev.pointerId !== undefined && ev.pointerId !== drag.pointerId)) {
+        return false;
+      }
+      drag = null;
+      if (dom && dom.windowEl && dom.windowEl.classList) {
+        dom.windowEl.classList.remove('is-dragging');
+        dom.windowEl.classList.remove('is-resizing');
+      }
+      return true;
+    }
+
+    /** A control button inside the title bar is not a drag handle. */
+    function isTitleBarControl(ev) {
+      var t = ev && ev.target;
+      return !!(t && typeof t.closest === 'function' && t.closest('.os-titlebar-btn'));
+    }
+
+    /** Wire one gesture source: down starts, move drags, up/cancel ends. */
+    function wireDragHandle(el, kind) {
+      if (!el) return;
+      on(el, 'pointerdown', function(ev) {
+        if (isTitleBarControl(ev)) return;
+        if (beginDrag(kind, ev, el) && ev && typeof ev.preventDefault === 'function') {
+          ev.preventDefault();
+        }
+      });
+      on(el, 'pointermove', moveDrag);
+      on(el, 'pointerup', endDrag);
+      on(el, 'pointercancel', endDrag);
     }
 
     var controller = {
@@ -318,6 +577,13 @@
       requestClose: requestClose,
       confirmClose: confirmClose,
       cancelClose: cancelClose,
+      hide: hide,
+      close: close,
+      // The desktop regime (ticket #60): geometry through the core, plus
+      // the controller's view/viewport decision.
+      applyGeometry: applyGeometry,
+      geometry: geometry,
+      isWindowed: isWindowed,
       setView: function(view) { machine.setView(view); return render(); },
       render: render,
 
@@ -329,14 +595,22 @@
           dom.windowEl.setAttribute('tabindex', '-1');
         }
         if (dom && dom.programBtn) {
-          // Clicking the program button restores a minimized window (the
-          // era's restore path); otherwise it just refocuses this window.
-          // "In the taskbar but not on the desktop" is the core's derived
-          // reading of minimized — no mode string compared here.
+          // The program button is the way back: it restores a minimized
+          // window (the era's taskbar path, ticket #43) AND a hidden one
+          // (ticket #60 — close on the desktop stage is hide(), so this is
+          // the gesture that brings the window back). Not visible = exactly
+          // those two modes; the core's restore() refuses every other, so
+          // a click on a visible window stays a no-op refocus.
           on(dom.programBtn, 'click', function() {
-            if (machine.inTaskbar() && !machine.isVisible()) controller.restore();
+            if (!machine.isVisible()) controller.restore();
           });
         }
+        // Desktop regime (ticket #60): the title bar drags the window and
+        // the corner grip resizes it, both through applyGeometry → the
+        // core. On the flow views and the mobile layout beginDrag refuses;
+        // while maximized the core itself refuses the write.
+        wireDragHandle(dom && dom.titleBar, 'move');
+        wireDragHandle(dom && dom.resizeGrip, 'resize');
         // View changes (App.showView flips section[hidden]) re-render the
         // button gating: landing draws [×][□] gray, every other view live.
         // Observer, not a showView patch — js/main.js stays read-only.
@@ -530,7 +804,17 @@
     openSystemDialog: openSystemDialog,
     isDialogOpen: function() { return activeDialog !== null; },
     VIEW_LANDING: VIEW_LANDING,
-    TRACE_MS: TRACE_MS
+    TRACE_MS: TRACE_MS,
+    // Desktop regime (ticket #60): the clamp and the view set, exposed for
+    // the headless tests (the controller drives them through the core).
+    WINDOWED_VIEWS: WINDOWED_VIEWS,
+    isWindowedView: isWindowedView,
+    clampGeometry: clampGeometry,
+    MIN_W: MIN_W,
+    MIN_H: MIN_H,
+    TITLEBAR_H: TITLEBAR_H,
+    TASKBAR_H: TASKBAR_H,
+    TITLE_REACH: TITLE_REACH
   };
 
   if (typeof module !== 'undefined') module.exports = app.Windows;

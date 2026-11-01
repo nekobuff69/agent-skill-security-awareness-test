@@ -118,6 +118,72 @@ body:has(#app > #landing-view:not([hidden])) .os-window {
   margin: 0;
 }
 
+/* ── Desktop regime (ticket #60) ──────────────────────────────────────
+
+   On the results and review views the frame becomes a positioned window:
+   the controller (js/windows.js) adds .is-windowed and paints the core's
+   Geometry inline (left/top/width/height). Landing and quiz keep the
+   layout-flow frame above — the desktop does not exist before the Finish
+   Commit. The z ladder is untouched: the fixed taskbar (1000) still paints
+   over the window, exactly like the era's always-on-top bar. */
+
+.os-window.is-windowed {
+  position: fixed;   /* desktop coordinates, taskbar excluded by the clamp */
+  margin: 0;
+  max-width: none;
+  height: auto;      /* the inline Geometry IS the height */
+}
+
+/* The title bar is the drag handle while the window is a window: no text
+   selection under the pointer, and no browser scroll gesture stealing it
+   on touch. The buttons keep their own cursor. */
+.os-window.is-windowed .os-titlebar {
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+}
+
+/* Bottom-right corner grip (js/shell.js builds it; the controller resizes
+   through it). Shown only in the regime — on the flow views and on the
+   mobile layout there is nothing to grab. The dithered diagonal is the
+   era's sizing box, drawn with gradients, no image asset (ADR 0001). */
+.os-resize-grip {
+  display: none;
+}
+
+.os-window.is-windowed .os-resize-grip {
+  display: block;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  touch-action: none;
+  user-select: none;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--color-secondary) 0 1px,
+    var(--color-face) 1px 2px,
+    var(--color-surface) 2px 3px,
+    var(--color-face) 3px 4px
+  );
+}
+
+/* Live gesture: the bevel reads pressed while the Participant drags or
+   sizes (no text is selectable under the pointer either way). */
+.os-window.is-dragging .os-titlebar,
+.os-window.is-resizing .os-resize-grip {
+  filter: brightness(0.96);
+}
+
+/* A closed window is off the desktop (core hide(), ticket #60): no frame,
+   no client area — the bare teal desktop and the taskbar stay, and the
+   program button is the way back. */
+.os-window.is-hidden {
+  display: none;
+}
+
 /* ── Title bar ─────────────────────────────────────────────────────────
 
    Navy → lighter blue gradient, exactly like the Quiz Card header drawn in
@@ -583,6 +649,19 @@ body:has(#app > #landing-view:not([hidden])) .os-window {
     margin: 0;
     box-shadow: none;
     overflow: hidden;
+  }
+
+  /* The desktop regime (ticket #60) is a desktop-width presentation: the
+     controller never paints Geometry here, and the corner grip stays hidden
+     with it. Restated at mobile specificity so a class that outlives a
+     viewport crossing can never leave a half-positioned frame. */
+  .os-window.is-windowed {
+    inset: 0 0 var(--os-taskbar-height) 0;
+    max-width: none;
+  }
+
+  .os-window.is-windowed .os-resize-grip {
+    display: none;
   }
 
   .os-window #app {

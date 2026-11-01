@@ -115,14 +115,13 @@
     'wizard.next': 'Next >',
     'wizard.finish': 'Finish',
 
-    /* ── Results Title Card (ticket #45) ──
+    /* ── Results header (ticket #45, re-rendered by #60) ──
        Section headings and panel copy resolve from the results.* ids above;
-       these are the retro additions: the Overall caption and the drawn,
-       DISABLED [—][□][×] aria-labels of the Title Card title bar. */
+       this is the retro addition: the Overall caption of the window's first
+       body panel. The fake Title Card's drawn [—][□][×] aria-labels left
+       with the fake chrome (#60) — the real title bar speaks through the
+       shell.* strings. */
     'results.overall': 'Overall',
-    'results.titleBtnMin': 'Minimize',
-    'results.titleBtnMax': 'Maximize',
-    'results.titleBtnClose': 'Close',
 
     /* ── AST Risk names (ADR-0013: ids and severities stay in js/ast.js) ── */
     'ast.AST01': 'Malicious Skills',

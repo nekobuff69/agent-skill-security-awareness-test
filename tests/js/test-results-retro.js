@@ -65,11 +65,6 @@ exports.run = function() {
   require('../../js/ast.js');
   var AST = globalThis.App.AST;
 
-  // shell.js first — the page order — because the Title Card draws from
-  // App.Shell.TITLE_BAR_GLYPHS (#49), the one glyph table both windows use.
-  require('../../js/shell.js');
-  var Shell = globalThis.App.Shell;
-
   var Results = require('../../js/results.js');
   check('module loads headless and exposes the internals seam',
     Results && Results.resultsInternals &&
@@ -82,12 +77,20 @@ exports.run = function() {
   var overallEn = I18n.t('results.overall');
   I18n.use('zh');
   var overallZh = I18n.t('results.overall');
-  var minZh = I18n.t('results.titleBtnMin');
   I18n.use('en');
   check('results.* retro ids resolve in en and zh',
-    overallEn === 'Overall' && overallZh === '总分' && minZh === '最小化',
-    overallEn + '/' + overallZh + '/' + minZh);
-  check('title-button ids resolve in en', I18n.t('results.titleBtnMax') === 'Maximize');
+    overallEn === 'Overall' && overallZh === '总分',
+    overallEn + '/' + overallZh);
+  // Ticket #60: the fake Title Card's [—][□][×] aria-labels left with the
+  // fake chrome; asking for one must throw in BOTH dictionaries.
+  var btnGone = 0;
+  ['en', 'zh'].forEach(function(locale) {
+    I18n.use(locale);
+    try { I18n.t('results.titleBtnMin'); } catch (e) { btnGone++; }
+  });
+  I18n.use('en');
+  check('the retired Title Card button ids are gone from both dictionaries',
+    btnGone === 2, String(btnGone));
 
   // ── Synthetic report (structure only — scoring fixtures live elsewhere) ─
   var pcts = [33, 50, 62, 70, 74, 81, 88, 92, 96, 100];
@@ -200,53 +203,32 @@ exports.run = function() {
     }),
     'dots=' + dotFills.length);
 
-  // ══ Title Card window idiom ═════════════════════════════════════════════
+  // ══ Results header panel (ticket #60: the window's first body panel) ═══
 
-  var frag = internals.buildTitleCard(report);
-  var win = frag.children[0];
-  check('title card renders as a window frame',
-    classOf(win) === 'results-title-window', classOf(win));
-  var bar = win.children[0];
-  var client = win.children[1];
-  check('title bar reuses the shell .os-titlebar idiom',
-    classOf(bar).indexOf('os-titlebar') >= 0, classOf(bar));
-  var titleText = bar.children[0];
-  check('title bar carries the Progression Title emoji + name',
-    classOf(titleText).indexOf('os-titlebar-title') >= 0 &&
-    titleText.textContent === 'X Sentinel',
-    titleText.textContent);
-  var buttons = bar.children[1];
-  var btnEls = buttons.children;
-  check('drawn DISABLED [—][□][×] marks with data-os-button hooks (shell parity)',
-    btnEls.length === 3 &&
-    btnEls.every(function(b) { return b.disabled === true; }) &&
-    btnEls[0].attrs['data-os-button'] === 'minimize' &&
-    btnEls[1].attrs['data-os-button'] === 'maximize' &&
-    btnEls[2].attrs['data-os-button'] === 'close' &&
-    btnEls.every(function(b) { return classOf(b).indexOf('os-titlebar-btn') >= 0; }));
-  check('title-bar buttons carry localized aria-labels',
-    btnEls[0].attrs['aria-label'] === 'Minimize' && btnEls[2].attrs['aria-label'] === 'Close',
-    btnEls[0].attrs['aria-label'] + '/' + btnEls[2].attrs['aria-label']);
-  // #49: the card draws the shell's glyph table verbatim — 6×2 bar, 9×9
-  // outlined square, 8×7 cross, currentColor-painted — so the program
-  // window and this card can never render differently.
-  check('title-card buttons draw the shell glyph table verbatim (both windows identical)',
-    btnEls.every(function(b) {
-      var action = b.attrs['data-os-button'];
-      return typeof b.innerHTML === 'string' &&
-        b.innerHTML === Shell.TITLE_BAR_GLYPHS[action] &&
-        b.innerHTML.indexOf('<svg') === 0 &&
-        b.innerHTML.indexOf('class="tb-glyph"') >= 0 &&
-        b.innerHTML.indexOf('fill="currentColor"') >= 0;
-    }));
-  check('client field keeps the .results-title-card class (skin paints it)',
-    classOf(client).indexOf('results-title-card') >= 0, classOf(client));
-  check('client shows the Overall caption + percentage with the band class',
-    client.children[0].textContent === 'Overall' &&
-    client.children[1].textContent === '62%' &&
-    classOf(client.children[1]).indexOf(internals.scoreClass(report.percentage)) >= 0,
-    client.children[0].textContent + '/' + client.children[1].textContent +
-    '/' + classOf(client.children[1]));
+  var header = internals.buildResultsHeader(report);
+  check('the header is the sunken client field itself — no fake window frame',
+    classOf(header) === 'results-title-card', classOf(header));
+  check('the Progression Title (emoji + name) leads the body panel',
+    classOf(header.children[0]).indexOf('results-title-name') >= 0 &&
+    header.children[0].textContent === 'X Sentinel',
+    classOf(header.children[0]) + '/' + header.children[0].textContent);
+  check('the Overall caption + percentage follow with the band class',
+    header.children[1].textContent === 'Overall' &&
+    header.children[2].textContent === '62%' &&
+    classOf(header.children[2]).indexOf(internals.scoreClass(report.percentage)) >= 0,
+    header.children[1].textContent + '/' + header.children[2].textContent +
+    '/' + classOf(header.children[2]));
+  // The fake chrome is gone: no title-bar row, no reuse of the shell's
+  // .os-titlebar* classes, no second set of [—][□][×] anywhere. These
+  // assertions REPLACE the ones that pinned the three disabled glyphs —
+  // the real frame (js/shell.js + js/windows.js) owns the only title bar.
+  var barNodes = walk(header, 'div').concat(walk(header, 'button')).filter(function(n) {
+    return classOf(n).indexOf('os-titlebar') >= 0 ||
+      String(n.attrs['data-os-button'] || '').length > 0;
+  });
+  check('the header renders no title bar and no title-bar buttons',
+    barNodes.length === 0 && header.children.length === 3,
+    'chrome nodes=' + barNodes.length);
 
   // ══ Blind-Spot Bars: weakest-first, full localized names ════════════════
 
@@ -409,9 +391,12 @@ exports.run = function() {
   check('blind-spot fills are segmented blocks with a reduced-motion gate',
     css.indexOf('repeating-linear-gradient') >= 0 &&
     /prefers-reduced-motion: reduce\) \{\s*\.results-bar-fill \{\s*transition: none/.test(css));
-  check('title window + nested panels carry Win95 bevels (no radii)',
-    /\.results-title-window \{[^}]*box-shadow: var\(--bevel-raised\)/.test(css) &&
-    /\.results-action-item \{[^}]*box-shadow: var\(--bevel-raised\)/.test(css));
+  // Ticket #60: the header panel is the window's sunken client field — the
+  // raised frame belongs to the real shell window, not to a nested fake.
+  check('header panel + nested panels carry Win95 bevels (no radii)',
+    /\.results-title-card \{[^}]*box-shadow: var\(--bevel-sunken\)/.test(css) &&
+    /\.results-action-item \{[^}]*box-shadow: var\(--bevel-raised\)/.test(css) &&
+    css.indexOf('.results-title-window') < 0);
 
   // ══ PNG export pipeline: params unchanged for the data ══════════════════
 

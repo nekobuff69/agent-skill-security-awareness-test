@@ -220,9 +220,12 @@ exports.run = function() {
   check('toggleMaximize again removes it',
     ctl.getState().mode === 'normal' && !refs.windowEl.classList.contains('is-maximized'));
 
-  // Confirm from quiz → landing gating re-rendered.
-  ctl.setView('results-view');
-  ctl.requestClose();
+  // The End Program dialog path belongs to a FLOW stage (ticket #60 took it
+  // off results/review, where [×] puts the window away): confirm from quiz →
+  // landing gating re-rendered.
+  ctl.setView('quiz-view');
+  check('close on a flow stage routes to the End Program dialog',
+    ctl.close() === 'dialog' && ctl.getState().confirmOpen === true);
   check('requestClose renders every button disabled while the dialog owns the desktop',
     refs.buttons.minimize.disabled === true && refs.buttons.maximize.disabled === true &&
     refs.buttons.close.disabled === true);
@@ -299,6 +302,199 @@ exports.run = function() {
     !mrefs.windowEl.classList.contains('is-maximized'));
   if (typeof savedMM === 'undefined') delete globalThis.matchMedia;
   else globalThis.matchMedia = savedMM;
+
+  // ── Desktop regime (ticket #60): positioned window, drag, resize, close ─
+  // The controller paints the core's Geometry onto the frame and moves it
+  // through applyGeometry — the ONE write point the core owns (spec #58).
+  // The viewport is injected so the clamp is deterministic headless.
+
+  var VP = { width: 1280, height: 800, taskbar: 36 };
+  var ddoc = fakeDoc();
+  var dpending = [];
+  var dctl = Windows.create({
+    doc: ddoc,
+    schedule: function(fn) { dpending.push(fn); },
+    viewport: function() { return VP; }
+  });
+  var drefs = {
+    windowEl: fakeEl('div'),
+    titleBar: fakeEl('div'),
+    resizeGrip: fakeEl('div'),
+    programBtn: fakeEl('button'),
+    buttons: { minimize: fakeEl('button'), maximize: fakeEl('button'), close: fakeEl('button') }
+  };
+  dctl.attach(drefs);
+  var g0 = dctl.geometry();
+
+  function pointer(el, type, x, y) {
+    el.handlers[type]({
+      pointerId: 1, clientX: x, clientY: y, button: 0, target: el,
+      preventDefault: function() {}
+    });
+  }
+
+  check('the landing frame stays in layout flow: no regime class, no inline box',
+    !drefs.windowEl.classList.contains('is-windowed') &&
+    drefs.windowEl.style.left === '' && drefs.windowEl.style.width === '');
+
+  dctl.setView('results-view');
+  check('the results stage positions the frame at the core Geometry',
+    drefs.windowEl.classList.contains('is-windowed') &&
+    drefs.windowEl.style.left === g0.x + 'px' &&
+    drefs.windowEl.style.top === g0.y + 'px' &&
+    drefs.windowEl.style.width === g0.w + 'px' &&
+    drefs.windowEl.style.height === g0.h + 'px',
+    JSON.stringify(dctl.geometry()));
+
+  dctl.setView('quiz-view');
+  check('the quiz stage returns the frame to layout flow',
+    !drefs.windowEl.classList.contains('is-windowed') &&
+    drefs.windowEl.style.left === '');
+  dctl.setView('review-view');
+  check('the review stage is the same program: windowed too',
+    drefs.windowEl.classList.contains('is-windowed'));
+  dctl.setView('results-view');
+
+  // Drag by the title bar: origin + delta, written through the core.
+  pointer(drefs.titleBar, 'pointerdown', 300, 100);
+  pointer(drefs.titleBar, 'pointermove', 340, 150);
+  pointer(drefs.titleBar, 'pointerup', 340, 150);
+  var g1 = dctl.geometry();
+  check('a title-bar drag writes the moved Geometry through the core',
+    g1.x === g0.x + 40 && g1.y === g0.y + 50 && g1.w === g0.w && g1.h === g0.h &&
+    drefs.windowEl.style.left === g1.x + 'px', JSON.stringify(g1));
+  check('the frame is not left wearing a drag class after pointerup',
+    !drefs.windowEl.classList.contains('is-dragging') &&
+    !drefs.windowEl.classList.contains('is-resizing'));
+
+  // One continuous gesture: into the walls and back — the clamp bites, the
+  // origin stays true, so releasing at the start point restores the box.
+  pointer(drefs.titleBar, 'pointerdown', 300, 100);
+  pointer(drefs.titleBar, 'pointermove', 9000, 9000);
+  var gWall = dctl.geometry();
+  check('dragging past the walls clamps: title bar never reaches the taskbar',
+    gWall.x === VP.width - Windows.TITLE_REACH &&
+    gWall.y === VP.height - VP.taskbar - Windows.TITLEBAR_H &&
+    gWall.y + Windows.TITLEBAR_H <= VP.height - VP.taskbar,
+    JSON.stringify(gWall));
+  pointer(drefs.titleBar, 'pointermove', 300, 100);
+  pointer(drefs.titleBar, 'pointerup', 300, 100);
+  check('the same gesture back restores the origin Geometry',
+    dctl.geometry().x === g1.x && dctl.geometry().y === g1.y,
+    JSON.stringify(dctl.geometry()));
+
+  // Resize from the corner grip, with the minimum-size floor.
+  var gBeforeResize = dctl.geometry();
+  pointer(drefs.resizeGrip, 'pointerdown', 700, 600);
+  pointer(drefs.resizeGrip, 'pointermove', 760, 640);
+  pointer(drefs.resizeGrip, 'pointerup', 760, 640);
+  var g2 = dctl.geometry();
+  check('the corner grip resizes through the core',
+    g2.w === gBeforeResize.w + 60 && g2.h === gBeforeResize.h + 40 &&
+    g2.x === gBeforeResize.x && g2.y === gBeforeResize.y, JSON.stringify(g2));
+  pointer(drefs.resizeGrip, 'pointerdown', 700, 600);
+  pointer(drefs.resizeGrip, 'pointermove', 10, 10);
+  pointer(drefs.resizeGrip, 'pointerup', 10, 10);
+  var g3 = dctl.geometry();
+  check('the floor keeps the score header readable (min size enforced)',
+    g3.w === Windows.MIN_W && g3.h === Windows.MIN_H, JSON.stringify(g3));
+
+  // Maximized: the core refuses the write and the CSS owns the box.
+  dctl.toggleMaximize();
+  check('a maximized window refuses geometry writes (core rule)',
+    dctl.applyGeometry({ x: 0, y: 0, w: 600, h: 400 }) === false &&
+    dctl.geometry().w === g3.w);
+  check('maximized drops the inline box so .is-maximized draws it',
+    !drefs.windowEl.classList.contains('is-windowed') &&
+    drefs.windowEl.style.width === '' &&
+    drefs.windowEl.classList.contains('is-maximized'));
+  pointer(drefs.titleBar, 'pointerdown', 100, 100);
+  pointer(drefs.titleBar, 'pointermove', 500, 500);
+  pointer(drefs.titleBar, 'pointermove', 100, 100);
+  check('a drag started while maximized writes nothing',
+    dctl.geometry().w === g3.w && dctl.geometry().x === g3.x);
+  dctl.toggleMaximize();
+
+  // Flow stages have no desktop yet — the regime starts at the Finish Commit.
+  dctl.setView('quiz-view');
+  check('flow stages refuse geometry writes and ignore the drag handles',
+    dctl.applyGeometry({ x: 5, y: 5, w: 700, h: 500 }) === false);
+  pointer(drefs.titleBar, 'pointerdown', 100, 100);
+  pointer(drefs.titleBar, 'pointermove', 400, 400);
+  check('a title-bar drag on the quiz stage writes nothing',
+    dctl.geometry().x === g3.x && dctl.geometry().w === g3.w);
+  dctl.setView('results-view');
+
+  // Close on the desktop stage: the window goes away, no dialog.
+  var gClose = dctl.geometry();
+  check('close on the results stage puts the window away (core hide, no dialog)',
+    dctl.close() === 'hidden' && dctl.getState().mode === 'hidden' &&
+    dctl.getState().confirmOpen === false &&
+    drefs.windowEl.classList.contains('is-hidden') &&
+    !drefs.windowEl.classList.contains('is-windowed'));
+  check('a hidden window has nothing to close: [×] renders disabled',
+    drefs.buttons.close.disabled === true && dctl.canClose() === false);
+  drefs.programBtn.click();
+  while (dpending.length) dpending.shift()();
+  var gBack = dctl.geometry();
+  check('the taskbar program button restores a hidden window to its arrangement',
+    dctl.getState().mode === 'normal' &&
+    !drefs.windowEl.classList.contains('is-hidden') &&
+    drefs.windowEl.classList.contains('is-windowed') &&
+    gBack.x === gClose.x && gBack.w === gClose.w &&
+    drefs.windowEl.style.left === gClose.x + 'px', JSON.stringify(gBack));
+
+  // Minimized restore still routes through the same program button.
+  dctl.minimize();
+  while (dpending.length) dpending.shift()();
+  drefs.programBtn.click();
+  while (dpending.length) dpending.shift()();
+  check('the program button still restores a minimized window',
+    dctl.getState().mode === 'normal' &&
+    !drefs.windowEl.classList.contains('is-minimized'));
+
+  // Flow stages keep the End Program dialog.
+  dctl.setView('quiz-view');
+  check('close on a flow stage still asks for the End Program dialog',
+    dctl.close() === 'dialog' && dctl.getState().confirmOpen === true);
+  dctl.cancelClose();
+
+  // Mobile layout (≤768px): the controller refuses geometry; the stylesheet
+  // keeps presenting the maximized form. The core stays viewport-blind.
+  globalThis.matchMedia = function(query) {
+    return {
+      matches: query.indexOf('max-width') >= 0,
+      addEventListener: function() {}, addListener: function() {}
+    };
+  };
+  check('the mobile layout drops the positioned regime',
+    dctl.setView('results-view') &&
+    !drefs.windowEl.classList.contains('is-windowed') &&
+    drefs.windowEl.style.width === '');
+  var gMobile = dctl.geometry();
+  check('the mobile layout refuses geometry writes',
+    dctl.applyGeometry({ x: 200, y: 200, w: 700, h: 500 }) === false &&
+    dctl.geometry().x === gMobile.x);
+  pointer(drefs.titleBar, 'pointerdown', 100, 100);
+  pointer(drefs.titleBar, 'pointermove', 400, 400);
+  pointer(drefs.resizeGrip, 'pointerdown', 400, 400);
+  pointer(drefs.resizeGrip, 'pointermove', 600, 600);
+  check('mobile ignores the drag and resize handles',
+    dctl.geometry().x === gMobile.x && dctl.geometry().w === gMobile.w);
+  // Close on mobile keeps working — hide() is a mode, not a geometry.
+  check('close still puts the window away on the mobile layout',
+    dctl.close() === 'hidden' && dctl.getState().mode === 'hidden');
+  drefs.programBtn.click();
+  while (dpending.length) dpending.shift()();
+  delete globalThis.matchMedia;
+
+  // Pure clamp contract (the controller's viewport-blind maths, exported).
+  var clamped = Windows.clampGeometry(
+    { x: -10000, y: -10, w: 40, h: 40 }, { width: 1280, height: 800, taskbar: 36 });
+  check('clampGeometry floors the size and keeps the title bar reachable',
+    clamped.w === Windows.MIN_W && clamped.h === Windows.MIN_H &&
+    clamped.x === Windows.TITLE_REACH - Windows.MIN_W && clamped.y === 0,
+    JSON.stringify(clamped));
 
   // ── System dialog primitive contract ──────────────────────────────────
 

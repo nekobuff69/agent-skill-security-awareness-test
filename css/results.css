@@ -10,36 +10,30 @@
   padding-bottom: var(--space-4);
 }
 
-/* ── Title Card (ticket #45: .os-window idiom) ──
+/* ── Results header panel (ticket #60: the window's first body panel) ──
 
-   A Win95 program window: silver raised frame, navy title bar carrying the
-   Progression Title (emoji + name) and the drawn, DISABLED [—][□][×] marks
-   (js/results.js buildTitleCard reuses the shell's .os-titlebar* classes, so
-   css/shell.css draws the bar itself), then a sunken white client field with
-   the Overall Percentage. The tier data path is untouched. */
-
-.results-title-window {
-  background: var(--color-face);
-  border-radius: 0;
-  box-shadow: var(--bevel-raised);
-  padding: var(--space-1);
-}
-
-/* The title-bar glyph rides the navy bar at chrome size. */
-.results-title-bar .results-title-emoji {
-  font-size: 14px;
-  line-height: 1;
-  margin: 0;
-}
+   The fake Title Card window of #45 is retired: the shell frame IS the
+   window now, so the Progression Title (emoji + name) and the Overall
+   Percentage render in one sunken white client field, and no second title
+   bar exists. Its raised frame and navy title-bar rules left with it; the
+   skin's .results-title-name rule (css/theme-retro-os.css) still owns the
+   tier name's face, and the tier data path is untouched. */
 
 .results-title-card {
   text-align: left;
-  margin: var(--space-1);
+  margin: var(--space-1) 0;
   padding: var(--space-3);
   background: var(--color-surface);
   color: var(--color-text);
   border-radius: 0;
   box-shadow: var(--bevel-sunken);
+}
+
+/* The Progression Title row: .results-title-name (the skin's face and
+   colour) + this size, as the window's first body row (ticket #60). */
+.results-title-caption {
+  font-size: 1.125rem;
+  margin-bottom: var(--space-1);
 }
 
 .results-overall-caption {
@@ -48,9 +42,6 @@
   color: var(--color-text);
   margin-bottom: var(--space-1);
 }
-
-/* .results-title-name was retired with the window idiom: the name now rides
-   the title bar via .os-titlebar-title (css/shell.css). */
 
 .results-title-pct {
   font-family: var(--font-heading);
@@ -63,7 +54,7 @@
 
 /* The score's meaning, on the headline itself.
 
-   js/results.js buildTitleCard appends results-green/amber/red alongside
+   js/results.js buildResultsHeader appends results-green/amber/red alongside
    results-title-pct. These rules override the accent colour above, so the
    largest, most eye-catching element on the page finally says something:
    a 100% does not render in the same navy as every neutral control.

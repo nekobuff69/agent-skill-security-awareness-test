@@ -148,7 +148,7 @@ exports.run = function() {
       return zh.ctl.titleButtons[a].innerHTML === en.ctl.titleButtons[a].innerHTML;
     }));
 
-  check('the glyph table is exported so the results Title Card reuses it',
+  check('the glyph table is exported from the module that owns the ONE title bar',
     Shell.TITLE_BAR_GLYPHS && actions.every(function(a) {
       return Shell.TITLE_BAR_GLYPHS[a] === en.ctl.titleButtons[a].innerHTML;
     }));

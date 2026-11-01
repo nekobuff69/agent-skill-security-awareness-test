@@ -114,13 +114,10 @@
     'wizard.next': '下一步 >',
     'wizard.finish': '完成',
 
-    /* ── 结果页标题卡（ticket #45） ──
-       标题与面板文案由上面的 results.* id 提供；这里是复古皮肤的新增：
-       总分小标题，以及标题卡标题栏上 [—][□][×] 的 aria-label。 */
+    /* ── 结果页标题（ticket #45，#60 之后） ──
+       总分小标题在窗口正文的第一块面板上；复古皮肤新增的假窗框与它的 [—][□][×]
+       aria-label 一起不再使用（真标题栏只有一块，由 shell 提供）。 */
     'results.overall': '总分',
-    'results.titleBtnMin': '最小化',
-    'results.titleBtnMax': '最大化',
-    'results.titleBtnClose': '关闭',
 
     /* ── AST 风险名称（术语表定稿） ── */
     'ast.AST01': '恶意技能',

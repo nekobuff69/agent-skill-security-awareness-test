@@ -70,79 +70,41 @@
     return map;
   }
 
-  /* ── Title Card ── */
-  /* Title-bar button glyphs for the Title Card window. Mirrors the shell's
-     idiom (js/shell.js): drawn, DISABLED, inert — aria-labels only, no live
-     controls on a static results document. The glyph markup itself is NOT
-     duplicated: the buttons read App.Shell.TITLE_BAR_GLYPHS (#49), the one
-     table both windows draw from, so the program window and this card can
-     never drift apart. shell.js is loaded before this module on both
-     language pages. */
-  var TITLE_BUTTON_ACTIONS = ['minimize', 'maximize', 'close'];
-  var TITLE_BUTTON_LABEL_IDS = [
-    'results.titleBtnMin', 'results.titleBtnMax', 'results.titleBtnClose'
-  ];
+  /* ── Results header panel ── */
 
-  function buildTitleCard(report) {
+  /**
+   * The window's first body panel (ticket #60): the Progression Title and
+   * the Overall Percentage merged into one sunken-white client field. The
+   * fake Title Card window of #45 is gone — the shell frame IS the window
+   * now, its navy title bar carries the program title, so the tier name
+   * rides the body panel again via .results-title-name (css/
+   * theme-retro-os.css keeps its rule) and no second title bar exists.
+   *
+   * The tier data path (title.emoji / title.name / percentage) and the
+   * score-band colouring are unchanged from #45: the percentage is the
+   * most eye-catching element on the surface, so it carries scoreClass()
+   * — without it a perfect score and a failing one rendered identically
+   * in --color-accent while green bars sat beside them saying the opposite.
+   * The band rules in css/results.css resolve to the --color-score-* TEXT
+   * tokens (css/theme-retro-os.css), not the graphic fills, because the
+   * fill values do not meet the contrast floor for text on white.
+   */
+  function buildResultsHeader(report) {
     var title = report.title;
-    var frag = document.createDocumentFragment();
 
-    /* The percentage is the most eye-catching element on the results page, so it
-       has to carry the score's meaning. It previously had no score class at all
-       and inherited --color-accent from .results-title-pct — the same orange used
-       for every risk indicator in the bars and the radar — so a perfect score
-       and a failing one rendered identically, while green bars sat directly
-       beside the headline saying the opposite. scoreClass() already exists and
-       already drives the bar fills; applying it here makes the two agree.
-
-       The colours resolve in css/theme-retro-os.css to the *-text tokens
-       rather than the fill tokens, because the fill values do not meet the
-       contrast floor for text on a light background.
-
-       Ticket #45: the card is now a window in the .os-window idiom — a
-       silver raised frame with a navy title bar carrying the Progression
-       Title (emoji + name), and a sunken white client field carrying the
-       Overall Percentage. The title bar and its disabled control buttons
-       reuse the shell's classes (css/shell.css) so the two windows draw
-       identically; the tier data path (title.emoji/title.name/percentage +
-       scoreClass) is unchanged. */
-    var win = el('div', { className: 'results-title-window' });
-
-    var bar = el('div', { className: 'os-titlebar results-title-bar' });
-    bar.appendChild(el('div', {
-      className: 'os-titlebar-title results-title-caption',
-      textContent: title.emoji + ' ' + title.name
-    }));
-    var buttons = el('div', { className: 'os-titlebar-buttons' });
-    // The shell owns the drawn glyph table; a headless render without the
-    // shell loaded still builds the card, just with empty controls.
-    var glyphs = (app.Shell && app.Shell.TITLE_BAR_GLYPHS) || {};
-    for (var b = 0; b < TITLE_BUTTON_ACTIONS.length; b++) {
-      var action = TITLE_BUTTON_ACTIONS[b];
-      var btn = el('button', { className: 'os-titlebar-btn' });
-      btn.type = 'button';
-      btn.disabled = true;
-      btn.setAttribute('data-os-button', action);
-      btn.setAttribute('aria-label', t(TITLE_BUTTON_LABEL_IDS[b]));
-      btn.innerHTML = glyphs[action] || '';
-      buttons.appendChild(btn);
-    }
-    bar.appendChild(buttons);
-    win.appendChild(bar);
-
-    /* Client field: .results-title-card keeps its class, so the skin's
-       sunken-white rule (css/theme-retro-os.css) paints the Win95 field. */
-    var client = el('div', { className: 'results-title-card' }, [
+    /* .results-title-card keeps its class, so the skin's sunken-white rule
+       (css/theme-retro-os.css) paints the Win95 field. */
+    return el('div', { className: 'results-title-card' }, [
+      el('div', {
+        className: 'results-title-name results-title-caption',
+        textContent: title.emoji + ' ' + title.name
+      }),
       el('div', { className: 'results-overall-caption', textContent: t('results.overall') }),
       el('div', {
         className: 'results-title-pct ' + scoreClass(report.percentage),
         textContent: report.percentage + '%'
       })
     ]);
-    win.appendChild(client);
-    frag.appendChild(win);
-
-    return frag;
   }
 
   /* ── Risk Radar (hand-rolled SVG) ── */
@@ -872,8 +834,8 @@
     var scoringBank = _scoredBank || bank;
     var shown = localizedReport(report, bank, scoringBank);
 
-    // Title Card
-    view.appendChild(buildTitleCard(shown));
+    // Results header panel (ticket #60)
+    view.appendChild(buildResultsHeader(shown));
 
     // Section: Risk Radar
     var radarSection = el('div', { className: 'results-section' });
@@ -988,7 +950,7 @@
     scoreColor: scoreColor,
     scoreClass: scoreClass,
     headingFont: headingFont,
-    buildTitleCard: buildTitleCard,
+    buildResultsHeader: buildResultsHeader,
     buildRadar: buildRadar,
     buildBars: buildBars,
     buildReview: buildReview,

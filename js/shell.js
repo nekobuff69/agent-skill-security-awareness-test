@@ -19,9 +19,17 @@
    * one in (js/shell.js start() builds it from js/windows.js). Without a
    * controller they keep the era default: drawn, disabled, inert — a
    * landing-state application that cannot close itself. The controller
-   * re-renders their disabled state on every view change, opens the End
-   * Program dialog on [×] away from the landing view, and drives the
-   * minimize/maximize trace classes on the window frame.
+   * re-renders their disabled state on every view change, drives the
+   * minimize/maximize trace classes on the window frame, and decides what
+   * [×] means: the End Program dialog on a flow view, the core's hide()
+   * on the results/review desktop stage (ticket #60).
+   *
+   * Desktop regime (ticket #60): on the results and review views the frame
+   * is a positioned, draggable, resizable window (`.is-windowed` — see
+   * css/shell.css); the landing and quiz views keep the layout-flow frame
+   * above. The title bar and the bottom-right corner grip are the drag and
+   * resize handles; js/windows.js moves the window only by writing the
+   * core's Geometry.
    *
    * Pure logic (menu/About state transitions) is exposed on App.Shell and
    * runs headless with fakeEl stubs; DOM wiring is guarded so `require()`
@@ -37,9 +45,10 @@
    * extra fonts (ADR 0001). `fill="currentColor"` lets the button's own
    * color token paint the glyph: black while live, gray on the disabled
    * landing state (the 1px white drop shadow rides the glyph in
-   * css/shell.css's `.tb-glyph` rule). The results Title Card
-   * (js/results.js) reads this same table so both windows draw
-   * identically.
+   * css/shell.css's `.tb-glyph` rule). These are the ONE title bar: the
+   * results header panel (js/results.js, ticket #60) rides the window's
+   * body instead of drawing a second fake chrome — no other module copies
+   * this table.
    */
   var TITLE_BAR_GLYPHS = {
     minimize:
@@ -234,6 +243,15 @@
     aboutEl.appendChild(okBtn);
     aboutBackdrop.appendChild(aboutEl);
 
+    // Resize grip (ticket #60): the bottom-right corner handle of the
+    // positioned window. The shell builds it; the controller owns when it
+    // is live (css/shell.css shows it only while .is-windowed is on the
+    // frame, and js/windows.js refuses the write on the mobile layout and
+    // while maximized). It carries no label: [—][□][×] and the keyboard
+    // route stay the accessible controls, so the grip is presentation.
+    var resizeGrip = createEl(doc, 'div', 'os-resize-grip');
+    resizeGrip.setAttribute('aria-hidden', 'true');
+
     // ── Re-parent into the live document ─────────────────────────────────
     // All three top-level containers are built; now they enter the body and
     // #app moves inside the window frame. The reference node (#app) stays in
@@ -244,6 +262,7 @@
     body.insertBefore(taskbar, appEl);
     body.appendChild(aboutBackdrop);
     windowEl.appendChild(appEl);
+    windowEl.appendChild(resizeGrip);
 
     // ── Controller (pure state + thin DOM ops) ───────────────────────────
     var menuOpen = false;
@@ -252,6 +271,7 @@
     var controller = {
       windowEl: windowEl,
       titleBar: titleBar,
+      resizeGrip: resizeGrip,
       titleButtons: titleButtonEls,
       taskbar: taskbar,
       startBtn: startBtn,
@@ -610,7 +630,12 @@
         minimize: function() { win.minimize(); },
         maximize: function() { win.toggleMaximize(); },
         close: function() {
-          if (!win.requestClose()) return;
+          // One decision (js/windows.js): on the desktop stage the window
+          // is PUT AWAY (core hide(), no dialog — the program keeps its
+          // results and the taskbar button brings the window back); a flow
+          // stage asks the End Program confirmation first.
+          var decision = win.close();
+          if (decision !== 'dialog') return;
           // The opener explicitly: requestClose() renders all three
           // controls disabled, which blurs the focused [×] before the
           // dialog could read doc.activeElement.
@@ -624,9 +649,12 @@
     appEl.setAttribute('data-shell-mounted', 'true');
     if (win) {
       // Landing rules first: [×][□] gray, [—] live; the program-button
-      // click handler (restore when minimized) is wired here too.
+      // click handler (restore when minimized OR hidden) and the title-bar
+      // drag / corner-grip resize handles are wired in there too.
       win.attach({
         windowEl: controller.windowEl,
+        titleBar: controller.titleBar,
+        resizeGrip: controller.resizeGrip,
         programBtn: controller.programBtn,
         buttons: controller.titleButtons
       });
