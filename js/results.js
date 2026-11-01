@@ -73,7 +73,11 @@
   /* ── Title Card ── */
   /* Title-bar button glyphs for the Title Card window. Mirrors the shell's
      idiom (js/shell.js): drawn, DISABLED, inert — aria-labels only, no live
-     controls on a static results document. */
+     controls on a static results document. The glyph markup itself is NOT
+     duplicated: the buttons read App.Shell.TITLE_BAR_GLYPHS (#49), the one
+     table both windows draw from, so the program window and this card can
+     never drift apart. shell.js is loaded before this module on both
+     language pages. */
   var TITLE_BUTTON_ACTIONS = ['minimize', 'maximize', 'close'];
   var TITLE_BUTTON_LABEL_IDS = [
     'results.titleBtnMin', 'results.titleBtnMax', 'results.titleBtnClose'
@@ -117,6 +121,7 @@
       btn.disabled = true;
       btn.setAttribute('data-os-button', action);
       btn.setAttribute('aria-label', t(TITLE_BUTTON_LABEL_IDS[b]));
+      btn.innerHTML = app.Shell.TITLE_BAR_GLYPHS[action];
       buttons.appendChild(btn);
     }
     bar.appendChild(buttons);

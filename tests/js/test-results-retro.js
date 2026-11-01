@@ -65,6 +65,11 @@ exports.run = function() {
   require('../../js/ast.js');
   var AST = globalThis.App.AST;
 
+  // shell.js first — the page order — because the Title Card draws from
+  // App.Shell.TITLE_BAR_GLYPHS (#49), the one glyph table both windows use.
+  require('../../js/shell.js');
+  var Shell = globalThis.App.Shell;
+
   var Results = require('../../js/results.js');
   check('module loads headless and exposes the internals seam',
     Results && Results.resultsInternals &&
@@ -222,6 +227,18 @@ exports.run = function() {
   check('title-bar buttons carry localized aria-labels',
     btnEls[0].attrs['aria-label'] === 'Minimize' && btnEls[2].attrs['aria-label'] === 'Close',
     btnEls[0].attrs['aria-label'] + '/' + btnEls[2].attrs['aria-label']);
+  // #49: the card draws the shell's glyph table verbatim — 6×2 bar, 9×9
+  // outlined square, 8×7 cross, currentColor-painted — so the program
+  // window and this card can never render differently.
+  check('title-card buttons draw the shell glyph table verbatim (both windows identical)',
+    btnEls.every(function(b) {
+      var action = b.attrs['data-os-button'];
+      return typeof b.innerHTML === 'string' &&
+        b.innerHTML === Shell.TITLE_BAR_GLYPHS[action] &&
+        b.innerHTML.indexOf('<svg') === 0 &&
+        b.innerHTML.indexOf('class="tb-glyph"') >= 0 &&
+        b.innerHTML.indexOf('fill="currentColor"') >= 0;
+    }));
   check('client field keeps the .results-title-card class (skin paints it)',
     classOf(client).indexOf('results-title-card') >= 0, classOf(client));
   check('client shows the Overall caption + percentage with the band class',

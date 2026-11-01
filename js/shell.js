@@ -30,6 +30,30 @@
 
   var TITLE_BUTTON_ACTIONS = ['minimize', 'maximize', 'close'];
 
+  /**
+   * Era-correct title-bar glyphs (#49): 98.css control geometry drawn as
+   * inline SVG — a 6×2 minimize bar, a 9×9 outlined maximize square, an
+   * 8×7 close cross — sized for the 16×14 button. No image assets, no
+   * extra fonts (ADR 0001). `fill="currentColor"` lets the button's own
+   * color token paint the glyph: black while live, gray on the disabled
+   * landing state (the 1px white drop shadow rides the glyph in
+   * css/shell.css's `.tb-glyph` rule). The results Title Card
+   * (js/results.js) reads this same table so both windows draw
+   * identically.
+   */
+  var TITLE_BAR_GLYPHS = {
+    minimize:
+      '<svg class="tb-glyph" width="6" height="2" viewBox="0 0 6 2" aria-hidden="true">' +
+      '<rect width="6" height="2" fill="currentColor"/></svg>',
+    maximize:
+      '<svg class="tb-glyph" width="9" height="9" viewBox="0 0 9 9" aria-hidden="true">' +
+      '<path fill-rule="evenodd" d="M9 0H0V9H9V0ZM8 2H1V8H8V2Z" fill="currentColor"/></svg>',
+    close:
+      '<svg class="tb-glyph" width="8" height="7" viewBox="0 0 8 7" aria-hidden="true">' +
+      '<path fill-rule="evenodd" d="M0 0H2V1H3V2H4H5V1H6V0H8V1H7V2H6V3H5V4H6V5H7V6H8V7H6V6H5V5H4H3V6H2V7H0V6H1V5H2V4H3V3H2V2H1V1H0V0Z" ' +
+      'fill="currentColor"/></svg>'
+  };
+
   var shell = {};
 
   // ── Clock ───────────────────────────────────────────────────────────────
@@ -122,6 +146,7 @@
         'data-os-button': action,
         'aria-label': strings['shell.' + action]
       });
+      btn.innerHTML = TITLE_BAR_GLYPHS[action];
       // Era default until an App.Windows controller refines it via render():
       // landing state draws [×][□] gray (a program that cannot close
       // itself) and live [—]; away from landing all three are live.
@@ -629,6 +654,7 @@
   shell.closeAbout = closeAbout;
   shell.resolveStrings = resolveStrings;
   shell.STRING_IDS = STRING_IDS;
+  shell.TITLE_BAR_GLYPHS = TITLE_BAR_GLYPHS;
 
   app.Shell = shell;
 

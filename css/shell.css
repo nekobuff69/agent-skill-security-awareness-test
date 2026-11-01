@@ -81,16 +81,28 @@ body {
   flex: none;
 }
 
-/* Title-bar buttons: drawn, gray, inert (era-correct for a landing-state
-   application that cannot close itself; live controls arrive with #43). */
+/* Title-bar buttons: 16×14 with a drawn era glyph inside (98.css geometry:
+   6×2 minimize bar, 9×9 outlined maximize square, 8×7 close cross — the
+   SVG markup lives in js/shell.js's TITLE_BAR_GLYPHS). Era-correct for a
+   landing-state application that cannot close itself: the controller (#43)
+   flips these between live and disabled, and only the glyph's color and
+   shadow follow the state — bevel, press offset and focus rectangle stay
+   exactly as every other command button draws them. */
 
 .os-titlebar-btn {
-  width: 18px;
-  height: 16px;
+  width: 16px;
+  height: 14px;
   padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
-  font-size: 10px;
   color: var(--color-text);
+}
+
+/* currentColor paints the glyph: black live, gray disabled. */
+.os-titlebar-btn .tb-glyph {
+  display: block;
 }
 
 .os-titlebar-btn:disabled {
@@ -101,7 +113,12 @@ body {
   color: var(--color-secondary);
   border: 0;
   box-shadow: var(--bevel-raised);
-  text-shadow: 1px 1px #FFFFFF;
+}
+
+/* Disabled glyphs get the classic 1px white drop shadow (text-shadow
+   cannot reach SVG content, so the shadow rides the glyph itself). */
+.os-titlebar-btn:disabled .tb-glyph {
+  filter: drop-shadow(1px 1px 0 #FFFFFF);
 }
 
 /* ── Taskbar ─────────────────────────────────────────────────────────── */

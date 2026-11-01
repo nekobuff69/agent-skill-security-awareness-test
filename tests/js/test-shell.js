@@ -143,6 +143,38 @@ exports.run = function() {
   });
   check('title-bar buttons disabled on the zh page too', zhAllDisabled);
 
+  // ── Drawn era glyphs (#49) ────────────────────────────────────────────
+  // Geometry pinned to the 98.css control reference: a 6×2 minimize bar,
+  // a 9×9 outlined maximize square, an 8×7 close cross, painted with
+  // currentColor so the live/disabled color token is the only variable
+  // (the disabled white drop shadow rides the .tb-glyph CSS rule).
+  var glyphGeometry = {
+    minimize: 'width="6" height="2" viewBox="0 0 6 2"',
+    maximize: 'width="9" height="9" viewBox="0 0 9 9"',
+    close: 'width="8" height="7" viewBox="0 0 8 7"'
+  };
+  var glyphsDrawn = actions.every(function(a) {
+    var html = en.ctl.titleButtons[a].innerHTML;
+    return typeof html === 'string' &&
+      html.indexOf('<svg') === 0 &&
+      html.indexOf('class="tb-glyph"') >= 0 &&
+      html.indexOf(glyphGeometry[a]) >= 0 &&
+      html.indexOf('fill="currentColor"') >= 0 &&
+      html.indexOf('aria-hidden="true"') >= 0;
+  });
+  check('every title-bar button draws its era glyph (6×2 bar, 9×9 square, 8×7 cross)',
+    glyphsDrawn);
+
+  check('zh page draws byte-identical glyphs to the en page',
+    actions.every(function(a) {
+      return zh.ctl.titleButtons[a].innerHTML === en.ctl.titleButtons[a].innerHTML;
+    }));
+
+  check('the glyph table is exported so the results Title Card reuses it',
+    Shell.TITLE_BAR_GLYPHS && actions.every(function(a) {
+      return Shell.TITLE_BAR_GLYPHS[a] === en.ctl.titleButtons[a].innerHTML;
+    }));
+
   // Delegation surface for ticket #43: the handler fires only while the
   // button is enabled; live behavior through an App.Windows controller is
   // covered in tests/js/test-windows.js.
