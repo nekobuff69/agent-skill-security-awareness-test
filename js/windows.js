@@ -5,14 +5,20 @@
   global.App = app;
 
   /**
-   * Window manager (ticket #43): the controller and rendering for the
-   * title-bar controls plus the reusable system-dialog primitive that
-   * tickets #44 (language offer) and #47 (404) will adopt.
+   * Window manager: the controller and rendering for the title-bar controls,
+   * the program frames and the reusable system-dialog primitive.
    *
    * Ticket #59 moved the state machine it used to own into js/desktop-core.js,
-   * the DOM-free desktop core (spec #58). This module renders; the core
+   * the DOM-free desktop core (parent spec #58). This module renders; the core
    * decides. The rules below are the core's rules restated where the
    * rendering depends on them.
+   *
+   * Ticket #61 generalizes the controller from ONE frame to the THREE
+   * desktop programs — Quiz, Action Plan, Deep-Dive Prompt — on the one
+   * shared Core: every frame paints its own Record, the taskbar lists
+   * exactly the running windows in program order, and pointer interaction
+   * inside any frame raises it. There is still exactly ONE state model;
+   * this module keeps no per-window copy of anything.
    *
    * Landing-state rule — era: an application that cannot close itself.
    *   close and maximize are DISABLED while the landing view shows: no
@@ -43,23 +49,27 @@
    *     via the program button, same as desktop.
    *   - [×] is unchanged (End Program dialog) once the landing rule allows.
    * Crossing the 768px boundary re-renders the controls via a matchMedia
-   * change listener, so [□] re-enables at desktop widths.
+   * change listener, so [□] re-enables at desktop widths. The same rule
+   * applies to the two program frames added by ticket #61: on the mobile
+   * layout every frame is full-screen and only the ACTIVE one paints, so
+   * the taskbar switcher is the way between programs.
    *
-   * Desktop regime (ticket #60): on the results and review stages the Quiz
-   * program IS a positioned window — the frame moves and sizes with the
-   * core's Geometry, drags by its title bar and resizes from a bottom-right
-   * corner grip. Landing and quiz keep the layout-flow regime (the desktop
-   * does not exist before the Finish Commit). Every geometry write goes
-   * through the core's applyGeometry, which refuses maximized windows; the
-   * controller adds the two refusals the viewport-blind core must never
-   * model: the mobile layout (≤768px, ticket #46) and clamping — a minimum
-   * size that keeps the score header readable, and a title bar that can
-   * never be dragged fully under the taskbar. Close on this stage is the
-   * core's hide(): the window leaves the screen, the bare desktop and the
-   * taskbar stay, and the program button brings it back (hidden and
-   * minimized alike) — no End Program dialog for a gesture that only puts
-   * the window away. Flow stages keep the dialog exactly as ticket #43
-   * built it.
+   * Desktop regime (ticket #60, generalized by #61): on the results and
+   * review stages each frame is a positioned window — Geometry inline,
+   * title-bar drag, corner-grip resize, clamp. Landing and quiz keep the
+   * layout-flow regime (the desktop does not exist before the Finish
+   * Commit); a program frame whose Record does not exist yet is not painted
+   * at all. Close on this stage is the core's hide(): the window leaves the
+   * screen, the bare desktop and the taskbar stay, and the program button
+   * brings it back (hidden and minimized alike) — no End Program dialog for
+   * a gesture that only puts the window away. Flow stages keep the dialog
+   * exactly as ticket #43 built it.
+   *
+   * Arrival (ticket #61, spec #58): a program window is BORN when its
+   * content settles, never before — the Action Plan opens cascaded from the
+   * focused window and lands BELOW it in the stacking order, without a
+   * focus call, a raise or a scroll; the Deep-Dive Prompt opens minimized
+   * at the Finish Commit and shows as a taskbar button only.
    *
    * Layering: js/desktop-core.js is the pure transition table (no DOM, no
    * timers, fully headless-testable). create() wraps it with the DOM
@@ -102,9 +112,10 @@
   }
 
   /**
-   * The single Quiz window's state, straight from the core. Exposed under
-   * its old name so the controller and the existing tests keep driving
-   * exactly one model: every method delegates — there is no local state.
+   * The desktop's state, straight from the core. The legacy no-argument
+   * surface addresses the Quiz window (the controller and the existing
+   * tests keep driving it by name); the ticket #61 methods take a program
+   * Id. Every method delegates — there is no local state.
    */
   function createMachine() {
     var Desktop = coreModule();
@@ -112,13 +123,17 @@
       throw new Error('js/windows.js needs the desktop core: load js/desktop-core.js first');
     }
     var core = Desktop.createCore({ id: Desktop.QUIZ_ID });
+    var quiz = Desktop.QUIZ_ID;
 
-    function getState() {
-      var snap = core.snapshot();
+    function getState(id) {
+      var wid = id || quiz;
+      var snap = core.windowSnapshot(wid) || { mode: null };
       return {
-        mode: snap.windows[core.soleId].mode,
-        confirmOpen: snap.confirmOpen,
-        view: snap.view
+        mode: snap.mode,
+        confirmOpen: core.isConfirmOpen(),
+        view: core.getView(),
+        active: core.activeId(),
+        z: snap.z
       };
     }
 
@@ -126,9 +141,13 @@
       /** The core itself — the controller reads state and derived flags
        *  through it and renders. */
       core: core,
+      quizId: quiz,
+      programIds: Desktop.PROGRAM_IDS,
       getState: getState,
+      hasWindow: core.hasWindow,
       isVisible: core.isVisible,
       inTaskbar: core.inTaskbar,
+      taskbarList: core.taskbarList,
       canFocus: core.canFocus,
       canMinimize: core.canMinimize,
       canMaximize: core.canMaximize,
@@ -137,17 +156,41 @@
       restore: core.restore,
       toggleMaximize: core.toggleMaximize,
       hide: core.hide,
+      open: core.open,
       requestClose: core.requestClose,
       confirmClose: core.confirmClose,
       cancelClose: core.cancelClose,
       applyGeometry: core.applyGeometry,
-      /** The Record's current Geometry — a fresh copy (ticket #60: the
-       *  controller paints and clamps it, the core owns it). */
-      geometry: function() { return core.windowSnapshot(core.soleId).geometry; },
+      /** A Record's current Geometry — a fresh copy, or null when the
+       *  program has not arrived (ticket #60: the controller paints and
+       *  clamps it, the core owns it). */
+      geometry: function(id) {
+        var snap = core.windowSnapshot(id || quiz);
+        return snap ? snap.geometry : null;
+      },
+      /** The Record's stacking order, or null for an absent program. */
+      z: function(id) {
+        var snap = core.windowSnapshot(id || quiz);
+        return snap ? snap.z : null;
+      },
+      activeId: core.activeId,
       setView: core.setView,
       setActive: core.setActive,
       raise: core.raise,
-      snapshot: core.snapshot
+      windowSnapshot: core.windowSnapshot,
+      snapshot: core.snapshot,
+      /** Put every program window except the Quiz away when the desktop
+       *  goes off stage: flow views have no desktop to draw them on. */
+      hidePrograms: function(exceptId) {
+        var ids = [];
+        Desktop.PROGRAM_IDS.forEach(function(pid) {
+          if (pid !== exceptId && core.hasWindow(pid) && core.inTaskbar(pid)) {
+            core.hide(pid);
+            ids.push(pid);
+          }
+        });
+        return ids;
+      }
     };
   }
 
@@ -199,8 +242,8 @@
   // ── Desktop regime (ticket #60) ──────────────────────────────────────
 
   /**
-   * The windowed views (spec #58): the Quiz program's finished work. On
-   * these the frame is positioned by the core's Geometry and can be
+   * The windowed views (spec #58): the desktop the finished work lives on.
+   * On these the frames are positioned by the core's Geometry and can be
    * dragged and resized; the landing and quiz views keep the layout-flow
    * regime — the desktop does not exist before the Finish Commit.
    */
@@ -265,16 +308,21 @@
    *             the drag/resize clamp reads (ticket #60); defaults to the
    *             live window.innerWidth/innerHeight with the CSS taskbar
    *             height, and headless tests inject their own
-   * attach(refs) supplies the built shell DOM:
+   * attach(refs) supplies the built Quiz shell DOM:
    *   windowEl, titleBar, resizeGrip, programBtn,
+   *   buttons {minimize, maximize, close}
+   * attachProgram(id, refs) supplies one program frame's DOM (ticket #61):
+   *   windowEl, bodyEl, titleBar, titleText, resizeGrip, taskbarBtn,
    *   buttons {minimize, maximize, close}
    */
   function create(deps) {
     deps = deps || {};
     var doc = deps.doc || null;
     var machine = createMachine();
-    var dom = null;
-    var traceToken = 0;   // invalidates stale minimize/restore trace callbacks
+    var QUIZ = machine.quizId;
+    var dom = null;                   // the Quiz frame (tickets #52/#60 shape)
+    var programs = {};                // id → its frame refs (ticket #61)
+    var traceTokens = {};             // id → invalidates stale trace callbacks
 
     var schedule = typeof deps.schedule === 'function' ? deps.schedule :
       function(fn, ms) {
@@ -291,7 +339,19 @@
     function syncView() {
       if (!doc || typeof doc.querySelector !== 'function') return;
       var visible = doc.querySelector('#app > section:not([hidden])');
-      if (visible && visible.id) machine.setView(visible.id);
+      if (visible && visible.id) applyStage(visible.id);
+    }
+
+    /**
+     * The one place the view changes. The desktop is a stage: leaving it
+     * (landing/quiz) puts the program windows away — they have no desktop
+     * to stand on — while the Quiz window keeps its flow frame. Entering
+     * it again shows them back through the taskbar, exactly as they were
+     * left (the hidden Record keeps its arrangement for restore()).
+     */
+    function applyStage(view) {
+      machine.setView(view);
+      if (!isWindowedView(view)) machine.hidePrograms(QUIZ);
     }
 
     /**
@@ -313,20 +373,68 @@
       return isWindowedView(machine.getState().view) && !mobileMaximized();
     }
 
+    /** The frame element of a program, or the Quiz frame when unaddressed. */
+    function frameOf(id) {
+      if (!id || id === QUIZ) return dom;
+      return programs[id] || null;
+    }
+
+    /** The clamped Geometry a frame should paint, or null (not positioned). */
+    function paintedGeometry(id) {
+      if (!machine.hasWindow(id) || !isWindowed()) return null;
+      if (machine.windowSnapshot(id).mode !== 'normal') return null;
+      return clampGeometry(machine.geometry(id), viewport());
+    }
+
+    // ── Paint ──────────────────────────────────────────────────────────
+
     /**
-     * Paint the frame from the core's Geometry (ticket #60). The class is
-     * the layout-regime switch (css/shell.css positions the frame only
-     * with .is-windowed); the inline styles carry the numbers. Flow views
-     * and the mobile layout keep the frame exactly as tickets #52/#53/#46
-     * draw it — no inline geometry at all.
+     * Paint one frame from its Record (ticket #60 for the Quiz window,
+     * ticket #61 for the program frames). The classes are the layout-regime
+     * switches (css/shell.css positions a frame only with .is-windowed);
+     * the inline styles carry the numbers; z-index carries the stacking
+     * order and a pressed-in title bar marks the active window.
+     *
+     * A program frame with no Record — not arrived yet, or hidden on the
+     * flow stage — is UNPAINTED: display none, no geometry, nothing on the
+     * taskbar. That is the core's absence, derived, never stored here.
      */
-    function paintGeometry(state) {
-      if (!dom || !dom.windowEl || !dom.windowEl.style) return;
-      var win = dom.windowEl;
-      if (state.mode === 'hidden') win.classList.add('is-hidden');
+    function paintFrame(id) {
+      var refs = frameOf(id);
+      if (!refs || !refs.windowEl || !refs.windowEl.style) return;
+      var win = refs.windowEl;
+      var snap = machine.windowSnapshot(id);
+      var exists = !!snap;
+      var mode = exists ? snap.mode : null;
+
+      if (!exists || mode === 'hidden') win.classList.add('is-hidden');
       else win.classList.remove('is-hidden');
-      var positioned = isWindowed() && state.mode === 'normal';
-      if (!positioned) {
+
+      if (exists && mode === 'maximized') win.classList.add('is-maximized');
+      else win.classList.remove('is-maximized');
+
+      // A Record born minimized (the Deep-Dive Prompt at the Finish
+      // Commit) is off the screen from the start; a window in the middle
+      // of its minimize trace keeps tracing and takes the class when the
+      // trace lands.
+      if (mode === 'minimized' && !win.classList.contains('is-minimizing')) {
+        win.classList.add('is-minimized');
+      } else if (mode !== 'minimized') {
+        win.classList.remove('is-minimized');
+      }
+
+      // The active window reads active: its title bar keeps the live navy,
+      // every other frame draws the era's inactive gray gradient.
+      var active = exists && machine.core.canFocus(id);
+      if (active) win.classList.add('is-active');
+      else win.classList.remove('is-active');
+      if (refs.titleBar) {
+        refs.titleBar.setAttribute('data-active', active ? 'true' : 'false');
+      }
+
+      var g = paintedGeometry(id);
+      win.style.zIndex = exists ? String(snap.z) : '';
+      if (!g) {
         win.classList.remove('is-windowed');
         win.style.left = '';
         win.style.top = '';
@@ -335,50 +443,82 @@
         return;
       }
       win.classList.add('is-windowed');
-      var g = clampGeometry(machine.geometry(), viewport());
       win.style.left = g.x + 'px';
       win.style.top = g.y + 'px';
       win.style.width = g.w + 'px';
       win.style.height = g.h + 'px';
     }
 
-    function render() {
-      syncView();
-      var state = machine.getState();
-      if (dom) {
-        if (dom.buttons) {
-          dom.buttons.minimize.disabled = !machine.canMinimize();
-          // Mobile rule (ticket #46): [□] also stays gray at ≤768px —
-          // the stylesheet already shows the maximized form.
-          dom.buttons.maximize.disabled =
-            !machine.canMaximize() || mobileMaximized();
-          dom.buttons.close.disabled = !machine.canClose();
-        }
-        if (dom.windowEl) {
-          // The drawn form comes from the core's mode, never a local copy.
-          if (state.mode === 'maximized') dom.windowEl.classList.add('is-maximized');
-          else dom.windowEl.classList.remove('is-maximized');
-          paintGeometry(state);
-        }
-        if (dom.programBtn) {
-          // Pressed = the window is on the desktop; the core derives that
-          // from the mode (minimized/hidden are the not-visible modes).
-          dom.programBtn.setAttribute('aria-pressed',
-            machine.isVisible() ? 'true' : 'false');
-        }
-      }
-      return state;
+    /** Title-bar control gating for one frame (the core's derived flags). */
+    function paintButtons(id) {
+      var refs = frameOf(id);
+      if (!refs || !refs.buttons) return;
+      refs.buttons.minimize.disabled = !machine.canMinimize(id);
+      // Mobile rule (ticket #46): [□] also stays gray at ≤768px —
+      // the stylesheet already shows the maximized form.
+      refs.buttons.maximize.disabled =
+        !machine.canMaximize(id) || mobileMaximized();
+      refs.buttons.close.disabled = !machine.canClose(id);
     }
 
-    function minimize() {
-      if (!machine.minimize()) return false;
+    /**
+     * The taskbar (ticket #61, spec #58):
+     *
+     *   - The Quiz program button is the app's own button, exactly as
+     *     tickets #43/#60 drew it: pressed while the Quiz window is on the
+     *     desktop, and the way back for a Quiz window the Participant put
+     *     away (close→puts-away STAYS reversible — an unreachable window is
+     *     a regression, mobile included).
+     *   - One button per program window, in the stable program order, and
+     *     EXACTLY the running ones: no Record (the Action Plan has not
+     *     settled, the Deep-Dive Prompt has not been committed) means no
+     *     button, and a hidden window leaves the bar. The button is pressed
+     *     while its window is the ACTIVE window.
+     */
+    function paintTaskbar() {
+      if (dom && dom.programBtn) {
+        // Pressed = the window is on the desktop; the core derives that
+        // from the mode (minimized/hidden are the not-visible modes).
+        dom.programBtn.setAttribute('aria-pressed',
+          machine.isVisible(QUIZ) ? 'true' : 'false');
+      }
+      machine.programIds.forEach(function(id) {
+        if (id === QUIZ) return;
+        var refs = frameOf(id);
+        if (!refs || !refs.taskbarBtn) return;
+        var running = machine.hasWindow(id) && machine.inTaskbar(id);
+        refs.taskbarBtn.hidden = !running;
+        refs.taskbarBtn.setAttribute('aria-pressed',
+          running && machine.canFocus(id) ? 'true' : 'false');
+      });
+    }
+
+    function render() {
+      syncView();
+      var ids = machine.programIds;
+      for (var i = 0; i < ids.length; i++) {
+        paintButtons(ids[i]);
+        paintFrame(ids[i]);
+      }
+      paintTaskbar();
+      return machine.getState(QUIZ);
+    }
+
+    // ── Transitions, per frame ─────────────────────────────────────────
+
+    /** The minimize trace: collapse toward the taskbar, then hide (ticket
+     *  #43); every frame traces with its own token. */
+    function minimize(id) {
+      id = id || QUIZ;
+      if (!machine.minimize(id)) return false;
       render();
-      var win = dom && dom.windowEl;
+      var refs = frameOf(id);
+      var win = refs && refs.windowEl;
       if (win) {
-        var token = ++traceToken;   // supersede any pending trace callback
+        var token = (traceTokens[id] = (traceTokens[id] || 0) + 1);
         win.classList.add('is-minimizing');
         schedule(function() {
-          if (token !== traceToken) return;
+          if (token !== traceTokens[id]) return;
           win.classList.remove('is-minimizing');
           win.classList.add('is-minimized');
         }, traceDelay());
@@ -386,16 +526,18 @@
       return true;
     }
 
-    function restore() {
-      if (!machine.restore()) return false;
-      var win = dom && dom.windowEl;
+    function restore(id) {
+      id = id || QUIZ;
+      if (!machine.restore(id)) return false;
+      var refs = frameOf(id);
+      var win = refs && refs.windowEl;
       if (win) {
-        var token = ++traceToken;   // a stale minimize callback must not re-hide
+        var token = (traceTokens[id] = (traceTokens[id] || 0) + 1);
         win.classList.remove('is-minimizing');
         win.classList.remove('is-minimized');
         win.classList.add('is-restoring');
         schedule(function() {
-          if (token !== traceToken) return;
+          if (token !== traceTokens[id]) return;
           win.classList.remove('is-restoring');
         }, traceDelay());
         if (typeof win.focus === 'function') win.focus();
@@ -404,18 +546,20 @@
       return true;
     }
 
-    function toggleMaximize() {
+    function toggleMaximize(id) {
+      id = id || QUIZ;
       // Mobile rule (ticket #46): at ≤768px there is nothing to toggle —
       // the CSS media query maximizes by default and un-maximizing is
       // meaningless on this viewport. The core stays viewport-blind.
       if (mobileMaximized()) return false;
-      if (!machine.toggleMaximize()) return false;
+      if (!machine.toggleMaximize(id)) return false;
       render();
       return true;
     }
 
-    function requestClose() {
-      if (!machine.requestClose()) return false;
+    function requestClose(id) {
+      id = id || QUIZ;
+      if (!machine.requestClose(id)) return false;
       render();
       return true;
     }
@@ -426,14 +570,16 @@
      * arrangement is exactly what restore() comes back to. No dialog: the
      * gesture puts the window away, it never ends the program's work.
      */
-    function hide() {
-      if (!machine.hide()) return false;
+    function hide(id) {
+      id = id || QUIZ;
+      if (!machine.hide(id)) return false;
       render();
       return true;
     }
 
-    function confirmClose() {
-      if (!machine.confirmClose()) return false;
+    function confirmClose(id) {
+      id = id || QUIZ;
+      if (!machine.confirmClose(id)) return false;
       render();
       return true;
     }
@@ -445,17 +591,90 @@
     }
 
     /**
-     * The [×] decision, in ONE place: 'hidden' when the windowed stage put
-     * the window away, 'dialog' when a flow stage asked for the End Program
-     * confirmation, false when the gesture was refused (the disabled
-     * button never reaches this). js/shell.js opens the dialog on 'dialog'.
+     * The Quiz window's [×] decision, in ONE place (ticket #60): 'hidden'
+     * when the windowed stage put the window away, 'dialog' when a flow
+     * stage asked for the End Program confirmation, false when the gesture
+     * was refused. js/shell.js opens the dialog on 'dialog'.
      */
     function close() {
       syncView();   // the decision follows what is actually on screen
       if (isWindowedView(machine.getState().view)) {
-        return hide() ? 'hidden' : false;
+        return hide(QUIZ) ? 'hidden' : false;
       }
-      return requestClose() ? 'dialog' : false;
+      return requestClose(QUIZ) ? 'dialog' : false;
+    }
+
+    /** A program frame's [×]: put it away (ticket #61). There is no End
+     *  Program dialog for the Action Plan or the Deep-Dive Prompt — the
+     *  gesture never ends anything; it hides the frame and the taskbar
+     *  button (or the next ticket's shortcut) brings it back. */
+    function closeProgram(id) {
+      return hide(id) ? 'hidden' : false;
+    }
+
+    // ── Arrival (ticket #61) ───────────────────────────────────────────
+
+    /**
+     * The program arrives: its Record is born from the core (designed
+     * Geometry, 24px cascade when another window is focused). opts:
+     *   minimized  the window is born in the taskbar only (Deep-Dive
+     *              Prompt at the Finish Commit)
+     *   belowActive  it lands BELOW the active window in the stacking
+     *              order and takes neither focus nor the pointer
+     *
+     * Arrival NEVER calls raise() or setActive() and NEVER scrolls: the
+     * window the Participant is reading stays exactly as it was — same
+     * mode, same Geometry, still active, still on top. It is the same
+     * transition on the LLM Path and on the Deterministic Fallback,
+     * including when the fallback settles inside the current tick.
+     */
+    function openProgram(id, opts) {
+      opts = opts || {};
+      if (!machine.open(id, {
+        minimized: !!opts.minimized,
+        below: opts.below !== false,
+        noCascade: !!opts.noCascade,
+        geometry: opts.geometry
+      })) return false;
+      render();
+      return true;
+    }
+
+    /** The Action Plan's arrival shape: content settled, so the window
+     *  appears beside (never over) the window being read. */
+    function actionPlanArrived() {
+      return openProgram('action-plan', { below: true });
+    }
+
+    /** The Deep-Dive Prompt's arrival shape: minimized at the Finish
+     *  Commit, a taskbar button and nothing else. */
+    function deepDiveArrived() {
+      return openProgram('deep-dive', { minimized: true });
+    }
+
+    // ── Focus and stacking ─────────────────────────────────────────────
+
+    /** Raise + focus: the answer to ANY pointer interaction inside a
+     *  frame (ticket #61) and to a taskbar click on a visible window. */
+    function focusWindow(id) {
+      if (!machine.raise(id)) return false;
+      render();
+      return true;
+    }
+
+    /**
+     * The taskbar button click (ticket #61): a running window becomes the
+     * active one; a minimized window is restored AND focused. Hidden
+     * windows have no button at all, so this never sees one.
+     */
+    function activateProgram(id) {
+      if (!machine.hasWindow(id)) return false;
+      var mode = machine.windowSnapshot(id).mode;
+      if (mode === 'minimized') {
+        restore(id);
+        return focusWindow(id);
+      }
+      return focusWindow(id);
     }
 
     // ── Geometry writes + pointer drag/resize (ticket #60) ─────────────
@@ -467,28 +686,30 @@
      * refuses maximized/minimized/hidden windows and a dialog that owns
      * the desktop. Paint only on a successful write.
      */
-    function applyGeometry(geometry) {
+    function applyGeometry(geometry, id) {
+      id = id || QUIZ;
       if (!isWindowed()) return false;
       var clamped = clampGeometry(geometry, viewport());
-      if (!machine.applyGeometry(clamped)) return false;
+      if (!machine.applyGeometry(clamped, id)) return false;
       render();
       return true;
     }
 
-    /** The Geometry the core holds — fresh copy. */
-    function geometry() {
-      return machine.geometry();
+    /** The Geometry the core holds for a frame — fresh copy, or null. */
+    function geometry(id) {
+      return machine.geometry(id || QUIZ);
     }
 
     /**
-     * One live gesture: 'move' (title bar) or 'resize' (corner grip), with
-     * the pointer id and the Geometry the gesture started from — deltas
-     * are always measured against that origin, never against a clamped
-     * intermediate, so dragging into a wall and back stays true.
+     * One live gesture: 'move' (title bar) or 'resize' (corner grip), on
+     * ONE frame, with the pointer id and the Geometry the gesture started
+     * from — deltas are always measured against that origin, never against
+     * a clamped intermediate, so dragging into a wall and back stays true.
      */
     var drag = null;
 
-    function beginDrag(kind, ev, handle) {
+    function beginDrag(kind, ev, handle, id) {
+      id = id || QUIZ;
       if (!isWindowed()) return false;
       // A secondary pointer (the second finger of a pinch) never hijacks a
       // live gesture; a new primary gesture replaces a stale one, which is
@@ -496,13 +717,18 @@
       // unavailable.
       if (drag && ev && ev.isPrimary === false) return false;
       if (!ev || (ev.button != null && ev.button !== 0)) return false;
-      if (machine.getState().mode !== 'normal') return false;
+      if (!machine.hasWindow(id) || machine.windowSnapshot(id).mode !== 'normal') {
+        return false;
+      }
+      // Grabbing a frame's handle IS a pointer interaction inside it.
+      machine.raise(id);
       drag = {
+        id: id,
         kind: kind,
         pointerId: ev.pointerId,
         startX: ev.clientX,
         startY: ev.clientY,
-        origin: machine.geometry()
+        origin: machine.geometry(id)
       };
       // Capture keeps the move/up stream on the handle even when the
       // pointer runs off the title bar or the window edge.
@@ -510,9 +736,11 @@
           typeof handle.setPointerCapture === 'function') {
         try { handle.setPointerCapture(ev.pointerId); } catch (e) { /* no capture */ }
       }
-      if (dom && dom.windowEl && dom.windowEl.classList) {
-        dom.windowEl.classList.add(kind === 'move' ? 'is-dragging' : 'is-resizing');
+      var refs = frameOf(id);
+      if (refs && refs.windowEl && refs.windowEl.classList) {
+        refs.windowEl.classList.add(kind === 'move' ? 'is-dragging' : 'is-resizing');
       }
+      render();
       return true;
     }
 
@@ -526,17 +754,18 @@
       var next = drag.kind === 'move'
         ? { x: o.x + dx, y: o.y + dy, w: o.w, h: o.h }
         : { x: o.x, y: o.y, w: o.w + dx, h: o.h + dy };
-      return applyGeometry(next);
+      return applyGeometry(next, drag.id);
     }
 
     function endDrag(ev) {
       if (!drag || (ev && ev.pointerId !== undefined && ev.pointerId !== drag.pointerId)) {
         return false;
       }
+      var refs = frameOf(drag.id);
       drag = null;
-      if (dom && dom.windowEl && dom.windowEl.classList) {
-        dom.windowEl.classList.remove('is-dragging');
-        dom.windowEl.classList.remove('is-resizing');
+      if (refs && refs.windowEl && refs.windowEl.classList) {
+        refs.windowEl.classList.remove('is-dragging');
+        refs.windowEl.classList.remove('is-resizing');
       }
       return true;
     }
@@ -547,12 +776,13 @@
       return !!(t && typeof t.closest === 'function' && t.closest('.os-titlebar-btn'));
     }
 
-    /** Wire one gesture source: down starts, move drags, up/cancel ends. */
-    function wireDragHandle(el, kind) {
+    /** Wire one gesture source of one frame: down starts, move drags,
+     *  up/cancel ends. */
+    function wireDragHandle(el, kind, id) {
       if (!el) return;
       on(el, 'pointerdown', function(ev) {
         if (isTitleBarControl(ev)) return;
-        if (beginDrag(kind, ev, el) && ev && typeof ev.preventDefault === 'function') {
+        if (beginDrag(kind, ev, el, id) && ev && typeof ev.preventDefault === 'function') {
           ev.preventDefault();
         }
       });
@@ -561,15 +791,45 @@
       on(el, 'pointercancel', endDrag);
     }
 
+    /**
+     * Raise-on-interaction (ticket #61, spec #58): ANY pointer interaction
+     * inside a frame raises it and makes it active. The title-bar handles
+     * already raise through beginDrag; this covers clicks and drags inside
+     * the body. A frame whose window is minimized or hidden cannot be
+     * interacted with — the core refuses, exactly as raise() says.
+     */
+    function wireRaise(el, id) {
+      if (!el) return;
+      on(el, 'pointerdown', function(ev) {
+        if (isTitleBarControl(ev)) return;      // the button paints its own state
+        focusWindow(id);
+      });
+    }
+
+    /** The taskbar button for one frame: focus, or restore when minimized. */
+    function wireTaskbarBtn(btn, id) {
+      if (!btn) return;
+      on(btn, 'click', function() {
+        controller.activateProgram(id);
+      });
+    }
+
     var controller = {
-      getState: function() { return machine.getState(); },
-      canMinimize: machine.canMinimize,
-      canMaximize: machine.canMaximize,
-      canClose: machine.canClose,
+      getState: function(id) { return machine.getState(id || QUIZ); },
+      activeId: machine.activeId,
+      programIds: machine.programIds,
+      runningPrograms: machine.taskbarList,
+      hasWindow: machine.hasWindow,
+      canMinimize: function(id) { return machine.canMinimize(id || QUIZ); },
+      canMaximize: function(id) { return machine.canMaximize(id || QUIZ); },
+      canClose: function(id) { return machine.canClose(id || QUIZ); },
       // The mode consequences the shell renders from — derived by the core.
-      isVisible: machine.isVisible,
-      inTaskbar: machine.inTaskbar,
-      canFocus: machine.canFocus,
+      // A call without an Id addresses the Quiz window: that is what the
+      // tickets #43/#60 surface always meant, and the desktop now has more
+      // than one window to be ambiguous about.
+      isVisible: function(id) { return machine.isVisible(id || QUIZ); },
+      inTaskbar: function(id) { return machine.inTaskbar(id || QUIZ); },
+      canFocus: function(id) { return machine.canFocus(id || QUIZ); },
       snapshot: machine.snapshot,
       minimize: minimize,
       restore: restore,
@@ -579,20 +839,28 @@
       cancelClose: cancelClose,
       hide: hide,
       close: close,
+      closeProgram: closeProgram,
       // The desktop regime (ticket #60): geometry through the core, plus
       // the controller's view/viewport decision.
       applyGeometry: applyGeometry,
       geometry: geometry,
       isWindowed: isWindowed,
-      setView: function(view) { machine.setView(view); return render(); },
+      setView: function(view) { applyStage(view); return render(); },
       render: render,
+      // The three-program desktop (ticket #61).
+      openProgram: openProgram,
+      actionPlanArrived: actionPlanArrived,
+      deepDiveArrived: deepDiveArrived,
+      focusWindow: focusWindow,
+      activateProgram: activateProgram,
 
-      /** Wire the built shell DOM (js/shell.js calls this after build()). */
+      /** Wire the built Quiz shell DOM (js/shell.js calls this after build()). */
       attach: function(refs) {
         dom = refs || null;
         if (dom && dom.windowEl) {
           // Makes restore()'s focus() land: a div needs a tabindex.
           dom.windowEl.setAttribute('tabindex', '-1');
+          wireRaise(dom.windowEl, QUIZ);
         }
         if (dom && dom.programBtn) {
           // The program button is the way back: it restores a minimized
@@ -602,15 +870,16 @@
           // those two modes; the core's restore() refuses every other, so
           // a click on a visible window stays a no-op refocus.
           on(dom.programBtn, 'click', function() {
-            if (!machine.isVisible()) controller.restore();
+            if (!machine.isVisible(QUIZ)) controller.restore(QUIZ);
+            else controller.focusWindow(QUIZ);
           });
         }
         // Desktop regime (ticket #60): the title bar drags the window and
         // the corner grip resizes it, both through applyGeometry → the
-        // core. On the flow views and the mobile layout beginDrag refuses;
+        // core. On the flow views and on the mobile layout beginDrag refuses;
         // while maximized the core itself refuses the write.
-        wireDragHandle(dom && dom.titleBar, 'move');
-        wireDragHandle(dom && dom.resizeGrip, 'resize');
+        wireDragHandle(dom && dom.titleBar, 'move', QUIZ);
+        wireDragHandle(dom && dom.resizeGrip, 'resize', QUIZ);
         // View changes (App.showView flips section[hidden]) re-render the
         // button gating: landing draws [×][□] gray, every other view live.
         // Observer, not a showView patch — js/main.js stays read-only.
@@ -638,6 +907,25 @@
           } catch (e) { /* live media query unavailable → desktop gate */ }
         }
         return render();
+      },
+
+      /**
+       * Wire one program frame (ticket #61). Same controls, same handles,
+       * same raise-on-interaction rule as the Quiz window — the frames
+       * differ only in what is mounted inside them.
+       */
+      attachProgram: function(id, refs) {
+        if (!refs) return false;
+        programs[id] = refs;
+        if (refs.windowEl) {
+          refs.windowEl.setAttribute('tabindex', '-1');
+          wireRaise(refs.windowEl, id);
+        }
+        wireDragHandle(refs.titleBar, 'move', id);
+        wireDragHandle(refs.resizeGrip, 'resize', id);
+        wireTaskbarBtn(refs.taskbarBtn, id);
+        render();
+        return true;
       }
     };
 

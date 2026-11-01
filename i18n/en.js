@@ -96,6 +96,14 @@
       '(SIL Open Font License 1.1).',
     'shell.ok': 'OK',
 
+    /* ── Program windows (ticket #61) ──
+       The Action Plan and the Deep-Dive Prompt are programs of their own:
+       these are their title bars and taskbar buttons. 'shell.programs' is
+       the accessible name of the running-windows list in the taskbar. */
+    'shell.actionPlanWindow': 'Action Plan',
+    'shell.deepDiveWindow': 'Deep-Dive Prompt',
+    'shell.programs': 'Programs',
+
     /* ── End Program dialog (ticket #43) ──
        Wording mirrors the Win95 "End Program" confirmation: the title bar
        names the program being ended, the message asks the single question.

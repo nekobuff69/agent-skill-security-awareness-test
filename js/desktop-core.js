@@ -45,11 +45,16 @@
  *               driving confirmClose) owns the desktop — every other
  *               transition is blocked while it is true
  *
- * Ticket #59 wires exactly ONE window (the Quiz window); the record map is
- * keyed by Id so the later three-program desktop reuses this core without
- * reshaping it. The mobile rule (ticket #46: [□] disabled at ≤768px) stays
- * a controller/stylesheet consequence — the core is viewport-blind and
- * never models a mode the stylesheet can silently override.
+ * Ticket #59 wired exactly ONE window (the Quiz window); ticket #61 (spec
+ * #58) runs the desktop as THREE programs — Quiz, Action Plan, Deep-Dive
+ * Prompt — all on this one Record map, keyed by Id: per-window transitions,
+ * per-program designed defaults, a 24px down-right cascade on arrival, and
+ * a taskbar that lists exactly the running windows in program order. An
+ * absent Record is NOT a mode: the Action Plan does not exist at all until
+ * its content settles, and open() is the only way a Record comes to be.
+ * The mobile rule (ticket #46: [□] disabled at ≤768px) stays a
+ * controller/stylesheet consequence — the core is viewport-blind and never
+ * models a mode the stylesheet can silently override.
  */
 (function(global) {
   'use strict';
@@ -66,13 +71,30 @@
   var MODE_MINIMIZED = 'minimized';
   var MODE_HIDDEN = 'hidden';
 
-  /** The one window wired by ticket #59; #60+ add the other two Ids. */
+  /** The three programs (ticket #61, parent spec #58): the Quiz program
+   *  plus the two windows that moved out of its body — the Action Plan and
+   *  the Deep-Dive Prompt. The order is the STABLE TASKBAR ORDER. */
   var QUIZ_ID = 'quiz';
+  var ACTION_PLAN_ID = 'action-plan';
+  var DEEP_DIVE_ID = 'deep-dive';
+  var PROGRAM_IDS = [QUIZ_ID, ACTION_PLAN_ID, DEEP_DIVE_ID];
 
-  /** Designed default geometry for the Quiz window (desktop coordinates,
-   *  taskbar excluded). Later tickets tune these per program; nothing in
-   *  ticket #59 renders it. */
-  var DEFAULT_GEOMETRY = { x: 48, y: 40, w: 928, h: 644 };
+  /** Designed default geometry per program (desktop coordinates, taskbar
+   *  excluded). The Quiz default is the ticket #60 arrangement: at
+   *  1024×768 the score header, Risk Radar and Blind-Spot Bars stay
+   *  readable without internal scrolling (768 − 36 taskbar = 732 desktop
+   *  height; 40 + 644 = 684 clears it, 48 + 928 = 976 clears 1024). The two
+   *  adjunct programs are tuned to sit inside the same desktop when they
+   *  arrive beside it. Nothing in the core renders these. */
+  var DESIGN_DEFAULTS = {
+    'quiz': { x: 48, y: 40, w: 928, h: 644 },
+    'action-plan': { x: 152, y: 120, w: 640, h: 480 },
+    'deep-dive': { x: 136, y: 96, w: 600, h: 440 }
+  };
+
+  /** The cascade step: a window born (or re-opened) while another window
+   *  is focused shifts 24px down and right off its designed default. */
+  var CASCADE = 24;
 
   /** Fresh copy — a Record never aliases a caller's object, and a
    *  snapshot never aliases the Record. */
@@ -97,8 +119,14 @@
 
   /**
    * Build the desktop. opts:
-   *   id        Id of the single wired window (default 'quiz')
+   *   id        Id of the window wired at boot (default 'quiz')
    *   geometry  designed default geometry for that window (optional)
+   *
+   * Ticket #61 (spec #58): the record map is keyed by program Id and starts
+   * with the sole wired window only. The Action Plan and the Deep-Dive
+   * Prompt are BORN LATER through open() — "the Action Plan window does not
+   * exist until its content settles" — so an absent record is not the same
+   * thing as a hidden one: nothing renders it, nothing lists it.
    */
   function createCore(opts) {
     opts = opts || {};
@@ -113,7 +141,8 @@
     };
 
     var start = hasValidGeometry(opts.geometry)
-      ? copyGeometry(opts.geometry) : copyGeometry(DEFAULT_GEOMETRY);
+      ? copyGeometry(opts.geometry)
+      : copyGeometry(DESIGN_DEFAULTS[soleId] || DESIGN_DEFAULTS[QUIZ_ID]);
 
     desktop.windows[soleId] = {
       mode: MODE_NORMAL,
@@ -123,58 +152,88 @@
       z: 0
     };
 
-    /** An absent or unknown Id addresses the active window. */
+    /** No Id addresses the active window; a named Id with no Record (a
+     *  program that has not arrived yet) addresses NOTHING — the queries
+     *  below answer false for it. Ticket #61: the Action Plan and the
+     *  Deep-Dive Prompt have no Record until open() settles them. */
     function target(id) {
-      return desktop.windows[id] ? id : desktop.active;
+      if (id === undefined || id === null) return desktop.active;
+      return desktop.windows[id] ? id : null;
+    }
+
+    /** True when the program has a Record at all (open() has run). */
+    function hasWindow(id) {
+      return !!desktop.windows[id];
     }
 
     function record(id) {
-      return desktop.windows[target(id)];
+      var rid = target(id);
+      return rid === null ? null : desktop.windows[rid];
     }
 
     function isActive(id) {
-      return desktop.active === target(id);
+      var rid = target(id);
+      return rid !== null && desktop.active === rid;
     }
 
     // ── Derived queries: consequences of the mode, never stored ────────
 
     /** normal/maximized show on the desktop; minimized/hidden do not. */
     function isVisible(id) {
-      return isDeskMode(record(id).mode);
+      var r = record(id);
+      return !!r && isDeskMode(r.mode);
     }
 
     /** Running programs live in the taskbar; a hidden one has no button,
-     *  and its shortcut is the way back. */
+     *  and its shortcut is the way back. An unopened program has no
+     *  button either — it is not running yet. */
     function inTaskbar(id) {
-      return record(id).mode !== MODE_HIDDEN;
+      var r = record(id);
+      return !!r && r.mode !== MODE_HIDDEN;
+    }
+
+    /** The taskbar list: EXACTLY the running windows (every Record that is
+     *  not hidden) in the stable program order. */
+    function taskbarList() {
+      var list = [];
+      PROGRAM_IDS.forEach(function(pid) {
+        if (desktop.windows[pid] && desktop.windows[pid].mode !== MODE_HIDDEN) {
+          list.push(pid);
+        }
+      });
+      return list;
     }
 
     /** Focus participation follows the table: hidden never, anything else
      *  only while it is the active window. */
     function canFocus(id) {
-      return record(id).mode !== MODE_HIDDEN && isActive(id);
+      var r = record(id);
+      return !!r && r.mode !== MODE_HIDDEN && isActive(id);
     }
 
     /** [—] is live on every view (era rule, ticket #43) but never twice:
      *  an already minimized or hidden window has nothing to shrink. The
      *  dialog owns the desktop while it is open. */
     function canMinimize(id) {
-      return !desktop.confirmOpen && isDeskMode(record(id).mode);
+      var r = record(id);
+      return !desktop.confirmOpen && !!r && isDeskMode(r.mode);
     }
 
     /** [□] is gated off on the landing view (no maximized work to reveal)
      *  and while the dialog owns the desktop. Mode impossibility
      *  (minimized/hidden) is refused by toggleMaximize itself. */
     function canMaximize(id) {
+      var r = record(id);
       return !desktop.confirmOpen && desktop.view !== VIEW_LANDING &&
-        record(id).mode !== MODE_HIDDEN;
+        !!r && r.mode !== MODE_HIDDEN;
     }
 
     /** [×] follows the same era gate as [□]; a hidden window has nothing
      *  on the desktop to close. */
     function canClose(id) {
+      var r = record(id);
       return !desktop.confirmOpen && desktop.view !== VIEW_LANDING &&
-        record(id).mode !== MODE_HIDDEN;
+        !!r && r.mode !== MODE_HIDDEN;
     }
 
     function isConfirmOpen() {
@@ -187,6 +246,97 @@
 
     function activeId() {
       return desktop.active;
+    }
+
+    // ── Arrival (ticket #61) ───────────────────────────────────────────
+
+    /** The geometry a program is designed to open with. */
+    function designedGeometry(id) {
+      return DESIGN_DEFAULTS[id] ? copyGeometry(DESIGN_DEFAULTS[id]) : null;
+    }
+
+    /** A focused window to cascade from: the active Record, when it is a
+     *  different program and it is on the desktop (normal/maximized). */
+    function focusedGeometry(exceptId) {
+      var w = desktop.windows[desktop.active];
+      if (!w || desktop.active === exceptId || !isDeskMode(w.mode)) return null;
+      return w.geometry;
+    }
+
+    /**
+     * open(id, opts) — the ONLY way a Record comes into existence.
+     * opts:
+     *   geometry  caller-supplied designed geometry (validated)
+     *   minimized birth mode: the window arrives in the taskbar only
+     *           (the Deep-Dive Prompt at the Finish Commit)
+     *   noCascade skip the 24px cascade even though a window is focused
+     *   below     stack the newcomer directly BELOW the active window
+     *           instead of on top (the Action Plan arrival: it must never
+     *           cover the window the Participant is reading)
+     *
+     * Arrival NEVER activates: the active Id, every other window's mode
+     * and geometry, and the active window's place on top are untouched —
+     * only the relative order of the windows UNDER the active one shifts
+     * to make room, which is invisible to the Participant.
+     *
+     * Re-arriving a program whose Record exists but was PUT AWAY (hidden —
+     * which is also where leaving the desktop stage leaves it: the flow
+     * stages have no desktop to stand a program window on) ARRIVES IT
+     * AGAIN: settled content is an arrival, and the window comes back with
+     * a fresh designed arrangement. A program already on the desktop or
+     * minimized in the taskbar is left exactly where it is — the Presenter
+     * re-renders into the frame that is already there.
+     */
+    function open(id, opts) {
+      opts = opts || {};
+      if (!DESIGN_DEFAULTS[id]) return false;
+      var existing = desktop.windows[id];
+      if (existing && existing.mode !== MODE_HIDDEN) return false;
+
+      var geometry = hasValidGeometry(opts.geometry)
+        ? copyGeometry(opts.geometry) : designedGeometry(id);
+      var cascade = focusedGeometry(id);
+      if (cascade && !opts.noCascade) {
+        geometry.x = cascade.x + CASCADE;
+        geometry.y = cascade.y + CASCADE;
+      }
+      var mode = opts.minimized ? MODE_MINIMIZED : MODE_NORMAL;
+      var rec = existing || (desktop.windows[id] = {});
+      rec.mode = mode;
+      rec.geometry = geometry;
+      rec.lastGeometry = copyGeometry(geometry);
+      rec.lastMode = MODE_NORMAL;
+      rec.z = rec.z || 0;
+      placeInStack(id, opts.below);
+      return true;
+    }
+
+    /** Ids ordered bottom → top by z. */
+    function stackOrder() {
+      return Object.keys(desktop.windows).sort(function(a, b) {
+        return desktop.windows[a].z - desktop.windows[b].z;
+      });
+    }
+
+    /** Insert the newcomer into the stack and renumber bottom → top. With
+     *  `below` it lands directly under the active window; otherwise on
+     *  top. zCounter follows the compacted order so the next raise still
+     *  wins. */
+    function placeInStack(id, below) {
+      var order = stackOrder();
+      var mine = order.indexOf(id);
+      if (mine >= 0) order.splice(mine, 1);       // a re-born Record re-arrives
+      var topId = desktop.windows[desktop.active] ? desktop.active : null;
+      var at = order.length;
+      if (below && topId && topId !== id) {
+        var ti = order.indexOf(topId);
+        if (ti >= 0) at = ti;
+      }
+      order.splice(at, 0, id);
+      order.forEach(function(pid, i) {
+        desktop.windows[pid].z = i;
+      });
+      desktop.zCounter = order.length - 1;
     }
 
     // ── Transitions ────────────────────────────────────────────────────
@@ -209,7 +359,7 @@
     function restore(id) {
       if (desktop.confirmOpen) return false;
       var r = record(id);
-      if (r.mode !== MODE_MINIMIZED && r.mode !== MODE_HIDDEN) return false;
+      if (!r || (r.mode !== MODE_MINIMIZED && r.mode !== MODE_HIDDEN)) return false;
       r.mode = r.lastMode;
       r.geometry = copyGeometry(r.lastGeometry);
       return true;
@@ -231,14 +381,35 @@
      *  lands where the Participant was. */
     function hide(id) {
       if (desktop.confirmOpen) return false;
+      var rid = target(id);
       var r = record(id);
-      if (r.mode === MODE_HIDDEN) return false;
+      if (!r || r.mode === MODE_HIDDEN) return false;
       if (r.mode !== MODE_MINIMIZED) {
         r.lastMode = r.mode;
         r.lastGeometry = copyGeometry(r.geometry);
       }
       r.mode = MODE_HIDDEN;
+      // Putting away the ACTIVE window hands the desktop to the topmost
+      // window still on it (ticket #61). With none left the active Id
+      // stays where it was — hidden windows simply cannot take focus.
+      if (desktop.active === rid) {
+        var next = leaderId();
+        if (next) desktop.active = next;
+      }
       return true;
+    }
+
+    /** Id of the topmost Record still on the desktop, or null. */
+    function leaderId() {
+      var leader = null;
+      var top = -Infinity;
+      PROGRAM_IDS.forEach(function(pid) {
+        var w = desktop.windows[pid];
+        if (!w || !isDeskMode(w.mode) || w.z <= top) return;
+        top = w.z;
+        leader = pid;
+      });
+      return leader;
     }
 
     // ── The End Program gate ───────────────────────────────────────────
@@ -257,6 +428,7 @@
       desktop.confirmOpen = false;
       desktop.view = VIEW_LANDING;
       var r = record(id);
+      if (!r) return true;
       r.mode = MODE_NORMAL;
       r.lastMode = MODE_NORMAL;
       r.lastGeometry = copyGeometry(r.geometry);
@@ -281,7 +453,7 @@
       if (!hasValidGeometry(geometry)) return false;
       if (desktop.confirmOpen) return false;
       var r = record(id);
-      if (r.mode !== MODE_NORMAL) return false;
+      if (!r || r.mode !== MODE_NORMAL) return false;
       r.geometry = copyGeometry(geometry);
       r.lastGeometry = copyGeometry(geometry);
       return true;
@@ -309,6 +481,7 @@
     function raise(id) {
       if (desktop.confirmOpen) return false;
       var rid = target(id);
+      if (rid === null) return false;
       if (!isDeskMode(desktop.windows[rid].mode)) return false;
       desktop.windows[rid].z = ++desktop.zCounter;
       desktop.active = rid;
@@ -317,8 +490,10 @@
 
     // ── Snapshots: fresh copies, never aliases ─────────────────────────
 
+    /** null for a program that has no Record yet (it has not arrived). */
     function windowSnapshot(id) {
       var r = record(id);
+      if (!r) return null;
       return {
         mode: r.mode,
         geometry: copyGeometry(r.geometry),
@@ -344,6 +519,10 @@
 
     return {
       soleId: soleId,
+      hasWindow: hasWindow,
+      open: open,
+      designedGeometry: designedGeometry,
+      taskbarList: taskbarList,
       isVisible: isVisible,
       inTaskbar: inTaskbar,
       canFocus: canFocus,
@@ -371,7 +550,12 @@
 
   app.Desktop.createCore = createCore;
   app.Desktop.VIEW_LANDING = VIEW_LANDING;
+  app.Desktop.PROGRAM_IDS = PROGRAM_IDS;
   app.Desktop.QUIZ_ID = QUIZ_ID;
+  app.Desktop.ACTION_PLAN_ID = ACTION_PLAN_ID;
+  app.Desktop.DEEP_DIVE_ID = DEEP_DIVE_ID;
+  app.Desktop.DESIGN_DEFAULTS = DESIGN_DEFAULTS;
+  app.Desktop.CASCADE = CASCADE;
 
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = app;

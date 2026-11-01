@@ -97,6 +97,13 @@
       'SIL OFL 1.1 许可）。',
     'shell.ok': '确定',
 
+    /* ── 程序窗口（ticket #61） ──
+       行动计划与深度提问各自成窗：这些是它们的标题栏与任务栏按钮文案。
+       'shell.programs' 是任务栏窗口列表的名称。 */
+    'shell.actionPlanWindow': '行动计划',
+    'shell.deepDiveWindow': '深度提问',
+    'shell.programs': '程序',
+
     /* ── 结束程序对话框（ticket #43） ──
        措辞对应 Win95 的“结束程序”确认框：标题栏点名被结束的程序，
        正文只问一个问题。可复用原语 App.Windows.openSystemDialog 在打开时
