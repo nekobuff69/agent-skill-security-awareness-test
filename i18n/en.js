@@ -36,13 +36,15 @@
        screen always names the program that follows it. */
     'boot.status': 'Starting application…',
 
-    /* ── Landing view ── */
+    /* ── Landing view (welcome splash, issue #53) ── */
+    'landing.headline1': 'Be Informed.',
+    'landing.headline2': 'Be Aware.',
     'landing.titleFallback': 'Agent Security Awareness Quiz',
-    'landing.subtitleFallback': '',
-    'landing.meta': '{count} questions {time}',
+    'landing.body': '{count} questions about the skills you install and the agents you run. Answer honestly; the results are for you.',
+    'landing.meta': '{count} questions · {time}',
     'landing.metaCountFallback': '20',
     'landing.timeFallback': '8-12 minutes',
-    'landing.start': 'Start Assessment',
+    'landing.start': 'Start',
 
     /* ── Quiz Chrome & Question Card ── */
     'quiz.phaseChip': 'Phase {number} · {title}',

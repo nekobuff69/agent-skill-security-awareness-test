@@ -88,6 +88,36 @@ body {
   padding-right: var(--space-4);
 }
 
+/* ── Welcome splash window (ticket #53) ──────────────────────────────
+
+   While the Landing view is the visible view, the window drops the
+   fixed-height desktop frame and becomes a content-sized ~560px panel
+   centred on the teal desktop above the taskbar. Every other view keeps
+   the ticket #52 frame unchanged. The state is derived from the DOM the
+   shell already maintains — App.showView flips section[hidden] — so no
+   view controller is told about window sizing. */
+
+body:has(#app > #landing-view:not([hidden])) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  /* The taskbar is fixed at the bottom edge; body's normal reserved
+     padding would push the centred window up by its own height, so the
+     splash reserves nothing and the window centres in the viewport strip
+     above the bar. */
+  height: calc(100vh - var(--os-taskbar-height));
+  padding-bottom: 0;
+}
+
+body:has(#app > #landing-view:not([hidden])) .os-window {
+  position: static;   /* the ≤768px maximized rule must not pin this box */
+  width: min(560px, calc(100vw - 2 * var(--space-4)));
+  height: auto;       /* content-sized: title bar + welcome card */
+  max-height: 100%;   /* taller content scrolls inside the view body */
+  margin: 0;
+}
+
 /* ── Title bar ─────────────────────────────────────────────────────────
 
    Navy → lighter blue gradient, exactly like the Quiz Card header drawn in

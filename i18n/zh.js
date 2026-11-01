@@ -37,10 +37,12 @@
        闪屏复用落地页标题作为应用名，保证开机画面与随后的程序同名。 */
     'boot.status': '正在启动程序……',
 
-    /* ── 落地页 ── */
+    /* ── 落地页（issue #53） ── */
+    'landing.headline1': '了解风险',
+    'landing.headline2': '保持警觉',
     'landing.titleFallback': '智能体安全意识测评',
-    'landing.subtitleFallback': '',
-    'landing.meta': '{count} 道问题，约 {time}',
+    'landing.body': '{count} 道题，关于你安装的技能和你运行的智能体。如实作答，结果只给你自己看。',
+    'landing.meta': '{count} 道问题 · {time}',
     'landing.metaCountFallback': '20',
     'landing.timeFallback': '8-12 分钟',
     'landing.start': '开始测评',

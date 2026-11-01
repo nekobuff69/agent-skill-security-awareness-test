@@ -65,12 +65,15 @@ exports.run = function() {
     Object.defineProperty(el, 'firstChild', {
       get: function() { return el.children.length ? el.children[0] : null; }
     });
-    // innerHTML = '' is the module's view reset; clearing children is the
-    // only use the code makes of it.
+    // innerHTML = '' is the module's view reset: it must really clear the
+    // children. A non-empty value is only ever the splash's inline eye
+    // glyph — an <svg> string kept verbatim, never parsed into children
+    // (same pattern as the shell's title-bar glyphs).
     Object.defineProperty(el, 'innerHTML', {
-      get: function() { return ''; },
+      get: function() { return el._html || ''; },
       set: function(v) {
-        if (v !== '') throw new Error('fake innerHTML only supports the clear path');
+        el._html = String(v);
+        if (v !== '') return;
         el.children.forEach(function(c) { c.parentNode = null; });
         el.children = [];
       }
@@ -167,12 +170,136 @@ exports.run = function() {
     questions: [q('q1', 'p1'), q('q2', 'p1'), q('q3', 'p2')]
   };
 
-  /* ── Other views: no status bar of their own ────────────────────────── */
+  /* ── Welcome splash: structure, copy, single action (ticket #53) ────── */
+
+  // The first-visit language offer must no longer be wired into the
+  // landing renderer. Both entry points are stubbed with call counters so
+  // a regression that offers again fails loudly here.
+  var offerCalls = { into: 0, should: 0 };
+  App.LangRouting = {
+    offerInto: function() { offerCalls.into++; return false; },
+    shouldOffer: function() { offerCalls.should++; return true; }
+  };
 
   App.renderLanding(bank);
+
+  var landing = views['landing-view'];
+
   check('landing view carries no status bar or footer',
-    byClass(views['landing-view'], 'quiz-statusbar').length === 0 &&
-    byClass(views['landing-view'], 'quiz-footer').length === 0);
+    byClass(landing, 'quiz-statusbar').length === 0 &&
+    byClass(landing, 'quiz-footer').length === 0);
+
+  check('the first-visit language offer is not rendered on the landing view',
+    offerCalls.into === 0 && offerCalls.should === 0,
+    JSON.stringify(offerCalls));
+
+  var head = landing.children[0];
+  var icon = head.children[0];
+  var title = head.children[1];
+  var sub = head.children[2];
+  var rule = landing.children[1];
+  var bodyLine = landing.children[2];
+  var metaLine = landing.children[3];
+  var actions = landing.children[4];
+
+  check('splash: head (icon + headline + subtitle), rule, body, meta, actions — in order',
+    landing.children.length === 5 &&
+    String(head.className).indexOf('wizard-head') >= 0 &&
+    String(icon.className).indexOf('wizard-icon') >= 0 &&
+    title.tagName === 'H1' &&
+    String(title.className).indexOf('wizard-title') >= 0 &&
+    String(sub.className).indexOf('wizard-sub') >= 0 &&
+    rule.tagName === 'HR' &&
+    String(rule.className).indexOf('wizard-rule') >= 0 &&
+    String(bodyLine.className).indexOf('wizard-body') >= 0 &&
+    String(metaLine.className).indexOf('wizard-meta') >= 0 &&
+    String(actions.className).indexOf('wizard-actions') >= 0,
+    'children=' + landing.children.length);
+
+  check('splash: 64px eye glyph — almond outline, navy iris, black pupil, white glint',
+    icon.innerHTML.indexOf('<svg') === 0 &&
+    icon.innerHTML.indexOf('width="64"') >= 0 &&
+    icon.innerHTML.indexOf('stroke="#000000"') >= 0 &&
+    icon.innerHTML.indexOf('fill="#000080"') >= 0 &&
+    icon.innerHTML.indexOf('fill="#000000"') >= 0 &&
+    icon.innerHTML.indexOf('fill="#FFFFFF"') >= 0,
+    icon.innerHTML.slice(0, 40));
+
+  check('splash: the catchphrase headline is two dictionary lines',
+    title.children.length === 2 &&
+    title.children[0].textContent === App.I18n.t('landing.headline1') &&
+    title.children[0].textContent === 'Be Informed.' &&
+    title.children[1].textContent === App.I18n.t('landing.headline2') &&
+    title.children[1].textContent === 'Be Aware.',
+    title.children.map(function(c) { return c.textContent; }).join(' / '));
+
+  check('splash: the Bank Variant title is the subtitle',
+    sub.textContent === 'Fixture' && sub.textContent === bank.meta.title,
+    sub.textContent);
+
+  check('splash: one body line with the count, then the time estimate',
+    bodyLine.textContent.indexOf('3 questions about the skills') === 0 &&
+    metaLine.textContent === '3 questions · 8-12 minutes',
+    bodyLine.textContent + ' / ' + metaLine.textContent);
+
+  /* ── Single primary action ─────────────────────────────────────────── */
+
+  function landingButtons() {
+    var found = [];
+    walk(landing, function(el) { if (el.tagName === 'BUTTON') found.push(el); });
+    return found;
+  }
+
+  var splashBtns = landingButtons();
+  check('splash: exactly one action — the default [Start] button',
+    splashBtns.length === 1 &&
+    splashBtns[0].id === 'start-btn' &&
+    splashBtns[0].textContent === 'Start' &&
+    String(splashBtns[0].className).indexOf('wizard-btn-default') >= 0,
+    splashBtns.length + '/' + (splashBtns[0] && splashBtns[0].textContent));
+
+  /* ── Start path: analytics event + show quiz + render ──────────────── */
+
+  var shownViews = [];
+  var realShowView = App.showView;
+  App.showView = function(id) { shownViews.push(id); };
+  tracked.length = 0;
+
+  splashBtns[0].click();
+
+  check('Start fires quiz_started, shows the quiz view and renders it',
+    tracked.length === 1 && tracked[0] === 'quiz_started' &&
+    shownViews.length === 1 && shownViews[0] === 'quiz-view' &&
+    views['quiz-view'].children.length === 3 &&
+    byClass(views['quiz-view'], 'quiz-statusbar').length === 1,
+    JSON.stringify(tracked) + '/' + JSON.stringify(shownViews));
+
+  if (realShowView === undefined) delete App.showView;
+  else App.showView = realShowView;
+  tracked.length = 0;   // later suites count Finish's event from zero
+
+  /* ── Same structure in Simplified Chinese (both locales, structurally) ─ */
+
+  require('../../i18n/zh.js');
+  App.I18n.use('zh');
+  App.renderLanding(bank);
+
+  var zhTitle = byClass(landing, 'wizard-title')[0];
+  var zhMeta = byClass(landing, 'wizard-meta')[0];
+  var zhStart = null;
+  walk(landing, function(el) { if (el.id === 'start-btn') zhStart = el; });
+
+  check('splash structure and copy hold in the zh dictionary',
+    landing.children.length === 5 &&
+    zhTitle.children[0].textContent === '了解风险' &&
+    zhTitle.children[1].textContent === '保持警觉' &&
+    zhMeta.textContent === '3 道问题 · 8-12 分钟' &&
+    !!zhStart && zhStart.textContent === '开始测评' &&
+    byClass(landing, 'wizard-icon').length === 1,
+    zhMeta.textContent + '/' + (zhStart && zhStart.textContent));
+
+  App.I18n.use('en');
+  delete App.LangRouting;   // restore: the landing renderer owns no offer
 
   /* ── Scaffolding: body + footer + status bar, in order ──────────────── */
 
@@ -357,6 +484,37 @@ exports.run = function() {
   check('shell.css: every view scrolls internally except the quiz',
     /:not\(#quiz-view\)/.test(shellCss) &&
     /\.os-window\s+#app\s*>\s*section:not\(\[hidden\]\):not\(#quiz-view\)\s*\{[^}]*overflow-y:\s*auto/.test(shellCss));
+
+  /* ── Splash window + welcome card contracts (ticket #53) ───────────── */
+
+  var stylesCss = read('styles.css');
+
+  check('shell.css: splash state is derived from section[hidden], no controller',
+    /body:has\(#app > #landing-view:not\(\[hidden\]\)\)\s*\{[^}]*display:\s*flex/.test(shellCss));
+
+  check('shell.css: splash window is ~560px content-sized, centred above the taskbar',
+    /body:has\(#app > #landing-view:not\(\[hidden\]\)\)\s+\.os-window\s*\{[^}]*width:\s*min\(560px/.test(shellCss) &&
+    /body:has\(#app > #landing-view:not\(\[hidden\]\)\)\s+\.os-window\s*\{[^}]*height:\s*auto/.test(shellCss) &&
+    /body:has\(#app > #landing-view:not\(\[hidden\]\)\)\s*\{[^}]*height:\s*calc\(100vh - var\(--os-taskbar-height\)\)/.test(shellCss));
+
+  check('styles.css: welcome card on the wizard classes, no editorial banner',
+    /#landing-view\.wizard\s*\{/.test(stylesCss) &&
+    !/#landing-view\s*\{\s*display:\s*flex[^}]*align-items:\s*flex-start/.test(stylesCss));
+
+  check('styles.css: catchphrase on the pixel grids — Silkscreen 32px, CJK 36px',
+    /#landing-view \.wizard-title\s*\{[^}]*font-family:\s*'Silkscreen'/.test(stylesCss) &&
+    /#landing-view \.wizard-title\s*\{[^}]*font-size:\s*32px/.test(stylesCss) &&
+    /html\[lang\^="zh"\] #landing-view \.wizard-title\s*\{[^}]*font-size:\s*36px/.test(stylesCss));
+
+  check('styles.css: the old 64px editorial headline is gone',
+    !/#landing-view h1\s*\{[^}]*font-size:\s*64px/.test(stylesCss));
+
+  check('pages: the landing section is the wizard card in both locales',
+    read('index.html').indexOf('<section id="landing-view" class="wizard">') !== -1 &&
+    read('zh/index.html').indexOf('<section id="landing-view" class="wizard">') !== -1);
+
+  check('quiz.js: the landing renderer no longer wires the language offer',
+    read('js/quiz.js').indexOf('offerInto') === -1);
 
   /* ── Restore globals for the rest of the suite ─────────────────────── */
 

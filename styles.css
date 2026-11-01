@@ -69,46 +69,138 @@ button:hover {
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
-/* Landing view */
-#landing-view {
+/* ── Landing view: compact welcome splash (issue #53) ────────────────
+
+   The window itself is sized for this view in css/shell.css; this block
+   is only the wizard card inside it. Centred icon-first column: a 64px
+   eye glyph, the display-face catchphrase on its pixel grid (Silkscreen
+   32px, uppercase), the Bank Variant's title as subtitle, a hairline
+   rule, one body line, the time estimate, and a single default [Start]. */
+
+#landing-view.wizard {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  text-align: left;
-  flex: 1;
-  /* Tightened for the fixed-height window (ticket #52): this 96px sat
-     under the old 64px #app client padding, which the shell now removes. */
-  padding-top: var(--space-6);
+  align-items: center;
+  text-align: center;
+  padding: 18px 22px 14px;
+  background: var(--color-bg);
+  box-shadow: inset 1px 1px #808080, inset -1px -1px #FFFFFF;
 }
 
-#landing-view h1 {
-  font-family: var(--font-heading);
-  font-size: 64px;
+.wizard-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.wizard-icon {
+  display: block;
+  flex: none;
+  width: 64px;
+  height: 64px;
+  line-height: 0;
+}
+
+.wizard-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#landing-view .wizard-title {
+  margin: 2px 0 0;
+  font-family: 'Silkscreen', var(--font-heading);
   font-weight: 400;
-  line-height: 1.1;
-  margin-bottom: var(--space-4);
-  letter-spacing: -0.02em;
-}
-
-#landing-view .subtitle {
-  font-size: 24px;
-  color: var(--color-text-muted);
-  margin-bottom: var(--space-2);
-  max-width: 540px;
-  line-height: 1.4;
-}
-
-#landing-view .meta {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  color: var(--color-text-light);
-  margin-bottom: var(--space-8);
+  font-size: 32px;
+  line-height: 1.15;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  color: #000000;
 }
 
-#landing-view #start-btn {
-  max-width: 300px;
+#landing-view .wizard-line {
+  display: block;
+}
+
+#landing-view .wizard-sub {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 13px;
+  color: #000000;
+}
+
+#landing-view .wizard-rule {
+  width: 100%;
+  height: 0;
+  border: 0;
+  border-top: 1px solid #808080;
+  box-shadow: 0 1px 0 #FFFFFF;
+  margin: 12px 0 10px;
+}
+
+#landing-view .wizard-body {
+  margin: 0 auto 8px;
+  max-width: 46ch;
+  font-family: var(--font-heading);
+  font-size: 13px;
+  line-height: 1.5;
+  color: #000000;
+}
+
+#landing-view .wizard-meta {
+  margin: 0 0 14px;
+  font-family: var(--font-heading);
+  font-size: 11px;
+  color: var(--color-text-light);
+}
+
+.wizard-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.wizard-btn {
+  height: 26px;
+  min-width: 78px;
+  padding: 0 12px;
+  font-family: var(--font-heading);
+  font-size: 13px;
+  box-shadow: var(--bevel-raised);
+}
+
+.wizard-btn-default {
+  box-shadow: var(--bevel-raised), 0 0 0 1px #000000;
+}
+
+.wizard-btn:focus-visible {
+  outline: 1px dotted #000;
+  outline-offset: -4px;
+}
+
+/* Chinese: the headline moves to the CJK pixel face on its 36px grid
+   (html[lang^="zh"] --font-heading leads with the Fusion Pixel subset);
+   Han has no case, so the EN-only uppercase transform is dropped. */
+
+html[lang^="zh"] #landing-view .wizard-title {
+  font-family: var(--font-heading);
+  font-size: 36px;
+  line-height: 1.15;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+html[lang^="zh"] #landing-view .wizard-sub,
+html[lang^="zh"] #landing-view .wizard-meta,
+html[lang^="zh"] #landing-view .wizard-btn {
+  font-family: var(--font-heading);
+  font-size: 12px;
+}
+
+html[lang^="zh"] #landing-view .wizard-body {
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 /* Responsive — Tablet */
@@ -116,46 +208,12 @@ button:hover {
   #app {
     padding: var(--space-6) var(--space-3);
   }
-
-  #landing-view {
-    padding-top: var(--space-6);
-  }
-
-  #landing-view h1 {
-    font-size: 44px;
-  }
-
-  #landing-view .subtitle {
-    font-size: 20px;
-    margin-bottom: var(--space-6);
-  }
-
-  #landing-view .meta {
-    margin-bottom: var(--space-6);
-  }
 }
 
 /* Responsive — Mobile */
 @media (max-width: 480px) {
   #app {
     padding: var(--space-4) var(--space-3);
-  }
-
-  #landing-view {
-    padding-top: var(--space-4);
-  }
-
-  #landing-view h1 {
-    font-size: 32px;
-    letter-spacing: -0.01em;
-  }
-
-  #landing-view .subtitle {
-    font-size: 18px;
-  }
-
-  #landing-view #start-btn {
-    max-width: 100%;
   }
 
   p {
