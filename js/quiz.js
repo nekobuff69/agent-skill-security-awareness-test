@@ -120,12 +120,6 @@
     var card = makeEl('div', 'quiz-card');
     card.setAttribute('data-qid', q.id);
 
-    // ── Card header: question-number chip ──
-    var cardHeader = makeEl('div', 'quiz-card-header');
-    var numChip = makeEl('span', 'quiz-number-chip', t('quiz.questionChip', { number: idx + 1 }));
-    cardHeader.appendChild(numChip);
-    card.appendChild(cardHeader);
-
     // ── Scenario block with micro-label ──
     if (q.scenario) {
       card.appendChild(makeEl('span', 'quiz-label', t('quiz.labelScenario')));

@@ -19,6 +19,7 @@
     /* ── Language ── */
     'lang.name': 'English',
     'lang.otherName': '中文',
+    'lang.otherShort': '中文',
     'lang.switchLabel': 'Switch to Chinese',
     'lang.offerTitle': 'Language',
     'lang.selfName': 'EN',

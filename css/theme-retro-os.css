@@ -350,31 +350,10 @@ button:disabled {
   color: var(--color-text);
 }
 
-/* ── Question Card ──────────────────────────────────────────────────── */
-
-.quiz-card {
-  background: var(--color-face);
-  border: 0;
-  border-radius: 0;
-  box-shadow: var(--bevel-raised);
-}
-
-/* The card header row becomes the window title bar: navy → lighter blue,
-   exactly like a real Win95 title bar. */
-.quiz-card-header {
-  margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-4)) var(--space-3);
-  padding: 4px var(--space-3);
-  background: linear-gradient(90deg, #000080 0%, #1084D0 100%);
-  color: #FFFFFF;
-}
-
-.quiz-number-chip {
-  background: var(--color-face);
-  color: var(--color-text);
-  font-family: var(--font-heading);
-  border-radius: 0;
-  box-shadow: var(--bevel-raised);
-}
+/* ── Question Card ──────────────────────────────────────────────────────
+   The card is a grouping element only: the scenario and option rows carry
+   the sunken fields, so a second raised frame inside the window would read
+   as a nested title bar. */
 
 .quiz-label {
   font-family: var(--font-heading);   /* Chrome String on the pixel face */

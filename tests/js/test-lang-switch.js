@@ -435,7 +435,7 @@ exports.run = function() {
       check('the tray re-labels itself after the switch',
         ctl.langSegments.self.textContent === '中文' &&
         ctl.langSegments.self.getAttribute('aria-pressed') === 'true' &&
-        ctl.langSegments.other.textContent === 'English' &&
+        ctl.langSegments.other.textContent === 'EN' &&
         ctl.programLabel.textContent === I18n.t('shell.windowTitle'),
         ctl.langSegments.self.textContent + '/' + ctl.langSegments.other.textContent);
 

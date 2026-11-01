@@ -274,7 +274,7 @@
           langToggle.setAttribute('aria-label', I18n.t('lang.offerTitle'));
           langSegments.self.textContent = I18n.t('lang.selfName');
           langSegments.self.setAttribute('aria-pressed', 'true');
-          langSegments.other.textContent = I18n.t('lang.otherName');
+          langSegments.other.textContent = I18n.t('lang.otherShort');
           langSegments.other.setAttribute('aria-pressed', 'false');
           langSegments.other.setAttribute('title', I18n.t('lang.switchLabel'));
         }
@@ -601,7 +601,7 @@
         title: I18n.t('lang.offerTitle'),
         self: { label: I18n.t('lang.selfName') },
         other: {
-          label: I18n.t('lang.otherName'),
+          label: I18n.t('lang.otherShort'),
           title: I18n.t('lang.switchLabel')
         },
         onClick: langAction

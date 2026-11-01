@@ -20,7 +20,8 @@
 
     /* ── 语言 ── */
     'lang.name': '简体中文',
-    'lang.otherName': 'English',
+    'lang.otherName': '英文',
+    'lang.otherShort': 'EN',
     'lang.switchLabel': '切换到英文',
     'lang.offerTitle': '语言',
     'lang.selfName': '中文',

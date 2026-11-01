@@ -295,7 +295,7 @@ exports.run = function() {
         title: I18n.t('lang.offerTitle'),
         self: { label: I18n.t('lang.selfName') },
         other: {
-          label: I18n.t('lang.otherName'),
+          label: I18n.t('lang.otherShort'),
           title: I18n.t('lang.switchLabel')
         },
         onClick: fakeSwitch
@@ -313,11 +313,11 @@ exports.run = function() {
     langZh.langToggle.getAttribute('aria-label') === '语言',
     langEn.langToggle.getAttribute('aria-label'));
 
-  check('both language names show: EN + 中文 on en, 中文 + English on zh',
+  check('both language names show: EN + 中文 on en, 中文 + EN on zh',
     langEn.langSegments.self.textContent === 'EN' &&
     langEn.langSegments.other.textContent === '中文' &&
     langZh.langSegments.self.textContent === '中文' &&
-    langZh.langSegments.other.textContent === 'English',
+    langZh.langSegments.other.textContent === 'EN',
     langEn.langSegments.self.textContent + '+' +
     langEn.langSegments.other.textContent + '/' +
     langZh.langSegments.self.textContent + '+' +
