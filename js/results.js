@@ -582,6 +582,8 @@
         ctx.fillRect(0, 0, 800, 800);
         ctx.drawImage(img, 0, 0, 800, 800);
         canvas.toBlob(function(pngBlob) {
+          URL.revokeObjectURL(url);
+          if (!pngBlob) return;
           var pngUrl = URL.createObjectURL(pngBlob);
           var a = document.createElement('a');
           a.href = pngUrl;
@@ -589,7 +591,6 @@
           a.click();
           setTimeout(function() { URL.revokeObjectURL(pngUrl); }, 1000);
         }, 'image/png');
-        URL.revokeObjectURL(url);
       };
       img.src = url;
     });

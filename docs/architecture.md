@@ -224,6 +224,7 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 | 0017 | Universal Session storage — one `quiz-session` record shared by every Bank Variant; the version stamp hashes bank structure, never authored text | [0017-universal-session-storage.md](adr/0017-universal-session-storage.md) |
 | 0018 | First-visit language routing — a Language Preference stored apart from the Session, automatic routing on a strong browser-language signal, and a dismissible offer otherwise | [0018-first-visit-language-routing.md](adr/0018-first-visit-language-routing.md) |
 | 0020 | Wizard navigation with explicit commit — one Option per Question, auto-advance only on a first answer, [Finish] as the single Completion path | [0020-wizard-navigation-with-explicit-commit.md](adr/0020-wizard-navigation-with-explicit-commit.md) |
+| 0021 | Retro-OS skin replaces the editorial skin — Windows 95 presentation layer with an OS shell, zero-dependency constraint kept | [0021-retro-os-skin-replaces-editorial-skin.md](adr/0021-retro-os-skin-replaces-editorial-skin.md) |
 
 ---
 
@@ -307,7 +308,7 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
     ├── architecture.md
     ├── TESTING.md
     ├── owasp-ast-full.md       # Grounding Corpus
-    ├── adr/                    # one decision per note — 0001–0018 + 0020
+    ├── adr/                    # one decision per note — 0001–0018 + 0020–0021
     └── agents/                 # issue-tracker, triage-labels, domain consumer rules
 ```
 
