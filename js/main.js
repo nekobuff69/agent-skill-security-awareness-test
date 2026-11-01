@@ -149,13 +149,34 @@
   // Fetch and initialize bank
   function loadBank() {
     var landing = document.getElementById('landing-view');
+
+    // Ticket #63: a committed desktop Record predicts that the entry view
+    // is the desktop, so the landing must not be painted "Loading bank…" —
+    // it would flash above the restored desktop. Presence only: the Record
+    // is validated against the bank the moment it lands.
+    var desktopPending = false;
+    try {
+      desktopPending = !!(app.DesktopStore &&
+        typeof app.DesktopStore.exists === 'function' &&
+        app.DesktopStore.exists());
+    } catch (err) {
+      desktopPending = false;
+    }
+
     if (landing) {
-      // Build via textContent so the dictionary value is never parsed as HTML.
-      landing.innerHTML = '';
-      var loadingP = document.createElement('p');
-      loadingP.textContent = t('loading.bank');
-      landing.appendChild(loadingP);
-      landing.hidden = false;
+      if (desktopPending) {
+        // Nothing shows while the bank is in flight except the desktop
+        // shell itself; the restore (or the quiet fall-back to landing
+        // below) fills it in.
+        landing.hidden = true;
+      } else {
+        // Build via textContent so the dictionary value is never parsed as HTML.
+        landing.innerHTML = '';
+        var loadingP = document.createElement('p');
+        loadingP.textContent = t('loading.bank');
+        landing.appendChild(loadingP);
+        landing.hidden = false;
+      }
     }
 
     app.fetchBank(BANK_URL, function(data) {
@@ -172,7 +193,28 @@
           global.Corpus = null;
         });
 
-      app.activateBank(data);
+      // The committed desktop comes first, before any view renders — an
+      // invalid Record is discarded quietly by the store and this load
+      // proceeds exactly as it would without one.
+      var restored = false;
+      if (desktopPending && app.DesktopStore &&
+          typeof app.DesktopStore.restore === 'function') {
+        try {
+          global.Bank = data;
+          app.Bank = data;
+          restored = !!app.DesktopStore.restore(data);
+        } catch (err) {
+          restored = false;
+        }
+        if (!restored && landing) {
+          // Quiet invalidation: the landing is the entry view after all.
+          landing.hidden = false;
+        }
+      }
+
+      if (!restored) {
+        app.activateBank(data);
+      }
       // The first Bank Variant has landed: the language toggle may swap.
       if (app.LangSwitch && typeof app.LangSwitch.ready === 'function') {
         app.LangSwitch.ready();

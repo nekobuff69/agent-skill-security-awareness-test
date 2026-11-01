@@ -320,6 +320,15 @@
       if (app.renderResults) {
         app.renderResults(bank, result.report);
       }
+      // The desktop Record (ticket #63): the ONLY place it is written —
+      // exactly here, the Finish Commit, right after the desktop came into
+      // being. Never on load, never for an uncommitted Session. It captures
+      // the structural bank hash, the answers, the language, and every
+      // window Record (mode/geometry/lastGeometry/z) plus the active
+      // program, so a reload returns to this desktop before first paint.
+      if (app.DesktopStore && typeof app.DesktopStore.captureAtCommit === 'function') {
+        app.DesktopStore.captureAtCommit(bank, answers);
+      }
     }, reducedMotion() ? 0 : FINISH_BEAT_MS);
   }
 
