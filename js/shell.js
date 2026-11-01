@@ -152,7 +152,8 @@
       'aria-expanded': 'false'
     });
     startBtn.appendChild(createEl(doc, 'span', 'os-start-icon'));
-    startBtn.appendChild(createEl(doc, 'span', 'os-start-label', strings['shell.start']));
+    var startLabel = createEl(doc, 'span', 'os-start-label', strings['shell.start']);
+    startBtn.appendChild(startLabel);
 
     // ── Start menu (built once; shown/hidden by class) ───────────────────
     var menu = createEl(doc, 'div', 'os-start-menu');
@@ -162,12 +163,13 @@
     aboutItem.setAttribute('role', 'menuitem');
     menu.appendChild(aboutItem);
 
-    // ── Tray language toggle (ticket #50) ─────────────────────────────────
-    // Two segments name both languages: the page's own renders pressed
-    // (aria-pressed=true), the declared alternate flat. Both segments run
-    // one action (deps.trayLang.onClick): record the Language Preference,
-    // then navigate the declared alternate — the same action the inline
-    // Quiz Chrome switcher used. Built only when the page declares a
+    // ── Tray language toggle (tickets #50, #55) ──────────────────────────
+    // Two segments name both languages: the active language renders
+    // pressed (aria-pressed=true), the other flat. Both segments run one
+    // action (deps.trayLang.onClick): js/lang-switch.js swaps the Chrome
+    // String dictionary and Bank Variant in place on the splash and
+    // answering screens, and keeps the record-and-navigate action for
+    // the views it does not swap. Built only when the page declares a
     // data-lang-alt, so a page without an alternate shows no toggle.
     var langToggle = null;
     var langSegments = null;
@@ -211,14 +213,17 @@
     aboutEl.appendChild(aboutTitleBar);
 
     var aboutBody = createEl(doc, 'div', 'os-about-body');
-    aboutBody.appendChild(createEl(doc, 'p', 'os-about-app', strings['shell.windowTitle']));
-    aboutBody.appendChild(createEl(doc, 'p', 'os-about-desc', strings['shell.aboutBody']));
+    var aboutApp = createEl(doc, 'p', 'os-about-app', strings['shell.windowTitle']);
+    aboutBody.appendChild(aboutApp);
+    var aboutDesc = createEl(doc, 'p', 'os-about-desc', strings['shell.aboutBody']);
+    aboutBody.appendChild(aboutDesc);
     var aboutLink = createEl(doc, 'a', 'os-about-link', strings['shell.aboutLink']);
     aboutLink.href = 'https://owasp.org/Top10/AST10/';
     aboutLink.setAttribute('target', '_blank');
     aboutLink.setAttribute('rel', 'noopener noreferrer');
     aboutBody.appendChild(aboutLink);
-    aboutBody.appendChild(createEl(doc, 'p', 'os-about-credits', strings['shell.aboutCredits']));
+    var aboutCredits = createEl(doc, 'p', 'os-about-credits', strings['shell.aboutCredits']);
+    aboutBody.appendChild(aboutCredits);
     aboutEl.appendChild(aboutBody);
 
     var okBtn = createEl(doc, 'button', 'os-about-ok', strings['shell.ok']);
@@ -252,6 +257,43 @@
       programLabel: programLabel,
       langToggle: langToggle,
       langSegments: langSegments,
+
+      /**
+       * Re-resolve every Chrome String on the shell after an in-place
+       * language switch (#55): tray labels and pressed states, title bar,
+       * Start button, About window. Render-time resolution, exactly as
+       * the quiz views rebuild theirs (ADR 0015).
+       */
+      refreshLang: function() {
+        var I18n = app.I18n;
+        if (!I18n || I18n.locale === null) return false;
+        if (langSegments) {
+          langToggle.setAttribute('aria-label', I18n.t('lang.offerTitle'));
+          langSegments.self.textContent = I18n.t('lang.selfName');
+          langSegments.self.setAttribute('aria-pressed', 'true');
+          langSegments.other.textContent = I18n.t('lang.otherName');
+          langSegments.other.setAttribute('aria-pressed', 'false');
+          langSegments.other.setAttribute('title', I18n.t('lang.switchLabel'));
+        }
+        titleText.textContent = I18n.t('shell.windowTitle');
+        programLabel.textContent = I18n.t('shell.windowTitle');
+        startLabel.textContent = I18n.t('shell.start');
+        aboutItem.textContent = I18n.t('shell.menuAbout');
+        aboutTitle.textContent = I18n.t('shell.aboutTitle');
+        aboutApp.textContent = I18n.t('shell.windowTitle');
+        aboutDesc.textContent = I18n.t('shell.aboutBody');
+        aboutLink.textContent = I18n.t('shell.aboutLink');
+        aboutCredits.textContent = I18n.t('shell.aboutCredits');
+        okBtn.textContent = I18n.t('shell.ok');
+        TITLE_BUTTON_ACTIONS.forEach(function(action) {
+          var btn = titleButtonEls[action];
+          if (btn) btn.setAttribute('aria-label', I18n.t('shell.' + action));
+        });
+        if (controller.soundEntry && typeof controller.soundEntry.paint === 'function') {
+          controller.soundEntry.paint();
+        }
+        return true;
+      },
       aboutBackdrop: aboutBackdrop,
       aboutEl: aboutEl,
       okBtn: okBtn,
@@ -424,6 +466,9 @@
 
     controller.menu.insertBefore(entry, controller.menu.firstChild);
     controller.soundEntry = entry;
+    // Paintable again so controller.refreshLang (#55) can re-resolve the
+    // menu label after an in-place language switch.
+    entry.paint = paint;
     return entry;
   }
 
@@ -477,11 +522,13 @@
 
   /**
    * Record the language choice and navigate the declared alternate — the
-   * exact action the inline Quiz Chrome switcher (js/quiz.js) performed on
-   * click: `LangPref.setLanguage(data-lang-alt-locale)` first, then a plain
-   * navigation to `data-lang-alt`, so the destination page treats the
-   * Participant as a chooser and never routes them back (ADR 0018).
-   * Returns true when a switch was performed. Headless-safe.
+   * pre-#55 action: `LangPref.setLanguage(data-lang-alt-locale)` first,
+   * then a plain navigation to `data-lang-alt`, so the destination page
+   * treats the Participant as a chooser and never routes them back
+   * (ADR 0018). js/lang-switch.js mirrors this action for the results and
+   * review views (instant presence there is #56) and as the fallback
+   * when the switch module is absent. Returns true when a switch was
+   * performed. Headless-safe.
    */
   function recordChoice(root) {
     try {
@@ -504,6 +551,12 @@
   function switchLanguage() {
     var doc = global.document;
     if (!doc || !doc.documentElement) return false;
+    // #55: swap in place on the splash and answering screens. The switch
+    // module keeps the pre-#55 record-and-navigate behavior for results
+    // and review; without the module this falls straight back to it.
+    if (app.LangSwitch && typeof app.LangSwitch.toggle === 'function') {
+      return app.LangSwitch.toggle();
+    }
     return recordChoice(doc.documentElement);
   }
 
