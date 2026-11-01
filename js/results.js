@@ -114,6 +114,9 @@
       textContent: title.emoji + ' ' + title.name
     }));
     var buttons = el('div', { className: 'os-titlebar-buttons' });
+    // The shell owns the drawn glyph table; a headless render without the
+    // shell loaded still builds the card, just with empty controls.
+    var glyphs = (app.Shell && app.Shell.TITLE_BAR_GLYPHS) || {};
     for (var b = 0; b < TITLE_BUTTON_ACTIONS.length; b++) {
       var action = TITLE_BUTTON_ACTIONS[b];
       var btn = el('button', { className: 'os-titlebar-btn' });
@@ -121,7 +124,7 @@
       btn.disabled = true;
       btn.setAttribute('data-os-button', action);
       btn.setAttribute('aria-label', t(TITLE_BUTTON_LABEL_IDS[b]));
-      btn.innerHTML = app.Shell.TITLE_BAR_GLYPHS[action];
+      btn.innerHTML = glyphs[action] || '';
       buttons.appendChild(btn);
     }
     bar.appendChild(buttons);
