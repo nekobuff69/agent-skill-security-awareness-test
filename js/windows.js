@@ -179,6 +179,7 @@
       raise: core.raise,
       windowSnapshot: core.windowSnapshot,
       snapshot: core.snapshot,
+      loadSnapshot: core.loadSnapshot,
       /** Put every program window except the Quiz away when the desktop
        *  goes off stage: flow views have no desktop to draw them on. */
       hidePrograms: function(exceptId) {
@@ -831,6 +832,13 @@
       inTaskbar: function(id) { return machine.inTaskbar(id || QUIZ); },
       canFocus: function(id) { return machine.canFocus(id || QUIZ); },
       snapshot: machine.snapshot,
+      /** Ticket #63 (js/desktop-store.js): write the committed desktop's
+       *  Records back into the core BEFORE the restored render. No render()
+       *  here on purpose: the visible section is still the landing until
+       *  renderResults flips it, and an early syncView would read the
+       *  landing and put the arriving programs away. The MutationObserver
+       *  wired in attach() paints the Records as soon as the desktop shows. */
+      restoreSnapshot: function(snap) { return machine.loadSnapshot(snap); },
       minimize: minimize,
       restore: restore,
       toggleMaximize: toggleMaximize,

@@ -281,6 +281,7 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 │   ├── quiz.js           # quiz status bar + pinned footer, question cards, back nav, localStorage
 │   ├── scoring.js        # deterministic scoring, title lookup, ranked views
 │   ├── session-store.js  # one Session per Participant, structural-hash versioned (ADR-0017)
+│   ├── desktop-store.js  # the per-tab desktop Record under `quiz-desktop` — sessionStorage, written only at the Finish Commit, restored before first paint (ticket #63)
 │   ├── lang-pref.js      # remembered Language Preference under `quiz-lang`, stored apart from the Session (ADR-0018)
 │   ├── lang-routing.js   # first-visit routing decision — system language decides once, then is never consulted again (ADR-0018)
 │   ├── lang-switch.js    # the Locale Swap — idle prefetch, in-place dictionary + Bank Variant swap, view re-render, pushState/popstate sync, failure notice (ADR-0019)
@@ -320,6 +321,7 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 │       ├── test-shell.js           # taskbar Language Toggle build, title-bar glyph delegation, program button, Start menu via DOM stubs
 │       ├── test-windows.js         # window controller rendering (delegating to the desktop core), desktop regime (Geometry paint, drag/resize clamp, hide-to-taskbar close), dialog primitive, trace classes
 │       ├── test-desktop-core.js    # DOM-free desktop core: Window Record transitions, mode-derived consequences, End Program gate, section mount points (ticket #59)
+│       ├── test-desktop-store.js   # the per-tab desktop Record: the one write at the Finish Commit, restore-before-paint, the Record round-trip through the core, quiet invalidation and unavailable storage (ticket #63)
 │       ├── test-sound.js           # audible() matrix, voice table, mute persistence
 │       ├── test-results-retro.js   # retro results: header panel with NO fake chrome (one title bar only), radar SVG + dither, review disclosures
 │       ├── test-cjk-font-subset.js # the committed Fusion Pixel subset covers every Han codepoint the Chinese dictionary and Bank Variant render (fonts/PROVENANCE.md)

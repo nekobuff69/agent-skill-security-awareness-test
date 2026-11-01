@@ -517,6 +517,66 @@
       };
     }
 
+    /**
+     * loadSnapshot(snap) — the additive restore hook (ticket #63), the
+     * inverse of snapshot(): js/desktop-store.js writes the committed
+     * desktop back into the ONE state model before the first paint, so the
+     * Records — never a parallel copy — carry the restored arrangement.
+     *
+     * All-or-nothing, and never a throw: every key must name a program,
+     * every Record must carry a legal mode, a lastMode that can be a desk
+     * mode, valid Geometry in BOTH geometry and lastGeometry, and a finite
+     * z; the active Id must address a loaded Record; the view must be a
+     * non-empty string. A snapshot that fails any of it changes NOTHING —
+     * there is no partial restore. confirmOpen is never restored: the End
+     * Program dialog is not a persisted state, and a snapshot carrying it
+     * open is refused outright.
+     *
+     * A program missing from the snapshot keeps NO Record — absence is not
+     * a mode (the Action Plan that had not settled at the commit is born by
+     * its own arrival later), so the map is replaced, not merged.
+     */
+    function loadSnapshot(snap) {
+      if (!snap || typeof snap !== 'object') return false;
+      if (snap.confirmOpen !== false) return false;
+      if (typeof snap.view !== 'string' || snap.view === '') return false;
+      if (!isFiniteNumber(snap.zCounter) || snap.zCounter < 0) return false;
+      if (!snap.windows || typeof snap.windows !== 'object' ||
+          Array.isArray(snap.windows)) return false;
+
+      var ids = Object.keys(snap.windows);
+      if (ids.length === 0) return false;
+
+      var next = {};
+      for (var i = 0; i < ids.length; i++) {
+        var id = ids[i];
+        if (PROGRAM_IDS.indexOf(id) === -1) return false;
+        var r = snap.windows[id];
+        if (!r || typeof r !== 'object') return false;
+        if (r.mode !== MODE_NORMAL && r.mode !== MODE_MAXIMIZED &&
+            r.mode !== MODE_MINIMIZED && r.mode !== MODE_HIDDEN) return false;
+        if (r.lastMode !== MODE_NORMAL && r.lastMode !== MODE_MAXIMIZED) return false;
+        if (!hasValidGeometry(r.geometry) || !hasValidGeometry(r.lastGeometry)) return false;
+        if (!isFiniteNumber(r.z) || r.z < 0) return false;
+        next[id] = {
+          mode: r.mode,
+          geometry: copyGeometry(r.geometry),
+          lastGeometry: copyGeometry(r.lastGeometry),
+          lastMode: r.lastMode,
+          z: r.z
+        };
+      }
+
+      if (typeof snap.active !== 'string' || !next[snap.active]) return false;
+
+      desktop.windows = next;
+      desktop.active = snap.active;
+      desktop.zCounter = snap.zCounter;
+      desktop.view = snap.view;
+      desktop.confirmOpen = false;
+      return true;
+    }
+
     return {
       soleId: soleId,
       hasWindow: hasWindow,
@@ -544,7 +604,8 @@
       setActive: setActive,
       raise: raise,
       windowSnapshot: windowSnapshot,
-      snapshot: snapshot
+      snapshot: snapshot,
+      loadSnapshot: loadSnapshot
     };
   }
 

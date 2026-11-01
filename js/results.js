@@ -435,6 +435,16 @@
   var _planSlots = {};        // locale → { report, promise, narrative, actions }
   var _planRenderId = 0;      // the live Action Plan render; 0 = none
 
+  /* Ticket #63 hook — the desktop restore render. js/desktop-store.js arms
+     this for exactly one renderResults() call: a restored desktop re-renders
+     its sections, but the Action Plan request belongs to a later ticket.
+     While the hold is armed the slot assembles on the Deterministic Fallback
+     only (no proxy config → no LLM request, no fetch, no Analytics), and the
+     store releases it in a finally block, so a render that never reaches the
+     assembly can never strand it. This is the documented hook: the later
+     ticket replaces the hold with the persisted Narrative's restore path. */
+  var _planHoldNext = false;
+
   function planSlot(locale) {
     var slot = _planSlots[locale];
     if (!slot) {
@@ -473,8 +483,13 @@
       slot.promise = null;
       slot.narrative = null;
       slot.actions = null;
-      // The Action Plan module owns the path decision and retry policy
-      slot.promise = App.ActionPlan.assemble(localizedReport(report, bank, scoringBank), bank, corpus, window.APP_CONFIG);
+      // The Action Plan module owns the path decision and retry policy.
+      // #63: on a desktop restore render the hold is armed, and the config
+      // that reaches assemble is null — the Deterministic Fallback, with no
+      // Action Plan request fired merely because a Record exists.
+      var held = _planHoldNext;
+      _planHoldNext = false;
+      slot.promise = App.ActionPlan.assemble(localizedReport(report, bank, scoringBank), bank, corpus, held ? null : window.APP_CONFIG);
     }
 
     var mine = slot.promise;
@@ -738,6 +753,12 @@
     var btn = el('button', { className: 'results-retake-btn', textContent: t('results.retake') });
     btn.addEventListener('click', function() {
       App.SessionStore.clear();
+      // Ticket #63: the desktop Record describes the run this Retake ends —
+      // a reload after it must land on the fresh run, not on the old
+      // desktop. Guarded so a page without js/desktop-store.js is unchanged.
+      if (app.DesktopStore && typeof app.DesktopStore.clear === 'function') {
+        app.DesktopStore.clear();
+      }
       App.showView('landing-view');
     });
     return btn;
@@ -1024,6 +1045,12 @@
   app.resultsState     = resultsState;
   app.resultsMount     = resultsMount;
   app.resultsMountIds  = MOUNT_IDS;
+
+  /* Ticket #63 seam — js/desktop-store.js arms the hold for the one restore
+     render; buildActionPlan consumes it (Deterministic Fallback, no Action
+     Plan request) and the store's finally releases it. */
+  app.holdActionPlanRequest = function(on) { _planHoldNext = !!on; };
+  app.actionPlanRequestHeld = function() { return _planHoldNext; };
 
   /* Test seam (tests/js/test-results-retro.js, fakeEl pattern): the pure
      DOM builders plus the two palette helpers. Not used by the page. */

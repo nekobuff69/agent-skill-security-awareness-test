@@ -146,7 +146,27 @@ exports.run = function() {
     computeScores: function() { return { ok: true, report: { stub: true } }; }
   };
   var handedOff = [];
-  App.renderResults = function(bank, report) { handedOff.push({ bank: bank, report: report }); };
+  var finishSeq = [];
+  App.renderResults = function(bank, report) {
+    handedOff.push({ bank: bank, report: report });
+    finishSeq.push('render');
+  };
+
+  // Ticket #63 seam: the suite records the capture calls the Finish Commit
+  // makes; the real js/desktop-store.js is not loaded here, so nothing
+  // touches storage — the contract under test is WHEN quiz.js asks for the
+  // Record (the Finish Commit, once, after the desktop arrived) and that
+  // answering or loading never does.
+  var desktopCaptures = [];
+  var realDesktopStore = App.DesktopStore;
+  App.DesktopStore = {
+    exists: function() { return false; },
+    captureAtCommit: function(b, a) {
+      desktopCaptures.push({ bank: b, answers: a.slice() });
+      finishSeq.push('capture');
+      return true;
+    }
+  };
 
   /* ── Fixture: 3 Questions, two Phases ───────────────────────────────── */
 
@@ -328,6 +348,10 @@ exports.run = function() {
     byClass(views['quiz-view'], 'quiz-statusbar').length === 1 &&
     views['quiz-view'].children.length === 3);
 
+  check('the load path never asks for a desktop Record (#63)',
+    desktopCaptures.length === 0 && finishSeq.length === 0,
+    JSON.stringify(finishSeq));
+
   check('the sticky Quiz Chrome bar is gone from the DOM',
     byClass(quiz, 'quiz-chrome').length === 0);
 
@@ -462,6 +486,46 @@ exports.run = function() {
   finish.click();
   check('the commit gate refuses a second Finish click',
     tracked.length === 1 && handedOff.length === 1);
+  check('the Record is captured exactly once, after the desktop arrived (#63)',
+    desktopCaptures.length === 1 &&
+    JSON.stringify(finishSeq) === JSON.stringify(['render', 'capture']) &&
+    desktopCaptures[0].bank === bank &&
+    desktopCaptures[0].answers.length === 3 &&
+    desktopCaptures[0].answers.indexOf(null) === -1,
+    JSON.stringify(finishSeq) + '/' + JSON.stringify(desktopCaptures.map(function(c) { return c.answers; })));
+
+  /* ── A fully answered but UNCOMMITTED Session still resumes (#63) ───── */
+
+  // The Record is the commit's, never the answers': a Session that is
+  // complete but uncommitted resumes exactly as ADR 0020 designed it — the
+  // last Question, [Finish] live — and writes nothing to the desktop store.
+  var uncommitted = [1, 2, 3];
+  App.SessionStore.clear();
+  App.SessionStore.save(bank, uncommitted);
+  var capturesBefore = desktopCaptures.length;
+  App.renderQuiz(bank);
+
+  quiz = views['quiz-view'];
+  body = quiz.children[0];
+  footer = quiz.children[1];
+  statusbar = quiz.children[2];
+  back = footer.children[0];
+  next = footer.children[1];
+  finish = footer.children[2];
+  counter = byClass(statusbar, 'quiz-status-counter')[0];
+
+  check('a complete uncommitted Session resumes on the last Question with Finish live',
+    counter.textContent === '3 / 3' && next.hidden === true &&
+    finish.disabled === false && back.disabled === false,
+    counter.textContent + '/' + next.hidden + '/' + finish.disabled);
+  check('the resume path never captures a desktop Record (#63)',
+    desktopCaptures.length === capturesBefore &&
+    tracked.length === 1 && handedOff.length === 1 &&
+    JSON.stringify(App.quizState().answers) === JSON.stringify(uncommitted),
+    'captures=' + desktopCaptures.length + ' state=' +
+    JSON.stringify(App.quizState().answers));
+
+  App.SessionStore.clear();
 
   /* ── Layout contracts in the stylesheets (ticket #52) ──────────────── */
 
@@ -516,6 +580,21 @@ exports.run = function() {
   check('quiz.js: the landing renderer no longer wires the language offer',
     read('js/quiz.js').indexOf('offerInto') === -1);
 
+  // Ticket #63: the Record has exactly ONE writer in the answering view.
+  // A second write site (a load, an answer, a notice) is the regression.
+  var quizSrc = read('js/quiz.js');
+  check('quiz.js: the Finish Commit is the only desktop-Record writer',
+    (quizSrc.match(/captureAtCommit\s*\(/g) || []).length === 1 &&
+    quizSrc.indexOf('DesktopStore') !== -1,
+    'writers=' + (quizSrc.match(/captureAtCommit\s*\(/g) || []).length);
+
+  check('the load path has no desktop-Record write (persist stays Session-only)',
+    read('js/session-store.js').split('quiz-desktop').length - 1 === 0);
+
+  check('pages: both locales load js/desktop-store.js',
+    read('index.html').indexOf('js/desktop-store.js') !== -1 &&
+    read('zh/index.html').indexOf('js/desktop-store.js') !== -1);
+
   /* ── Restore globals for the rest of the suite ─────────────────────── */
 
   globalThis.setTimeout = realSetTimeout;
@@ -524,6 +603,8 @@ exports.run = function() {
   delete globalThis.matchMedia;
   App.Scoring = realScoring;              // scoring.js owns the global
   App.renderResults = realRenderResults;
+  if (realDesktopStore === undefined) delete App.DesktopStore;
+  else App.DesktopStore = realDesktopStore;
   globalThis.Analytics = realAnalytics;
 
   return results;
