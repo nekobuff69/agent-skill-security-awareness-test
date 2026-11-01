@@ -263,5 +263,99 @@ exports.run = function() {
   try { Shell.resolveStrings(I18n, ['shell.nope']); } catch (e) { threw = true; }
   check('a missing shell.* id fails loudly', threw);
 
+  // ── Language surfaces (ticket #44): tray chip + Start-menu entry ─────
+
+  // A page declaring a data-lang-alt gets both surfaces, wired to the SAME
+  // action — the inline Quiz Chrome switcher's job moved here.
+  var switchCalls = 0;
+  function fakeSwitch() { switchCalls++; }
+
+  function buildWithLang(locale) {
+    I18n.use(locale);
+    var doc = fakeDoc();
+    var appEl = fakeEl('div');
+    appEl.setAttribute('id', 'app');
+    doc.body.appendChild(appEl);
+    var ctl = Shell.build({
+      doc: doc,
+      appEl: appEl,
+      strings: Shell.resolveStrings(I18n, Shell.STRING_IDS),
+      trayLang: {
+        label: I18n.t('lang.selfName'),
+        title: I18n.t('lang.switchLabel'),
+        onClick: fakeSwitch
+      },
+      langMenuItem: {
+        label: I18n.t('lang.menuItem', { language: I18n.t('lang.otherName') }),
+        onClick: fakeSwitch
+      }
+    });
+    return ctl;
+  }
+
+  var langEn = buildWithLang('en');
+  var langZh = buildWithLang('zh');
+  check('the tray chip names the page language (EN on en, 中文 on zh)',
+    langEn.trayLang.textContent === 'EN' &&
+    langEn.trayLang.getAttribute('aria-label') === 'Switch to Chinese' &&
+    langZh.trayLang.textContent === '中文' &&
+    langZh.trayLang.getAttribute('aria-label') === '切换到英文',
+    langEn.trayLang.textContent + '/' + langZh.trayLang.textContent);
+  check('the Start menu carries a localized Language entry',
+    langEn.langItem.textContent === 'Language: switch to 中文' &&
+    langZh.langItem.textContent === '语言：切换到English',
+    langEn.langItem.textContent + '/' + langZh.langItem.textContent);
+
+  I18n.use('en');
+  langEn.trayLang.click();
+  check('clicking the tray chip runs the switch action', switchCalls === 1);
+  langEn.openMenu();
+  langEn.langItem.click();
+  check('the Start-menu Language entry closes the menu and runs the same action',
+    switchCalls === 2 && !langEn.isMenuOpen(),
+    'calls=' + switchCalls);
+
+  // A build without language deps (a page with no declared alternate)
+  // renders neither surface.
+  var noLang = mount('en');
+  check('a page without a declared alternate shows no language surfaces',
+    noLang.ctl.trayLang === null && noLang.ctl.langItem === null);
+
+  // The switch action itself: records the Language Preference, then
+  // navigates the declared alternate — the exact LangPref path the inline
+  // switcher used (ADR 0018: using the switch records the choice).
+  var savedStorage = globalThis.localStorage;
+  var savedLocation = globalThis.location;
+  var langStore = {};
+  globalThis.localStorage = {
+    getItem: function(k) {
+      return Object.prototype.hasOwnProperty.call(langStore, k) ? langStore[k] : null;
+    },
+    setItem: function(k, v) { langStore[k] = String(v); },
+    removeItem: function(k) { delete langStore[k]; }
+  };
+  globalThis.location = { href: null };
+  require('../../js/lang-pref.js');
+
+  var altRoot = fakeEl('html');
+  altRoot.setAttribute('data-lang-alt', 'zh/');
+  altRoot.setAttribute('data-lang-alt-locale', 'zh');
+  check('the switch records the Language Preference before navigating',
+    Shell.recordChoice(altRoot) === true &&
+    globalThis.App.LangPref.get().language === 'zh' &&
+    globalThis.location.href === 'zh/',
+    JSON.stringify(globalThis.App.LangPref.get()) + ' href=' + globalThis.location.href);
+
+  var noAltRoot = fakeEl('html');
+  check('a page with no declared alternate neither records nor navigates',
+    Shell.recordChoice(noAltRoot) === false &&
+    globalThis.location.href === 'zh/',
+    'href=' + globalThis.location.href);
+
+  if (savedStorage === undefined) delete globalThis.localStorage;
+  else globalThis.localStorage = savedStorage;
+  if (savedLocation === undefined) delete globalThis.location;
+  else globalThis.location = savedLocation;
+
   return results;
 };

@@ -161,6 +161,31 @@
     aboutItem.setAttribute('role', 'menuitem');
     menu.appendChild(aboutItem);
 
+    // ── Tray language indicator + Start-menu language entry (ticket #44) ─
+    // Both surfaces share one action (deps.trayLang.onClick / deps.
+    // langMenuItem.onClick): record the Language Preference, then navigate
+    // the declared alternate — the same action the inline Quiz Chrome
+    // switcher used. Built only when the page declares a data-lang-alt,
+    // so a page without an alternate shows neither surface.
+    var trayLang = null;
+    if (deps.trayLang) {
+      trayLang = createEl(doc, 'button', 'os-tray-lang', deps.trayLang.label);
+      trayLang.type = 'button';
+      setAttrs(trayLang, {
+        title: deps.trayLang.title,
+        'aria-label': deps.trayLang.title
+      });
+    }
+
+    var langItem = null;
+    if (deps.langMenuItem) {
+      langItem = createEl(doc, 'button', 'os-start-menu-item', deps.langMenuItem.label);
+      langItem.type = 'button';
+      langItem.setAttribute('role', 'menuitem');
+      langItem.setAttribute('data-os-menu', 'language');
+      menu.appendChild(langItem);
+    }
+
     // ── Program button (pressed: this window is the running program) ─────
     var programBtn = createEl(doc, 'button', 'os-program-btn');
     programBtn.type = 'button';
@@ -174,6 +199,7 @@
     taskbar.appendChild(startBtn);
     taskbar.appendChild(menu);
     taskbar.appendChild(programBtn);
+    if (trayLang) taskbar.appendChild(trayLang);
     taskbar.appendChild(clockEl);
 
     // ── About window (over a dimmed backdrop) ────────────────────────────
@@ -228,6 +254,8 @@
       programBtn: programBtn,
       programLabel: programLabel,
       clockEl: clockEl,
+      trayLang: trayLang,
+      langItem: langItem,
       aboutBackdrop: aboutBackdrop,
       aboutEl: aboutEl,
       okBtn: okBtn,
@@ -311,6 +339,17 @@
 
     // ── Wiring ───────────────────────────────────────────────────────────
     on(startBtn, 'click', function() { controller.toggleMenu(); });
+    if (trayLang) {
+      on(trayLang, 'click', function() {
+        if (typeof deps.trayLang.onClick === 'function') deps.trayLang.onClick();
+      });
+    }
+    if (langItem) {
+      on(langItem, 'click', function() {
+        controller.closeMenu(false);
+        if (typeof deps.langMenuItem.onClick === 'function') deps.langMenuItem.onClick();
+      });
+    }
     on(aboutItem, 'click', function() {
       controller.closeMenu(false);
       controller.openAbout();
@@ -453,6 +492,38 @@
   }
 
   /**
+   * Record the language choice and navigate the declared alternate — the
+   * exact action the inline Quiz Chrome switcher (js/quiz.js) performed on
+   * click: `LangPref.setLanguage(data-lang-alt-locale)` first, then a plain
+   * navigation to `data-lang-alt`, so the destination page treats the
+   * Participant as a chooser and never routes them back (ADR 0018).
+   * Returns true when a switch was performed. Headless-safe.
+   */
+  function recordChoice(root) {
+    try {
+      if (!root || typeof root.getAttribute !== 'function') return false;
+      var href = root.getAttribute('data-lang-alt');
+      var locale = root.getAttribute('data-lang-alt-locale');
+      if (!href) return false;
+      if (app.LangPref && typeof app.LangPref.setLanguage === 'function') {
+        app.LangPref.setLanguage(locale);
+      }
+      global.location.href = href;
+      return true;
+    } catch (e) {
+      // storage or navigation unavailable — the control degrades, never throws
+      return false;
+    }
+  }
+
+  /** The tray chip and the Start-menu entry both route through here. */
+  function switchLanguage() {
+    var doc = global.document;
+    if (!doc || !doc.documentElement) return false;
+    return recordChoice(doc.documentElement);
+  }
+
+  /**
    * Start the shell on the live page. Safe to call once; builds the frame,
    * re-parents #app, starts the clock and wires document-level handlers.
    */
@@ -474,10 +545,25 @@
     // attach() afterwards gives the controller the DOM to render onto.
     var win = app.Windows ? app.Windows.create({ doc: doc }) : null;
 
+    // Language surfaces (ticket #44): the tray chip and the Start-menu
+    // entry reflect the page's own locale and both run the switch action
+    // above. Only pages declaring a data-lang-alt get either surface.
+    var langAlt = doc.documentElement.getAttribute('data-lang-alt');
+    var langAction = langAlt ? switchLanguage : null;
+
     var controller = build({
       doc: doc,
       appEl: appEl,
       strings: resolveStrings(I18n, STRING_IDS),
+      trayLang: langAction ? {
+        label: I18n.t('lang.selfName'),
+        title: I18n.t('lang.switchLabel'),
+        onClick: langAction
+      } : null,
+      langMenuItem: langAction ? {
+        label: I18n.t('lang.menuItem', { language: I18n.t('lang.otherName') }),
+        onClick: langAction
+      } : null,
       windows: win ? {
         minimize: function() { win.minimize(); },
         maximize: function() { win.toggleMaximize(); },
@@ -530,6 +616,8 @@
 
   shell.build = build;
   shell.start = start;
+  shell.recordChoice = recordChoice;
+  shell.switchLanguage = switchLanguage;
   shell.attachSoundEntry = attachSoundEntry;
   shell.withSoundModule = withSoundModule;
   shell.openEndProgram = openEndProgram;

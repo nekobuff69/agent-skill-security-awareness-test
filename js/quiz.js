@@ -36,32 +36,6 @@
   var FINISH_BEAT_MS  = 400;
   var WIPE_MS         = 160;
 
-  /**
-   * The language switcher: one control, placed on the landing view and at the
-   * end of the Quiz Chrome. The target URL comes from the page's data-lang-alt
-   * attribute, so no path arithmetic and no auto-detection are involved — a
-   * visitor who does not read the current language navigates away from here.
-   */
-  function langSwitch() {
-    var a = document.createElement('a');
-    a.className = 'lang-switch';
-    a.href = document.documentElement.getAttribute('data-lang-alt') || '#';
-    a.title = t('lang.switchLabel');
-    a.setAttribute('aria-label', t('lang.switchLabel'));
-    a.textContent = t('lang.otherName');
-
-    // Using the switch is a decision, and recording it is what stops
-    // first-visit routing from sending the Participant straight back to the
-    // page they just left (ADR 0018).
-    if (app.LangPref && typeof app.LangPref.setLanguage === 'function') {
-      a.addEventListener('click', function() {
-        app.LangPref.setLanguage(
-          document.documentElement.getAttribute('data-lang-alt-locale'));
-      });
-    }
-    return a;
-  }
-
   /* ── Quiz state ──────────────────────────────────────────────────── */
 
   var bank       = null;
@@ -435,9 +409,6 @@
 
     view.appendChild(chrome);
 
-    // Language switcher: the way out of a language the Participant does not read.
-    chrome.appendChild(langSwitch());
-
     // Session resume — one Session per Participant, shared by every Bank
     // Variant, so a Participant who switches language mid-assessment returns
     // to their answers intact.
@@ -471,10 +442,6 @@
     var landing = byId('landing-view');
     if (!landing) return;
     landing.innerHTML = '';
-
-    // Language switcher: the other language is one click away, and switching
-    // keeps the Session the Participant already started in this one.
-    landing.appendChild(langSwitch());
 
     // A Participant who arrived in a language they may not read gets one
     // dismissible offer of the other, ahead of everything else on the page.

@@ -1,14 +1,15 @@
 /* ── Desktop shell (ticket #38) ──────────────────────────────────────────
 
-   Window frame, taskbar, Start menu and About window for the retro OS
-   desktop. Linked after css/theme-retro-os.css and before css/lang-switch.css
-   on every page. All colours, bevels and the chrome typeface come from the
-   skin's tokens — no new palette here.
+   Window frame, taskbar, Start menu, language tray chip and About window
+   for the retro OS desktop. Linked after css/theme-retro-os.css — the last
+   base stylesheet on every page. All colours, bevels and the chrome
+   typeface come from the skin's tokens — no new palette here.
 
    Layering (z-index ladder):
      .quiz-chrome (sticky, 10)  <  .os-window (0)
        <  .os-taskbar (1000)  <  .os-start-menu (1100)
        <  .os-about-backdrop (1200)
+       <  .os-dialog-backdrop (1300)
    ─────────────────────────────────────────────────────────────────── */
 
 :root {
@@ -174,6 +175,37 @@ body {
   font-size: 14px;
   background: var(--color-face);
   box-shadow: var(--bevel-sunken);
+}
+
+/* ── Tray language indicator (ticket #44) ──────────────────────────────
+
+   A compact sunken chip naming the page's own language, next to the
+   clock. Clicking it switches to the declared alternate (js/shell.js
+   switchLanguage). */
+
+.os-tray-lang {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: calc(var(--os-taskbar-height) - 8px);
+  padding: 0 var(--space-2);
+  font-family: var(--font-heading);
+  font-size: 14px;
+  background: var(--color-face);
+  box-shadow: var(--bevel-sunken);
+}
+
+.os-tray-lang:hover {
+  box-shadow: var(--bevel-raised);
+}
+
+.os-tray-lang:active {
+  box-shadow: var(--bevel-sunken);
+}
+
+.os-tray-lang:focus-visible {
+  outline: 1px dotted var(--color-text);
+  outline-offset: -4px;
 }
 
 /* ── Start menu popup ──────────────────────────────────────────────────

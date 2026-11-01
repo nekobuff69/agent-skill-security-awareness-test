@@ -42,7 +42,8 @@ questions.json — or a Bank Variant, e.g. questions.zh.json (each loaded once)
     │              quiz chrome (Progress Fill + Question Counter + Phase Chip,
     │              all updating in place), question cards (Q-number chip,
     │              labeled Scenario/Question blocks, A–D-lettered Options),
-    │              Back Navigation (← Previous, re-answer overwrites)
+    │              Wizard row ([< Back]/[Next >]; [Finish] on the last,
+    │              re-answer overwrites in place) — ADR-0020
     │     collects: option selections → answers: option_index, one per Question
     │     stores: localStorage quiz-session {v: structural-hash, answers} —
     │            one Session per Participant, shared by every Bank Variant,
@@ -113,8 +114,8 @@ questions.json — or a Bank Variant, e.g. questions.zh.json (each loaded once)
 │  Q3 ┌ [Scenario] ──────────────┐                         │
 │     └ [Question]               ┘                         │
 │  [A] Option  [B] Option  [C] Option  [D] Option          │
-│  select → silent save → slide+fade advance               │
-│  [← Previous]  (from Q2 onward)                          │
+│  select → silent save → card wipe advance               │
+│  [< Back] [Next >]  ([Finish] on the last card)           │
 └─────────────────────┬───────────────────────────────────┘
                       ↓
 ┌─────────────────────────────────────────────────────────┐
@@ -176,11 +177,25 @@ questions.json — or a Bank Variant, e.g. questions.zh.json (each loaded once)
 
 - **Three real screens.** Landing, quiz, and results are separate views — the `hidden` attribute actually hides (styles.css enforces it over author display rules).
 - **No per-question Feedback during the quiz.** Option saved silently. Momentum preserved.
-- **Auto-advance on selection.** Select → save → slide+fade transition. No "Next" button; **Back Navigation** only (← Previous from Q2; re-answering overwrites).
+- **Auto-advance on the first answer only (ADR 0020).** Select → save → the **Advance Transition** (client-area card wipe, ~160 ms inside the 200 ms beat; instant under prefers-reduced-motion). A revisit re-marks in place and never moves the card. The **wizard row** moves both ways: [< Back] from Q2, [Next >] between cards, and [Finish] — enabled exactly at 20/20 — is the sole Completion trigger.
 - **The Quiz Chrome never stacks.** One sticky bar: Progress Fill + Question Counter (the question being *viewed*) + Phase Chip updating in place. No phase header cards near the Question.
 - **Review is voluntary, on its own screen.** Reached from the results page; navigate back freely; skip it entirely if you want.
 - **The Deep-Dive Prompt is the hero artifact.** The thing the Participant takes away and uses.
 - **The radar is the shareable moment.** PNG download + Web Share API — results travel without a backend. Severity never renders on the charts; score-band colors alone encode performance.
+
+### Presentation layer: the retro-OS skin
+
+The interface is a Windows 95 desktop, delivered as a pure CSS override skin (`css/theme-retro-os.css`, linked last on every page) plus a small set of OS shell modules it drives with:
+
+| Module | File | Role |
+| ------ | ---- | ---- |
+| Boot | `js/boot.js` | Splash gate: a sessionStorage flag (`quiz-os-booted`) decides whether a tab sees the boot splash (1350ms, then a 200ms fade) or an instant load; reduced motion or a prior visit answers "already booted". The overlay masks but never gates data fetching — only rendering waits. |
+| Shell | `js/shell.js` + `css/shell.css` | Wraps `#app` in the `.os-window` frame (navy title bar, drawn [—][□][×] marks) and mounts the taskbar: Start button, program button, clock. Owned window controls (minimize/restore/zoom, ticket #43) live here. |
+| Windows | `js/windows.js` | The dialog primitive: `App.Windows.openSystemDialog` renders a Win95 system dialog — red warn / navy info circles, beveled command buttons, closes only via its buttons or Escape. One dialog at a time; the backdrop dims the desktop. The shell controller and the state machine are pure modules, testable headlessly. |
+| Sound | `js/sound.js` | Period system sounds (e.g. the click that marks an Option). Purely additive — every interaction works silently. |
+| WizardNav | `js/wizard-nav.js` | The pure decision core behind the quiz's wizard row (`tapOption`, `canFinish`, `next`, `prev`, the one-fire commit gate behind [Finish], ADR 0020). |
+
+Non-theming contract kept deliberately: the skin only re-points token values and repaints components; the semantic aliases (`--color-bg`, `--color-accent`, `--color-score-*`, `--color-success/--color-warning/--color-error`) keep their names, so the base stylesheets never learn the skin's palette. Motion is era-mechanical or none: the view trace, the card wipes and the Progress Fill run as `steps()` animations and are each disabled under `prefers-reduced-motion` (disjoint selector gates, no `!important`). On mobile (≤480px) the policy is "maximize": the app window fills the viewport above the taskbar, like a foregrounded program; dialog anatomy stacks and buttons wrap. The chrome typeface is self-hosted W95FA (OFL 1.1, `fonts/` with provenance record), pinned by `unicode-range` to Latin + typographic marks so Han text always falls through to the CJK stack (`--font-heading` cascade: SimSun → 宋体 → Microsoft YaHei → PingFang SC; `css/cjk.css` re-points the stack SimSun-first on the zh page). Every visual value is extracted and recorded in the root `design-dna-retro-os.json`; `404.html` restates the dialog idiom script-free (its system-error dialog is plain links) rather than loading app JS.
 
 ---
 
@@ -208,6 +223,7 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 | 0016 | Language-scoped Session storage — `quiz-session:<language>` — **superseded by 0017** | [0016-language-scoped-session-storage.md](adr/0016-language-scoped-session-storage.md) |
 | 0017 | Universal Session storage — one `quiz-session` record shared by every Bank Variant; the version stamp hashes bank structure, never authored text | [0017-universal-session-storage.md](adr/0017-universal-session-storage.md) |
 | 0018 | First-visit language routing — a Language Preference stored apart from the Session, automatic routing on a strong browser-language signal, and a dismissible offer otherwise | [0018-first-visit-language-routing.md](adr/0018-first-visit-language-routing.md) |
+| 0020 | Wizard navigation with explicit commit — one Option per Question, auto-advance only on a first answer, [Finish] as the single Completion path | [0020-wizard-navigation-with-explicit-commit.md](adr/0020-wizard-navigation-with-explicit-commit.md) |
 
 ---
 
@@ -218,6 +234,9 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 │   └── index.html           # Simplified Chinese page — same app, Bank Variant
 ├── config.js
 ├── styles.css
+├── 404.html                 # system error dialog — script-free, links the skin's tokens
+├── og-card.png              # 1200×630 share card, browser capture of the retro results view
+├── design-dna-retro-os.json # design-DNA record for the retro-OS skin (values traced to its CSS)
 ├── fonts/                  # self-hosted chrome typeface + license + provenance
 ├── questions.json           # Question Bank (English)
 ├── questions.zh.json        # Bank Variant (Simplified Chinese)
@@ -230,8 +249,9 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 │   ├── quiz.css
 │   ├── results.css
 │   ├── theme-retro-os.css  # retro-OS (Win95) skin, linked last as override layer
+│   ├── boot.css        # splash overlay — sunken groove, stepped navy fill, fade handoff
 │   ├── cjk.css          # CJK typography, gated on html[lang^="zh"] (zh page only)
-│   └── lang-switch.css   # language switch + first-visit offer (ADR-0018)
+│   └── shell.css        # retro-OS window frame, taskbar, tray chip, dialogs
 ├── js/
 │   ├── analytics.js      # analytics helpers
 │   ├── ast.js            # AST Risk registry — canonical ids + severities; display names are Chrome Strings (ADR-0013, ADR-0015)
@@ -241,7 +261,12 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 │   ├── scoring.js        # deterministic scoring, title lookup, ranked views
 │   ├── session-store.js  # one Session per Participant, structural-hash versioned (ADR-0017)
 │   ├── lang-pref.js      # remembered language choice + prompt dismissals (ADR-0018)
-│   ├── lang-routing.js   # first-visit routing decision + offer rendering (ADR-0018)
+│   ├── lang-routing.js   # first-visit routing decision + offer dialog (ADR-0018)
+│   ├── boot.js           # splash gate — sessionStorage flag, masked fetches, one-trace handoff (tickets #39/#42)
+│   ├── shell.js          # os-window wrap, taskbar, Start menu + About window (tickets #38/#43)
+│   ├── windows.js        # window controls state machine + system dialog primitive (ticket #43)
+│   ├── sound.js          # period system sounds, Start-menu mute toggle (ticket #41)
+│   ├── wizard-nav.js     # pure wizard decisions + Finish commit gate (ADR-0020, ticket #40)
 │   ├── prompt-builder.js # Deep-Dive Prompt assembly
 │   ├── fallback.js       # deterministic fallback from bank
 │   ├── extractor.js      # OWASP excerpt extraction
@@ -262,6 +287,13 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 │       ├── test-validator.js
 │       ├── test-i18n.js            # dictionary contract — missing id throws, no English fallback
 │       ├── test-action-plan-budget.js  # Action Plan prompt stays within llm.budget, trim ladder deterministic
+│       ├── test-boot.js            # splash gate — decide(landedFirst, hasFlag, reducedMotion), exactly-once flag, storage fail-open
+│       ├── test-wizard-nav.js      # tapOption/canFinish/prev/next decisions + the one-fire Finish commit gate (ADR-0020)
+│       ├── test-shell.js           # clock/tick cadence, title-bar button delegation, program button, Start menu via DOM stubs
+│       ├── test-windows.js         # window state machine (minimize/restore/zoom/close confirm), dialog primitive, trace classes
+│       ├── test-sound.js           # audible() matrix, voice table, mute persistence
+│       ├── test-results-retro.js   # retro results: Title Card window frame, radar SVG + dither, review disclosures
+│       ├── test-theme-retro-os.js  # static skin/token/integration checks for every entry point
 │       └── test-grounding.js   # gates the shipped Grounding Corpus itself
 ├── scripts/
 │   ├── preflight.sh
@@ -275,7 +307,7 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
     ├── architecture.md
     ├── TESTING.md
     ├── owasp-ast-full.md       # Grounding Corpus
-    ├── adr/                    # 0001–0018, one decision per note
+    ├── adr/                    # one decision per note — 0001–0018 + 0020
     └── agents/                 # issue-tracker, triage-labels, domain consumer rules
 ```
 

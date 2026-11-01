@@ -331,6 +331,9 @@
    *   opts.icon        'warn' (default: red circle, white cross) | 'info'
    *   opts.titleId     Chrome String id for the title bar (optional)
    *   opts.messageId   Chrome String id for the message (required)
+   *   opts.messageParams format vars for the message, when the id carries
+   *                    {placeholders} (e.g. the language offer names the other
+   *                    language)
    *   opts.okId        Chrome String id for the affirmative (default
    *                    'windows.yes')
    *   opts.cancelId    Chrome String id for the negative (default
@@ -363,7 +366,7 @@
     if (activeDialog) return null;
 
     var dangerous = opts.dangerous !== false;
-    var message = I18n.t(opts.messageId);
+    var message = I18n.t(opts.messageId, opts.messageParams);
     var title = opts.titleId ? I18n.t(opts.titleId) : '';
     var okLabel = I18n.t(opts.okId || 'windows.yes');
     var cancelLabel = I18n.t(opts.cancelId || 'windows.no');

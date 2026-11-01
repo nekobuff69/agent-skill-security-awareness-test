@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
-  <title>Page not found · 页面不存在</title>
+  <title>404 — Not Found · 页面不存在</title>
 
   <!--
     Cloudflare Pages serves this document for ANY unmatched path, but the
@@ -13,95 +13,243 @@
     /some/missing/page would resolve to /some/missing/styles.css and 404 in
     turn, turning one broken link into three.
 
-    Both languages are shown side by side rather than one being guessed. A 404
-    is precisely the case where nothing is known about the visitor, and the
-    language switch is the one control that cannot be wrong.
+    This page is the desktop idiom's system error dialog ("file not found"
+    is exactly the era's error state): a beveled window on the teal desktop,
+    navy title bar, the red warn circle, and two command buttons that ARE
+    the language switch — both languages are offered side by side rather
+    than one being guessed. A 404 is precisely the case where nothing is
+    known about the visitor, and the language switch is the one control
+    that cannot be wrong.
+
+    Script-free by policy: the dialog is plain links, so no app JS,
+    i18n wiring, or language routing can ever fail here. The skin file
+    (theme-retro-os.css) supplies the tokens; this page restates the few
+    values it needs as var() fallbacks so the geometry is self-contained.
   -->
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/css/theme-retro-os.css">
   <link rel="icon" href="data:,">
-</head>
-<body>
-  <main class="not-found">
-    <p class="not-found-code">404</p>
-
-    <h1 class="not-found-title" lang="en">That page doesn&rsquo;t exist.</h1>
-    <h1 class="not-found-title" lang="zh-Hans">该页面不存在。</h1>
-
-    <p class="not-found-body" lang="en">The assessment is two pages, one per language. Pick one:</p>
-    <p class="not-found-body" lang="zh-Hans">测评只有两个页面，每种语言一个。请选择：</p>
-
-    <nav class="not-found-actions">
-      <a class="not-found-link" href="/">English</a>
-      <a class="not-found-link" href="/zh/" lang="zh-Hans">简体中文</a>
-    </nav>
-  </main>
-
   <style>
-    .not-found {
-      max-width: 34rem;
-      margin: 12vh auto 0;
-      padding: var(--space-5, 32px) var(--space-4, 24px) var(--space-8, 64px);
-      text-align: center;
-      font-family: var(--font-body, sans-serif);
-      color: var(--color-text, #000000);
-      /* One program window standing on the teal desktop; the raised bevel
-         triad comes from the retro skin's token layer. */
-      background: var(--color-face, #C0C0C0);
-      box-shadow: inset -1px -1px #000000, inset 1px 1px #FFFFFF,
-                  inset -2px -2px #808080, inset 2px 2px #DFDFDF;
-    }
-
-    .not-found-code {
-      margin: 0 0 var(--space-3, 16px);
-      font-size: 0.8125rem;
-      font-weight: 600;
-      letter-spacing: 0.12em;
-      color: var(--color-accent, #000080);
-    }
-
-    .not-found-title {
-      margin: 0 0 var(--space-2, 8px);
-      font-family: var(--font-heading, sans-serif);
-      font-size: clamp(1.75rem, 5vw, 2.5rem);
-      line-height: 1.2;
-      font-weight: 400;
-      color: var(--color-text, #000000);
-    }
-
-    .not-found-body {
-      margin: 0 0 var(--space-5, 32px);
-      color: var(--color-text-muted, #000000);
-      line-height: 1.6;
-    }
-
-    .not-found-actions {
+    /* ── Desktop ──
+       The teal desktop painted by css/theme-retro-os.css; restated with a
+       fallback so the dialog stays centered even if the skin is absent. */
+    body {
+      margin: 0;
+      min-height: 100vh;
       display: flex;
-      gap: var(--space-3, 16px);
+      align-items: center;
       justify-content: center;
-      flex-wrap: wrap;
+      padding: var(--space-4, 24px);
+      background-color: #008080;
+      color: #000000;
+      font-family: var(--font-body, -apple-system, BlinkMacSystemFont,
+                    'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+                    'Noto Sans', sans-serif);
     }
 
-    .not-found-link {
+    /* ── The dialog ──
+       Same footprint as the app's system dialog primitive
+       (js/windows.js + .os-dialog): min(440px, viewport − 32px), silver
+       face, raised bevel from the classic triad. No radius, no shadow. */
+    .nf-window {
+      width: min(440px, calc(100vw - 2 * var(--space-3, 16px)));
+      background: var(--color-face, #C0C0C0);
+      box-shadow: var(--bevel-raised,
+        inset -1px -1px #000000, inset 1px 1px #FFFFFF,
+        inset -2px -2px #808080, inset 2px 2px #DFDFDF);
+      border-radius: 0;
+    }
+
+    /* ── Title bar ──
+       Navy → lighter-blue gradient, exactly the app's .os-titlebar. */
+    .nf-titlebar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 30px;
+      padding: 0 var(--space-1, 4px) 0 var(--space-2, 8px);
+      background: linear-gradient(90deg, #000080 0%, #1084D0 100%);
+      color: #FFFFFF;
+      font-family: var(--font-heading, 'W95FA', 'Segoe UI', Tahoma,
+                    'SimSun', '宋体', sans-serif);
+    }
+
+    .nf-titlebar-title {
+      font-size: 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .nf-titlebar-buttons {
+      display: flex;
+      gap: 2px;
+      flex: none;
+    }
+
+    /* Title-bar buttons: drawn, gray, inert — the era-correct disable. */
+    .nf-titlebar-btn {
       display: inline-flex;
       align-items: center;
-      padding: 0.6rem 1.4rem;
+      justify-content: center;
+      width: 18px;
+      height: 16px;
+      padding: 0;
+      font-size: 10px;
+      line-height: 1;
+      background: var(--color-face, #C0C0C0);
+      color: var(--color-secondary, #808080);
       border: 0;
-      border-radius: 0;
+      box-shadow: var(--bevel-raised,
+        inset -1px -1px #000000, inset 1px 1px #FFFFFF,
+        inset -2px -2px #808080, inset 2px 2px #DFDFDF);
+      text-shadow: 1px 1px #FFFFFF;
+    }
+
+    /* ── Dialog body ──
+       Icon field left, message right — same anatomy as .os-dialog-body. */
+    .nf-body {
+      display: flex;
+      gap: var(--space-3, 16px);
+      align-items: flex-start;
+      padding: var(--space-3, 16px);
+    }
+
+    /* Era warn icon: flat red circle + white cross drawn with pseudo bars —
+       the same glyph .os-dialog-icon[data-icon='warn'] draws. */
+    .nf-icon {
+      flex: none;
+      position: relative;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #FF0000;
+    }
+
+    .nf-icon::before,
+    .nf-icon::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 16px;
+      height: 4px;
+      margin: -2px 0 0 -8px;
+      background: #FFFFFF;
+    }
+
+    .nf-icon::before { transform: rotate(45deg); }
+    .nf-icon::after  { transform: rotate(-45deg); }
+
+    .nf-message {
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    .nf-message + .nf-message {
+      margin-top: var(--space-2, 8px);
+    }
+
+    /* ── Command buttons ──
+       Two beveled buttons; each IS a landing link, one per language.
+       Win95 hover: the button stays raised; focus is the dotted rectangle
+       drawn inside the face; press sinks it. No transition — instant. */
+    .nf-buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--space-2, 8px);
+      padding: 0 var(--space-3, 16px) var(--space-3, 16px);
+    }
+
+    .nf-btn {
+      display: inline-flex;
+      align-items: center;
+      min-width: 75px;
+      padding: var(--space-1, 4px) var(--space-3, 16px);
       color: var(--color-text, #000000);
       text-decoration: none;
-      font-weight: 400;
+      font-family: var(--font-heading, 'W95FA', 'Segoe UI', Tahoma,
+                    'SimSun', '宋体', sans-serif);
+      font-size: 14px;
+      border-radius: 0;
       transition: none;
+      box-shadow: var(--bevel-raised,
+        inset -1px -1px #000000, inset 1px 1px #FFFFFF,
+        inset -2px -2px #808080, inset 2px 2px #DFDFDF);
     }
 
-    .not-found-link:hover,
-    .not-found-link:focus-visible {
+    .nf-btn:hover {
       color: var(--color-text, #000000);
     }
 
-    @media (prefers-reduced-motion: reduce) {
-      .not-found-link { transition: none; }
+    .nf-btn:active {
+      box-shadow: var(--bevel-sunken,
+        inset -1px -1px #FFFFFF, inset 1px 1px #000000,
+        inset -2px -2px #DFDFDF, inset 2px 2px #808080);
     }
+
+    .nf-btn:focus-visible {
+      outline: 1px dotted var(--color-text, #000000);
+      outline-offset: -4px;
+    }
+
+    /* sr-only stays out of the rendered dialog; h1 is the epoch phrase. */
+    .sr-only {
+      position: absolute;
+      width: 1px; height: 1px;
+      padding: 0; margin: -1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    /* ── Responsive ──
+       At phone widths the dialog drops the two-column anatomy: the icon
+       centers above the message and the two landing buttons wrap. */
+    @media (max-width: 480px) {
+      .nf-body {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+
+      .nf-buttons {
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+    }
+
+    /* Prefers-reduced-motion is trivially satisfied by construction: the
+       dialog declares no animation and no transition anywhere — the
+       system error dialog of the era answered instantly too. */
   </style>
+</head>
+<body>
+  <main class="nf-window" role="main">
+    <div class="nf-titlebar">
+      <span class="nf-titlebar-title">404 — Not Found</span>
+      <span class="nf-titlebar-buttons" aria-hidden="true">
+        <span class="nf-titlebar-btn">&mdash;</span>
+        <span class="nf-titlebar-btn">&#9633;</span>
+        <span class="nf-titlebar-btn">&#10005;</span>
+      </span>
+    </div>
+
+    <h1 class="sr-only">Page not found · 页面不存在</h1>
+
+    <div class="nf-body">
+      <span class="nf-icon" aria-hidden="true"></span>
+      <div>
+        <p class="nf-message" lang="en">The page you were looking for does not exist. The desktop is safe &mdash; choose your language:</p>
+        <p class="nf-message" lang="zh-Hans">您要找的页面不存在。桌面仍然安全 &mdash; 请选择语言：</p>
+      </div>
+    </div>
+
+    <nav class="nf-buttons" aria-label="Pick a language · 选择语言">
+      <a class="nf-btn" href="/" lang="en">Return to desktop</a>
+      <a class="nf-btn" href="/zh/" lang="zh-Hans">返回桌面</a>
+    </nav>
+  </main>
 </body>
 </html>

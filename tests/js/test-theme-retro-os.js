@@ -107,7 +107,7 @@ exports.run = function() {
 
   /* ── No editorial orange, anywhere ── */
   ['css/theme-retro-os.css', 'css/cjk.css', 'css/quiz.css', 'css/results.css',
-   'css/lang-switch.css', 'styles.css', 'index.html', 'zh/index.html',
+   'styles.css', 'index.html', 'zh/index.html',
    '404.html', 'js/results.js'].forEach(function(f) {
     check(f + ' contains no #ED682B', read(f).toUpperCase().indexOf('ED682B') === -1);
   });

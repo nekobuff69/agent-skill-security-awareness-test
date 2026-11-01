@@ -23,6 +23,9 @@
     'lang.offerQuestion': 'Read this in {language}?',
     'lang.offerAccept': 'Continue',
     'lang.offerDismiss': 'Not now',
+    'lang.offerTitle': 'Language',
+    'lang.selfName': 'EN',
+    'lang.menuItem': 'Language: switch to {language}',
 
     /* ── Loading & errors ── */
     'loading.bank': 'Loading…',

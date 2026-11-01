@@ -1,13 +1,12 @@
 /* ── Retro OS Theme (Windows 95) ──────────────────────────────────────────
 
-   Override skin, linked LAST on every HTML page (immediately before
-   css/cjk.css on the Chinese page). The base structure stylesheets
-   (styles.css, css/quiz.css, css/results.css, css/lang-switch.css) keep their
-   semantic token aliases — --color-bg, --color-accent, --color-score-*,
-   --color-success/--color-warning/--color-error — untouched; this file only
-   re-points their values and restyles components in the Win95 idiom. Any rule
-   here that needs to beat a same-specificity rule in a base file (css/
-   lang-switch.css loads after this file) uses an element-prefixed selector.
+   Override skin, linked near the end of every HTML page (css/boot.css and
+   css/shell.css follow it; css/cjk.css is last on the Chinese page). The
+   base structure stylesheets (styles.css, css/quiz.css, css/results.css)
+   keep their semantic token aliases — --color-bg, --color-accent,
+   --color-score-*, --color-success/--color-warning/--color-error —
+   untouched; this file only re-points their values and restyles components
+   in the Win95 idiom.
 
    ── Bevel geometry ────────────────────────────────────────────────────
    Authentic Windows 95 outset/inset, drawn with box-shadow (no border
@@ -129,8 +128,8 @@
   --max-width: 720px;
   --border-radius: 0;           /* Win95 squares                       */
 
-  /* Win95 has no easing; feedback is instant. Kept as tokens because
-     css/lang-switch.css consumes them. */
+  /* Win95 has no easing; feedback is instant. Kept as tokens because the
+     base stylesheets consume them (styles.css, css/results.css). */
   --transition-fast: 0s;
   --transition-normal: 0s;
   --transition-slow: 0s;
@@ -168,8 +167,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* ── Command buttons ─────────────────────────────────────────────────── */
 
-button,
-a.not-found-link {
+button {
   font-family: var(--font-heading);
   font-weight: 400;             /* W95FA has one weight; no faux bold    */
   background: var(--color-face);
@@ -182,14 +180,12 @@ a.not-found-link {
 
 /* Win95 hover: the button stays raised; the keyboard focus is the dotted
    rectangle drawn inside the face. */
-button:hover,
-a.not-found-link:hover {
+button:hover {
   background: var(--color-face);
   transform: none;
 }
 
-button:focus-visible,
-a.not-found-link:focus-visible {
+button:focus-visible {
   outline: 1px dotted #000000;
   outline-offset: -4px;
 }
@@ -573,61 +569,6 @@ button:disabled {
   background: var(--color-surface);
   border-radius: 0;
   box-shadow: var(--bevel-sunken);
-}
-
-/* ── Language switch + first-visit offer ──────────────────────────────
-
-   css/lang-switch.css is linked AFTER this skin, so these use element-
-   prefixed selectors (higher specificity) to win without !important. */
-
-a.lang-switch,
-button.lang-switch {
-  font-family: var(--font-heading);
-  color: var(--color-text);
-  background: var(--color-face);
-  border: 0;
-  border-radius: 0;
-  box-shadow: var(--bevel-raised);
-}
-
-a.lang-switch:hover,
-button.lang-switch:hover {
-  color: var(--color-text);
-  background: var(--color-face);
-}
-
-.lang-offer {
-  font-family: var(--font-body);
-  background: var(--color-face);
-  color: var(--color-text);
-  border: 0;
-  border-radius: 0;
-  box-shadow: var(--bevel-raised);
-}
-
-a.lang-offer-accept,
-button.lang-offer-accept,
-button.lang-offer-dismiss {
-  font-family: var(--font-heading);
-  font-weight: 400;
-  border-radius: 0;
-  box-shadow: var(--bevel-raised);
-  color: var(--color-text);
-  background: var(--color-face);
-}
-
-a.lang-offer-accept:hover,
-button.lang-offer-accept:hover,
-button.lang-offer-dismiss:hover {
-  color: var(--color-text);
-  background: var(--color-face);
-}
-
-a.lang-offer-accept:focus-visible,
-button.lang-offer-accept:focus-visible,
-button.lang-offer-dismiss:focus-visible {
-  outline: 1px dotted #000000;
-  outline-offset: -4px;
 }
 
 /* ── Responsive ─────────────────────────────────────────────────────── */

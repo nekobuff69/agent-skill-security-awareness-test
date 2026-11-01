@@ -20,7 +20,8 @@
    *
    * Nothing here moves a Participant who has already chosen: a recorded
    * Language Preference or an existing Session both stop it, and the language
-   * switch in the page always wins regardless (ADR 0018).
+   * switch — the tray indicator and the Start-menu entry (ADR 0018) — always
+   * wins regardless.
    */
 
   var PROMPT = 'lang-offer';
@@ -102,7 +103,13 @@
   }
 
   /**
-   * Insert the offer into the Landing Page, if one is due.
+   * Present the offer as the Landing Page's due, if one is.
+   *
+   * The presentation is a system dialog (App.Windows, ticket #44), not
+   * inline page chrome: an info dialog, `dangerous: false` so Enter is the
+   * affirmative, with the existing offer copy resolved as Chrome Strings.
+   * The `container` gate keeps the offer tied to the Landing Page — the
+   * dialog renders on the desktop layer, not inside the container.
    *
    * Only the guard above is guarded. Everything from here on may throw on a
    * missing Chrome String id, and that is the intended failure: ADR 0015
@@ -110,40 +117,33 @@
    */
   function offerInto(container) {
     if (!container || !shouldOffer()) return false;
+    // One dialog at a time: the desktop owns a modal, so a system dialog
+    // already on screen (End Program, another offer) defers this one.
+    if (!app.Windows || typeof app.Windows.openSystemDialog !== 'function') return false;
+    if (typeof app.Windows.isDialogOpen === 'function' && app.Windows.isDialogOpen()) return false;
     var alt = other();
+    if (!alt) return false;
 
-    var wrap = document.createElement('div');
-    wrap.className = 'lang-offer';
-
-    var text = document.createElement('span');
-    text.className = 'lang-offer-text';
-    text.textContent = app.I18n.t('lang.offerQuestion', {
-      language: app.I18n.t('lang.otherName')
+    var controller = app.Windows.openSystemDialog({
+      icon: 'info',
+      titleId: 'lang.offerTitle',
+      messageId: 'lang.offerQuestion',
+      messageParams: { language: app.I18n.t('lang.otherName') },
+      okId: 'lang.offerAccept',
+      cancelId: 'lang.offerDismiss',
+      dangerous: false,
+      onOk: function() {
+        // Record the choice before leaving, exactly as the old banner's
+        // accept click did, so the destination page treats this as a
+        // decision already made and can never send them back.
+        app.LangPref.setLanguage(alt.locale);
+        window.location.href = alt.href;
+      },
+      onCancel: function() {
+        app.LangPref.dismiss(PROMPT);
+      }
     });
-    wrap.appendChild(text);
-
-    var accept = document.createElement('a');
-    accept.className = 'lang-offer-accept';
-    accept.href = alt.href;
-    accept.textContent = app.I18n.t('lang.offerAccept');
-    accept.addEventListener('click', function() {
-      app.LangPref.setLanguage(alt.locale);
-    });
-    wrap.appendChild(accept);
-
-    var dismiss = document.createElement('button');
-    dismiss.type = 'button';
-    dismiss.className = 'lang-offer-dismiss';
-    dismiss.textContent = app.I18n.t('lang.offerDismiss');
-    dismiss.setAttribute('aria-label', app.I18n.t('lang.offerDismiss'));
-    dismiss.addEventListener('click', function() {
-      app.LangPref.dismiss(PROMPT);
-      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
-    });
-    wrap.appendChild(dismiss);
-
-    container.insertBefore(wrap, container.firstChild);
-    return true;
+    return !!controller;
   }
 
   app.LangRouting = { PROMPT: PROMPT, init: init, offerInto: offerInto, shouldOffer: shouldOffer };

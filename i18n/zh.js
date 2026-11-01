@@ -25,6 +25,9 @@
     'lang.offerQuestion': '要用{language}阅读吗？',
     'lang.offerAccept': '继续',
     'lang.offerDismiss': '暂不',
+    'lang.offerTitle': '语言',
+    'lang.selfName': '中文',
+    'lang.menuItem': '语言：切换到{language}',
 
     /* ── 加载与错误 ── */
     'loading.bank': '加载中……',

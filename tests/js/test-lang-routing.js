@@ -33,6 +33,36 @@ exports.run = function() {
   var navigatedTo = null;
 
   /**
+   * The system-dialog primitive (js/windows.js) as a seam: true to its
+   * contract — one dialog at a time, close() routes once to onOk or onCancel.
+   * The real primitive's rendering and keyboard contract live in
+   * tests/js/test-windows.js; here the dialog layer exists so the offer's
+   * WIRING — which ids it resolves, what it records — is what gets asserted.
+   */
+  var offered = { opts: null, ctl: null };
+  var savedWindows = globalThis.App.Windows;
+  globalThis.App.Windows = {
+    isDialogOpen: function() { return !!(offered.ctl && offered.ctl.isOpen()); },
+    openSystemDialog: function(opts) {
+      if (globalThis.App.Windows.isDialogOpen()) return null;
+      var open = true;
+      offered.opts = opts;
+      offered.ctl = {
+        isOpen: function() { return open; },
+        close: function(result) {
+          if (!open) return false;
+          open = false;
+          offered.ctl = null;
+          if (result === 'ok' && typeof opts.onOk === 'function') opts.onOk();
+          else if (result === 'cancel' && typeof opts.onCancel === 'function') opts.onCancel();
+          return true;
+        }
+      };
+      return offered.ctl;
+    }
+  };
+
+  /**
    * A DOM node good enough to assert against: records children, attributes and
    * click handlers, so the offer can genuinely be rendered and used.
    */
@@ -115,6 +145,8 @@ exports.run = function() {
     setPage();
     setBrowserLanguages(languages || ['en-US']);
     I18n.use('en');
+    offered.opts = null;
+    offered.ctl = null;
   }
 
   // ── init(): automatic routing ───────────────────────────────────────────
@@ -231,40 +263,65 @@ exports.run = function() {
   check('offerInto tolerates a missing container',
     LR.offerInto(null) === false);
 
-  // 17. When an offer IS due it renders real, navigable content: the other
-  //     language's name, a link to the declared alternate, and a dismissal
-  //     that removes it and is remembered.
+  // 17. When an offer IS due it opens a system dialog: an info dialog that
+  //     is not dangerous, carrying the existing offer Chrome Strings, whose
+  //     affirmative navigates the declared alternate and records the choice
+  //     (ticket #44: banner → dialog, ADR 0018 semantics unchanged).
   reset(['fr-FR']);
   var host = fakeEl();
-  check('offerInto renders the offer when one is due',
-    LR.offerInto(host) === true && host.children.length === 1);
+  check('offerInto opens the offer dialog when one is due',
+    LR.offerInto(host) === true && !!offered.ctl);
 
-  var offer = host.children[0];
-  var text = offer.children[0];
-  var accept = offer.children[1];
+  var opts = offered.opts;
+  check('the offer dialog carries the offer Chrome Strings',
+    opts.messageId === 'lang.offerQuestion' &&
+    opts.titleId === 'lang.offerTitle' &&
+    opts.okId === 'lang.offerAccept' &&
+    opts.cancelId === 'lang.offerDismiss',
+    JSON.stringify(opts.messageId));
+  check('the offer is a safe info dialog (Enter is affirmative)',
+    opts.dangerous === false && opts.icon === 'info');
   check('the offer names the other language and offers to continue',
-    text.textContent === 'Read this in 中文?' && accept.textContent === 'Continue',
-    JSON.stringify(text.textContent) + ' / ' + JSON.stringify(accept.textContent));
+    I18n.t(opts.messageId, opts.messageParams) === 'Read this in 中文?' &&
+    I18n.t(opts.okId) === 'Continue',
+    I18n.t(opts.messageId, opts.messageParams) + ' / ' + I18n.t(opts.okId));
   check('the offer links to the declared alternate',
-    accept.href === 'zh/', String(accept.href));
+    opts.messageParams.language === '中文' && !window.location.href,
+    String(window.location.href));
 
-  accept.handlers.click();
+  offered.ctl.close('ok');
   check('accepting the offer records the language choice',
     LP.get().language === 'zh', String(LP.get().language));
+  check('accepting the offer navigates the declared alternate',
+    window.location.href === 'zh/', String(window.location.href));
 
-  // 18. Dismissing removes the offer and is remembered for good.
+  // 18. Dismissing the dialog is remembered for good — and the dialog is
+  //     gone, so the offer never comes back on this visit or the next.
   reset(['fr-FR']);
-  var host2 = fakeEl();
-  LR.offerInto(host2);
-  var offer2 = host2.children[0];
-  offer2.parentNode = host2;
-  offer2.children[2].handlers.click();
-  check('dismissing the offer removes it from the page',
-    host2.children.length === 0, 'children=' + host2.children.length);
+  LR.offerInto(fakeEl());
+  offered.ctl.close('cancel');
+  check('dismissing the offer closes the dialog',
+    globalThis.App.Windows.isDialogOpen() === false);
   check('a dismissal is remembered for good',
     LP.isDismissed(LR.PROMPT) === true && LR.shouldOffer() === false);
+  check('a dismissed offer does not reopen',
+    LR.offerInto(fakeEl()) === false);
+
+  // 19. One dialog at a time (double-open guard): the dialog layer owns
+  //     the modal, so a second offer while one is up does not open another.
+  reset(['fr-FR']);
+  var first = LR.offerInto(fakeEl());
+  var second = LR.offerInto(fakeEl());
+  check('the offer dialog opens once per eligible visit',
+    first === true && second === false,
+    'first=' + first + ' second=' + second);
+  check('the open offer dialog still switches and records on accept',
+    offered.ctl.close('ok') === true && LP.get().language === 'zh',
+    String(LP.get().language));
 
   reset();
+  if (savedWindows === undefined) delete globalThis.App.Windows;
+  else globalThis.App.Windows = savedWindows;
   delete globalThis.document;
   delete globalThis.window;
   return results;
