@@ -231,6 +231,75 @@ exports.run = function() {
     refs.buttons.close.disabled === true && refs.buttons.maximize.disabled === true &&
     refs.buttons.minimize.disabled === false);
 
+  // ── Mobile rule (ticket #46): [□] gated at ≤768px ────────────────────
+  // The media query itself is CSS's job; this asserts the JS side: the
+  // controller reads the same query, the live change listener re-renders,
+  // and [—]/[×] are untouched by the gate.
+
+  var savedMM = globalThis.matchMedia;
+  var mediaState = { mobile: false, changeHandler: null };
+  globalThis.matchMedia = function(query) {
+    var matches = query.indexOf('max-width') >= 0 ? mediaState.mobile : false;
+    return {
+      matches: matches,
+      addEventListener: function(evt, fn) {
+        if (evt === 'change') mediaState.changeHandler = fn;
+      },
+      addListener: function(fn) { mediaState.changeHandler = fn; }
+    };
+  };
+
+  var mdoc = fakeDoc();
+  var mpending = [];
+  var mctl = Windows.create({
+    doc: mdoc,
+    schedule: function(fn) { mpending.push(fn); }
+  });
+  var mrefs = {
+    windowEl: fakeEl('div'),
+    programBtn: fakeEl('button'),
+    buttons: { minimize: fakeEl('button'), maximize: fakeEl('button'), close: fakeEl('button') }
+  };
+  mctl.attach(mrefs);
+  mctl.setView('quiz-view');
+  check('desktop viewport: [□] renders enabled and toggles normally',
+    mrefs.buttons.maximize.disabled === false &&
+    mctl.toggleMaximize() === true &&
+    mctl.getState().mode === 'maximized' &&
+    mrefs.windowEl.classList.contains('is-maximized'));
+
+  // Crossing the 768px boundary: the live media listener re-renders.
+  mediaState.mobile = true;
+  check('attach registered the live 768px change listener',
+    typeof mediaState.changeHandler === 'function');
+  mediaState.changeHandler();
+  check('mobile viewport: [□] renders disabled after the media change',
+    mrefs.buttons.maximize.disabled === true);
+  check('mobile viewport: toggleMaximize is a no-op — mode and class stand',
+    mctl.toggleMaximize() === false &&
+    mctl.getState().mode === 'maximized' &&
+    mrefs.windowEl.classList.contains('is-maximized'));
+  check('mobile viewport: [—] still minimizes (gate touches maximize only)',
+    mctl.minimize() === true && mctl.getState().mode === 'minimized' &&
+    mrefs.buttons.minimize.disabled === true);
+  while (mpending.length) mpending.shift()();
+  mctl.restore();
+  check('mobile viewport: program-button restore returns to the pre-minimize mode',
+    mctl.getState().mode === 'maximized' &&
+    mrefs.programBtn.getAttribute('aria-pressed') === 'true');
+  while (mpending.length) mpending.shift()();
+
+  // Crossing back to desktop: [□] re-enables and toggles again.
+  mediaState.mobile = false;
+  mediaState.changeHandler();
+  check('desktop again: [□] re-enabled and toggles out of maximized',
+    mrefs.buttons.maximize.disabled === false &&
+    mctl.toggleMaximize() === true &&
+    mctl.getState().mode === 'normal' &&
+    !mrefs.windowEl.classList.contains('is-maximized'));
+  if (typeof savedMM === 'undefined') delete globalThis.matchMedia;
+  else globalThis.matchMedia = savedMM;
+
   // ── System dialog primitive contract ──────────────────────────────────
 
   require('../../js/i18n.js');

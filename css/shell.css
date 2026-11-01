@@ -471,16 +471,87 @@ body {
   }
 }
 
-/* ── Responsive ──────────────────────────────────────────────────────── */
+/* ── Responsive: mobile maximized default + slim taskbar (ticket #46) ──
 
+   At ≤768px the window opens MAXIMIZED by DEFAULT: full-bleed above the
+   taskbar, title bar flush with the viewport's top edge, the teal desktop
+   visible only behind the taskbar. Implemented as pure presentation —
+   the media query decides, not .is-maximized — so the state machine in
+   js/windows.js stays viewport-blind and the "mobile rule" documented
+   there (□ disabled at these widths, — and × unchanged) carries the only
+   behavioral consequence. Crossing 768px is an instant class-free state
+   switch, never an animation: nothing resizes, nothing moves twice. */
+@media (max-width: 768px) {
+  :root {
+    /* Slim taskbar: 44px IS the slim form — the slimmest bar whose
+       interactive controls (Start, program button, tray chip) still meet
+       the 44px touch minimum edge to edge. A shorter bar would need
+       invisible hit-area extensions, which lie about the visible chrome.
+       Every derived measurement (body padding-bottom, Start-menu anchor,
+       window insets) follows this one var. */
+    --os-taskbar-height: 44px;
+  }
+
+  .os-window {
+    position: fixed;
+    inset: 0 0 var(--os-taskbar-height) 0;
+    max-width: none;
+    margin: 0;
+    box-shadow: none;
+    overflow: hidden;
+  }
+
+  .os-window #app {
+    height: 100%;
+    min-height: 0;
+    max-width: none;   /* the skin's 720px cap would leave a teal gutter */
+    overflow: auto;
+    /* The skin's ≤768 #app margins would inset the full-bleed client
+       area; this file is the last base sheet, so margin: 0 wins the
+       cascade without touching css/theme-retro-os.css. */
+    margin: 0;
+  }
+
+  /* Vertical padding would shrink the controls below the 44px bar. */
+  .os-taskbar {
+    padding: 0 var(--space-2);
+  }
+
+  /* Taskbar controls fill the bar edge to edge: 44px tall hit targets. */
+  .os-start-btn,
+  .os-program-btn,
+  .os-clock,
+  .os-tray-lang {
+    height: 100%;
+  }
+
+  /* Tray compaction: the two tray fields sit at chrome-small on phones;
+     the clock stays 'HH:MM', the language chip keeps its label. */
+  .os-clock,
+  .os-tray-lang {
+    font-size: 13px;
+  }
+
+  /* Start menu entries: the pixel face needs the touch minimum too
+     (padding alone lands at ~29px). */
+  .os-start-menu-item {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  /* System dialog command buttons (End Program / Language offer). */
+  .os-dialog-btn {
+    min-height: 44px;
+  }
+}
+
+/* ≤480: menu spans the width; nothing wraps — the program button keeps
+   flexing down with its ellipsis, the tray fields stay flex:none. */
 @media (max-width: 480px) {
   .os-start-menu {
     left: var(--space-1);
     right: var(--space-1);
     min-width: 0;
-  }
-
-  .os-clock {
-    font-size: 13px;
   }
 }

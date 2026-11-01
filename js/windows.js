@@ -25,6 +25,21 @@
    *   `quiz-session`) is untouched — js/session-store.js owns persistence
    *   and is never called from here, so answers always survive the gesture.
    *
+   * Mobile rule (ticket #46): at viewport widths ≤ 768px the stylesheet
+   * (css/shell.css media block) presents the window maximized by DEFAULT —
+   * full-bleed above the taskbar. Because that maximization is pure CSS,
+   * the pure state machine stays viewport-blind: it never models a mode the
+   * viewport can silently override. The controller layer carries the
+   * consequences instead, behind the same 768px media query:
+   *   - [□] NEVER toggles and always renders disabled (mobileMaximized());
+   *     the stylesheet already shows the maximized form, so the button is
+   *     a lie on this viewport.
+   *   - [—] stays live: minimize traces to the taskbar, restore happens
+   *     via the program button, same as desktop.
+   *   - [×] is unchanged (End Program dialog) once the landing rule allows.
+   * Crossing the 768px boundary re-renders the controls via a matchMedia
+   * change listener, so [□] re-enables at desktop widths.
+   *
    * Layering: createMachine() is the pure transition table (no DOM, fully
    * headless-testable). create() wraps it with the DOM rendering (button
    * disabled states, trace classes, program-button bevel) behind a deps
@@ -159,6 +174,23 @@
     }
   }
 
+  /**
+   * Mobile rule (ticket #46): the viewport question behind the [□] gate.
+   * Same query the css/shell.css media block uses to maximize the window;
+   * headless environments (no matchMedia) count as desktop. Kept next to
+   * prefersReducedMotion() because it is the same access pattern.
+   */
+  var MOBILE_MAX_MEDIA = '(max-width: 768px)';
+
+  function mobileMaximized() {
+    try {
+      return !!(global.matchMedia &&
+        global.matchMedia(MOBILE_MAX_MEDIA).matches);
+    } catch (e) {
+      return false;
+    }
+  }
+
   // ── Controller: machine + rendering ──────────────────────────────────
 
   /**
@@ -201,7 +233,10 @@
       if (dom) {
         if (dom.buttons) {
           dom.buttons.minimize.disabled = !machine.canMinimize();
-          dom.buttons.maximize.disabled = !machine.canMaximize();
+          // Mobile rule (ticket #46): [□] also stays gray at ≤768px —
+          // the stylesheet already shows the maximized form.
+          dom.buttons.maximize.disabled =
+            !machine.canMaximize() || mobileMaximized();
           dom.buttons.close.disabled = !machine.canClose();
         }
         if (dom.windowEl) {
@@ -251,6 +286,10 @@
     }
 
     function toggleMaximize() {
+      // Mobile rule (ticket #46): at ≤768px there is nothing to toggle —
+      // the CSS media query maximizes by default and un-maximizing is
+      // meaningless on this viewport. The machine stays viewport-blind.
+      if (mobileMaximized()) return false;
       if (!machine.toggleMaximize()) return false;
       render();
       return true;
@@ -312,6 +351,21 @@
             new global.MutationObserver(function() { controller.render(); })
               .observe(root, { attributes: true, attributeFilter: ['hidden'], subtree: true });
           }
+        }
+        // Mobile rule (ticket #46): a live viewport crossing re-renders the
+        // [□] gate (and every other control) — resize 768 → 769 re-enables
+        // it, the other direction grays it out. Headless: no live media
+        // query, no listener; the gate simply reads false forever.
+        if (typeof global.matchMedia === 'function') {
+          try {
+            var mql = global.matchMedia(MOBILE_MAX_MEDIA);
+            var onMediaChange = function() { controller.render(); };
+            if (typeof mql.addEventListener === 'function') {
+              mql.addEventListener('change', onMediaChange);
+            } else if (typeof mql.addListener === 'function') {
+              mql.addListener(onMediaChange);   // legacy Safari
+            }
+          } catch (e) { /* live media query unavailable → desktop gate */ }
         }
         return render();
       }
