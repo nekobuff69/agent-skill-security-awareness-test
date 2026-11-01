@@ -195,7 +195,7 @@ The interface is a Windows 95 desktop, delivered as a pure CSS override skin (`c
 | Sound | `js/sound.js` | Period system sounds (e.g. the click that marks an Option). Purely additive — every interaction works silently. |
 | WizardNav | `js/wizard-nav.js` | The pure decision core behind the quiz's wizard row (`tapOption`, `canFinish`, `next`, `prev`, the one-fire commit gate behind [Finish], ADR 0020). |
 
-Non-theming contract kept deliberately: the skin only re-points token values and repaints components; the semantic aliases (`--color-bg`, `--color-accent`, `--color-score-*`, `--color-success/--color-warning/--color-error`) keep their names, so the base stylesheets never learn the skin's palette. Motion is era-mechanical or none: the view trace, the card wipes and the Progress Fill run as `steps()` animations and are each disabled under `prefers-reduced-motion` (disjoint selector gates, no `!important`). On mobile (≤480px) the policy is "maximize": the app window fills the viewport above the taskbar, like a foregrounded program; dialog anatomy stacks and buttons wrap. The chrome typeface is self-hosted W95FA (OFL 1.1, `fonts/` with provenance record), pinned by `unicode-range` to Latin + typographic marks so Han text always falls through to the CJK stack (`--font-heading` cascade: SimSun → 宋体 → Microsoft YaHei → PingFang SC; `css/cjk.css` re-points the stack SimSun-first on the zh page). Every visual value is extracted and recorded in the root `design-dna-retro-os.json`; `404.html` restates the dialog idiom script-free (its system-error dialog is plain links) rather than loading app JS.
+Non-theming contract kept deliberately: the skin only re-points token values and repaints components; the semantic aliases (`--color-bg`, `--color-accent`, `--color-score-*`, `--color-success/--color-warning/--color-error`) keep their names, so the base stylesheets never learn the skin's palette. Motion is era-mechanical or none: the view trace, the card wipes and the Progress Fill run as `steps()` animations and are each disabled under `prefers-reduced-motion` (disjoint selector gates, no `!important`). On mobile (≤480px) the policy is "maximize": the app window fills the viewport above the taskbar, like a foregrounded program; dialog anatomy stacks and buttons wrap. The chrome typefaces are self-hosted (OFL 1.1, `fonts/` with provenance record): W95FA for Latin UI chrome, Silkscreen for display headlines, and a Fusion Pixel 12 SC subset for Han chrome/headings — each pinned by `unicode-range` (W95FA/Silkscreen to Latin + typographic marks, the Fusion subset to CJK ranges) so Han text never lands on a Latin pixel face and Latin runs never land on a CJK one. On the Chinese page the `--font-heading` cascade leads with the Fusion subset (SimSun → 宋体 → Microsoft YaHei → PingFang SC behind it), prose stays on the SimSun-first system stack, and all of the CJK typography overrides are gated on `html[lang^="zh"]` inside `theme-retro-os.css` — both pages link the same stylesheet list. Every visual value is extracted and recorded in the root `design-dna-retro-os.json`; `404.html` restates the dialog idiom script-free (its system-error dialog is plain links) rather than loading app JS.
 
 ---
 
@@ -249,9 +249,8 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 ├── css/
 │   ├── quiz.css
 │   ├── results.css
-│   ├── theme-retro-os.css  # retro-OS (Win95) skin, linked last as override layer
+│   ├── theme-retro-os.css  # retro-OS (Win95) skin + CJK typography gated on html[lang^="zh"], linked last as override layer
 │   ├── boot.css        # splash overlay — sunken groove, stepped navy fill, fade handoff
-│   ├── cjk.css          # CJK typography, gated on html[lang^="zh"] (zh page only)
 │   └── shell.css        # retro-OS window frame, taskbar, tray chip, dialogs
 ├── js/
 │   ├── analytics.js      # analytics helpers
