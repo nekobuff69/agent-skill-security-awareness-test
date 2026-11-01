@@ -144,6 +144,13 @@
    */
   function buildFrameChrome(doc, strings, opts) {
     var windowEl = createEl(doc, 'div', 'os-window');
+    // Every window announces itself by its program name (ticket #67): a
+    // labelled grouping around the frame's content. NO aria-modal — the
+    // desktop's windows are peers on one stage, not dialogs; the keyboard
+    // floor that separates them is the inert attribute js/windows.js
+    // paints on the controls of every window but the focused one.
+    windowEl.setAttribute('role', 'group');
+    windowEl.setAttribute('aria-label', opts.titleText);
 
     var titleBar = createEl(doc, 'div', 'os-titlebar');
     titleBar.setAttribute('role', 'banner');
@@ -212,6 +219,9 @@
    *                   the same three control actions bound to each program
    *                   frame (ticket #61)
    *   deps.onOutsideClick - optional; receives the outside-click handler
+   *   deps.onWindowEscape - optional (ticket #67); the Escape stack's
+   *                   window tier, called only when no dialog, About or
+   *                   Start menu had anything to close
    */
   function build(deps) {
     var doc = deps.doc;
@@ -426,6 +436,7 @@
           langSegments.other.setAttribute('title', I18n.t('lang.switchLabel'));
         }
         titleText.textContent = I18n.t('shell.windowTitle');
+        windowEl.setAttribute('aria-label', I18n.t('shell.windowTitle'));
         programLabel.textContent = I18n.t('shell.windowTitle');
         startLabel.textContent = I18n.t('shell.start');
         aboutItem.textContent = I18n.t('shell.menuAbout');
@@ -440,6 +451,7 @@
         PROGRAM_FRAMES.forEach(function(spec) {
           var frame = programFrames[spec.id];
           frame.titleText.textContent = I18n.t(spec.titleId);
+          frame.windowEl.setAttribute('aria-label', I18n.t(spec.titleId));
           if (programLabels[spec.id]) {
             programLabels[spec.id].textContent = I18n.t(spec.titleId);
           }
@@ -509,9 +521,15 @@
         return menuOpen;
       },
 
-      /** Document-level keydown: Escape closes About first, then the menu.
-       *  A system dialog owns Escape while it is open (its own keydown
-       *  handler cancels it), so the menu/About handlers step aside. */
+      /** Document-level keydown. Escape runs the fixed stack, outermost
+       *  owner first: a system dialog owns Escape while it is open (its own
+       *  keydown handler cancels it, so every tier below steps aside), then
+       *  About, then the Start menu, then — ticket #67 — the WINDOW TIER:
+       *  deps.onWindowEscape hides the focused window through the desktop
+       *  core and hands focus back to its taskbar button or the shortcut
+       *  that opened it. The window tier answers only when every tier
+       *  above it had nothing to close, and it is the LAST consumer:
+       *  nothing is intercepted on Alt+Tab, no focus trap is added. */
       handleKeydown: function(key) {
         if (key !== 'Escape') return { menu: menuOpen, about: aboutOpen };
         if (app.Windows && app.Windows.isDialogOpen &&
@@ -520,6 +538,7 @@
         }
         if (aboutOpen) controller.closeAbout();
         else if (menuOpen) controller.closeMenu(true);
+        else if (typeof deps.onWindowEscape === 'function') deps.onWindowEscape();
         return { menu: menuOpen, about: aboutOpen };
       },
 
@@ -808,7 +827,12 @@
       })() : null,
       onOutsideClick: function(handler) {
         doc.addEventListener('click', handler);
-      }
+      },
+      // Escape's window tier (#67): the desktop controller hides the
+      // focused window and returns focus to the taskbar button or the
+      // shortcut that opened it. The shell asks it LAST, after the dialog,
+      // About and the Start menu have had their chance.
+      onWindowEscape: win ? function() { return win.escapeFocused(); } : null
     });
     appEl.setAttribute('data-shell-mounted', 'true');
     if (win) {

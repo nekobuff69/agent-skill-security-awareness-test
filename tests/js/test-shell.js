@@ -404,5 +404,77 @@ exports.run = function() {
   if (savedLocation === undefined) delete globalThis.location;
   else globalThis.location = savedLocation;
 
+  // ── Keyboard floor wiring (ticket #67) ────────────────────────────────
+  // The shell's side of the floor: every window announces its program by
+  // name through a labelled grouping, no window claims a modal, the
+  // retargeted pointer stream has a wrapper to land in, and Escape's
+  // window tier is asked LAST — dialog, then About, then Start menu.
+
+  I18n.use('en');
+  var esc67 = 0;
+  function mount67() {
+    var doc = fakeDoc();
+    var appEl = fakeEl('div');
+    appEl.setAttribute('id', 'app');
+    doc.body.appendChild(appEl);
+    return Shell.build({
+      doc: doc,
+      appEl: appEl,
+      strings: Shell.resolveStrings(I18n, Shell.STRING_IDS),
+      onWindowEscape: function() { esc67++; return true; }
+    });
+  }
+  var floor = mount67();
+
+  check('every window is announced by its program name through a labelled grouping',
+    floor.windowEl.getAttribute('role') === 'group' &&
+    floor.programFrames['action-plan'].windowEl.getAttribute('role') === 'group' &&
+    floor.programFrames['deep-dive'].windowEl.getAttribute('role') === 'group' &&
+    floor.windowEl.getAttribute('aria-label') === 'Agent Security Awareness Quiz' &&
+    floor.programFrames['action-plan'].windowEl.getAttribute('aria-label') === 'Action Plan' &&
+    floor.programFrames['deep-dive'].windowEl.getAttribute('aria-label') === 'Deep-Dive Prompt',
+    floor.windowEl.getAttribute('aria-label') + '/' +
+    floor.programFrames['action-plan'].windowEl.getAttribute('aria-label'));
+
+  check('no window claims aria-modal: the desktop frames are peers on one stage',
+    floor.windowEl.getAttribute('aria-modal') === null &&
+    Object.keys(floor.programFrames).every(function(id) {
+      return floor.programFrames[id].windowEl.getAttribute('aria-modal') === null;
+    }));
+
+  check('the labelled groupings re-resolve on an in-place language switch',
+    (I18n.use('zh'), floor.refreshLang(),
+      floor.windowEl.getAttribute('aria-label') === '智能体安全意识测评' &&
+      floor.programFrames['action-plan'].windowEl.getAttribute('aria-label') === '行动计划' &&
+      floor.programFrames['deep-dive'].windowEl.getAttribute('aria-label') === '深度提问'),
+    floor.windowEl.getAttribute('aria-label'));
+  I18n.use('en');
+
+  check('the taskbar program buttons are native buttons (Enter/Space activate them)',
+    floor.programBtn.tagName === 'BUTTON' && floor.programBtn.type === 'button' &&
+    Object.keys(floor.programBtns).every(function(id) {
+      return floor.programBtns[id].tagName === 'BUTTON' &&
+        floor.programBtns[id].type === 'button';
+    }));
+
+  floor.openAbout();
+  floor.handleKeydown('Escape');
+  check('Escape with About open closes About and never reaches the window tier',
+    !floor.isAboutOpen() && esc67 === 0);
+
+  floor.openMenu();
+  floor.handleKeydown('Escape');
+  check('Escape with the Start menu open closes the menu before the window tier',
+    !floor.isMenuOpen() && esc67 === 0);
+
+  floor.handleKeydown('Escape');
+  check('with nothing above it open, Escape drops to the window tier exactly once',
+    esc67 === 1);
+
+  floor.handleKeydown('Enter');
+  floor.handleKeydown('Tab');
+  check('the window tier answers Escape only — no other key is intercepted',
+    esc67 === 1);
+
   return results;
 };
