@@ -113,7 +113,7 @@
     "iconography": {
       "style": "flat circles and system flag marks, all CSS-drawn — no icon font, no image assets",
       "stroke_weight": "solid fills (4px cross bars, 2px wireframe ink)",
-      "size_scale": "32px dialog icons, 18×16 title-bar buttons, 16×14 start flag",
+      "size_scale": "32px dialog icons, 16×14 title-bar buttons, 16×14 start flag",
       "preferred_set": "hand-drawn era set: red circle + white cross (warn), navy circle (info), [—][□][×] title marks, [+] / [-] Explorer toggles, etched radio dial glyph, four-colour flag gradient"
     },
     "motion": {
