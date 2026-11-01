@@ -464,7 +464,25 @@
     renderQuestion(startIdx);
   }
 
-  /* ── renderLanding (public) ──────────────────────────────────────── */
+  /* ── Welcome splash (issue #53) ────────────────────────────────────
+
+     The title screen is a compact wizard card on the desktop, not a
+     full-height editorial page: a 64px eye icon, a two-line display-face
+     catchphrase headline, the Bank Variant's title as subtitle, a rule,
+     one body line with the time estimate, and a single default [Start].
+     The first-visit language offer is gone — the taskbar's language
+     toggle (ticket #50) is the only language affordance. */
+
+  // The Landing icon, drawn inline (the same idiom as the title-bar
+  // glyphs in js/shell.js): almond outline, navy iris, black pupil,
+  // white glint.
+  var EYE_SVG =
+    '<svg viewBox="0 0 32 32" width="64" height="64" aria-hidden="true">' +
+    '<path d="M2 16C8 7 24 7 30 16C24 25 8 25 2 16Z" fill="#FFFFFF" stroke="#000000" stroke-width="2"/>' +
+    '<circle cx="16" cy="16" r="6" fill="#000080"/>' +
+    '<circle cx="16" cy="16" r="3" fill="#000000"/>' +
+    '<circle cx="14" cy="14" r="1.5" fill="#FFFFFF"/>' +
+    '</svg>';
 
   function renderLanding(b) {
     var meta = b && b.meta;
@@ -472,27 +490,43 @@
     if (!landing) return;
     landing.innerHTML = '';
 
-    // A Participant who arrived in a language they may not read gets one
-    // dismissible offer of the other, ahead of everything else on the page.
-    if (app.LangRouting && typeof app.LangRouting.offerInto === 'function') {
-      app.LangRouting.offerInto(landing);
-    }
+    var head = makeEl('div', 'wizard-head');
+    var icon = makeEl('span', 'wizard-icon');
+    icon.innerHTML = EYE_SVG;
+    head.appendChild(icon);
 
-    landing.appendChild(makeEl('h1', null, meta.title || t('landing.titleFallback')));
-    landing.appendChild(makeEl('p', 'subtitle', meta.subtitle || t('landing.subtitleFallback')));
-    landing.appendChild(makeEl('p', 'meta', t('landing.meta', {
-      count: meta.total_questions || t('landing.metaCountFallback'),
+    var title = makeEl('h1', 'wizard-title');
+    title.appendChild(makeEl('span', 'wizard-line', t('landing.headline1')));
+    title.appendChild(makeEl('span', 'wizard-line', t('landing.headline2')));
+    head.appendChild(title);
+
+    head.appendChild(makeEl('p', 'wizard-sub',
+      meta.title || t('landing.titleFallback')));
+    landing.appendChild(head);
+
+    landing.appendChild(makeEl('hr', 'wizard-rule'));
+
+    var count = meta.total_questions || t('landing.metaCountFallback');
+    landing.appendChild(makeEl('p', 'wizard-body',
+      t('landing.body', { count: count })));
+
+    landing.appendChild(makeEl('p', 'wizard-meta', t('landing.meta', {
+      count: count,
       time: meta.time_estimate || t('landing.timeFallback')
     })));
 
-    var btn = makeEl('button', 'btn-primary', t('landing.start'));
+    var actions = makeEl('div', 'wizard-actions');
+    var btn = makeEl('button', 'wizard-btn wizard-btn-default',
+      t('landing.start'));
     btn.id = 'start-btn';
+    btn.type = 'button';
     btn.addEventListener('click', function() {
       global.Analytics.track('quiz_started');
       app.showView('quiz-view');
       renderQuiz(b);
     });
-    landing.appendChild(btn);
+    actions.appendChild(btn);
+    landing.appendChild(actions);
   }
 
 
