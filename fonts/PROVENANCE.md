@@ -64,9 +64,11 @@ marks with `unicode-range`; the font file itself is shipped unmodified
 ## Face 2 — Silkscreen (display face, ticket #51)
 
 Face: **Silkscreen**, author **Jason Kottke**, SIL Open Font License 1.1 —
-a compact bitmap-style display face reserved for headline/splash use
-(the face itself becomes visible in a later ticket; this record covers
-its acquisition).
+a compact bitmap-style display face reserved for headline/splash use, live
+since ticket #53 as the Welcome Splash catchphrase
+(`#landing-view .wizard-title`: 32px, uppercase; on the Chinese page the
+same line runs 36px and its Han glyphs fall through to the Fusion Pixel
+subset below, because this face is Latin-pinned).
 
 ### Files
 

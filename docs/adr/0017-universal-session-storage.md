@@ -35,7 +35,7 @@ The stated limit: shape survives a Question reorder or an Option re-score, so a 
 ## Consequences
 
 - A Participant has one Progress Fill, one Blind-Spot set, and one Action Plan regardless of which language they took the assessment in.
-- Switching language mid-assessment resumes at the first unanswered Question with every prior answer intact. The language switch is a full page navigation, which it already was — the page's `data-bank` attribute chooses the bank — so this costs nothing that was not already being paid.
+- Switching language mid-assessment resumes at the first unanswered Question with every prior answer intact. At the time of this decision the language switch was a full page navigation — the page's `data-bank` attribute chose the bank — so the shared record cost nothing that was not already being paid. *(Amended by #55–#56, recorded by #57: the switch is now an in-place Locale Swap with no page load at all ([0019](0019-in-page-locale-switching.md)); the Session contract described here is untouched, because it never depended on the navigation.)*
 - Rewording, reformatting, or retranslating authored text costs nobody their progress. Previously any text edit reset every Session for that bank.
 - A Question added, removed, reordered, re-scored, re-weighted, or re-mapped to AST Risks still soft-resets the Session and shows the non-blocking notice, in every language at once. That is ADR 0011's guarantee, intact and now consistent across Variants.
 - A shared record whose hash matches but whose payload cannot be trusted is treated as corruption rather than a version drift: it is discarded quietly, without telling the Participant their bank changed.
