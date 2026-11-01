@@ -60,9 +60,10 @@
    * layout-flow regime (the desktop does not exist before the Finish
    * Commit); a program frame whose Record does not exist yet is not painted
    * at all. Close on this stage is the core's hide(): the window leaves the
-   * screen, the bare desktop and the taskbar stay, and the program button
-   * brings it back (hidden and minimized alike) — no End Program dialog for
-   * a gesture that only puts the window away. Flow stages keep the dialog
+   * screen, the bare desktop and the taskbar stay, and the window comes back
+   * minimized from its taskbar button or hidden from its desktop shortcut
+   * (ticket #62) — no End Program dialog for a gesture that only puts the
+   * window away. Flow stages keep the dialog
    * exactly as ticket #43 built it.
    *
    * Arrival (ticket #61, spec #58): a program window is BORN when its
@@ -547,17 +548,30 @@
       // the stylesheet already shows the maximized form.
       refs.buttons.maximize.disabled =
         !machine.canMaximize(id) || mobileMaximized();
-      refs.buttons.close.disabled = !machine.canClose(id);
+      // A program frame's [×] puts the window away, and the way back is
+      // the desktop shortcut (ticket #62) — which this layout does not
+      // have. Put away would strand the window out of the taskbar too
+      // (a hidden window has no button), so on the ≤768px layout the
+      // program frames keep only [—] and [×]: the taskbar switcher moves
+      // between them, as #61 drew it. The Quiz frame's [×] is the End
+      // Program dialog here (see close()).
+      refs.buttons.close.disabled = !machine.canClose(id) ||
+        (id !== QUIZ && mobileMaximized());
     }
 
     /**
-     * The taskbar (ticket #61, spec #58):
+     * The taskbar (ticket #61, spec #58; ticket #62 makes the rule
+     * complete):
      *
-     *   - The Quiz program button is the app's own button, exactly as
-     *     tickets #43/#60 drew it: pressed while the Quiz window is on the
-     *     desktop, and the way back for a Quiz window the Participant put
-     *     away (close→puts-away STAYS reversible — an unreachable window is
-     *     a regression, mobile included).
+     *   - EXACTLY the running windows, for every program — Quiz included.
+     *     The Quiz program button is the app's own button, exactly as
+     *     tickets #43/#60 drew it, pressed while the Quiz window is on the
+     *     desktop; while the window is HIDDEN it leaves the bar like every
+     *     other program does (the #60 bridge that kept it alive for the
+     *     put-away window is gone now that desktop shortcuts exist). A
+     *     minimized Quiz window keeps its button — the era's taskbar path
+     *     (ticket #43, mobile #46) still restores it — and its shortcut
+     *     restores the hidden one at its last mode and geometry.
      *   - One button per program window, in the stable program order, and
      *     EXACTLY the running ones: no Record (the Action Plan has not
      *     settled, the Deep-Dive Prompt has not been committed) means no
@@ -566,6 +580,10 @@
      */
     function paintTaskbar() {
       if (dom && dom.programBtn) {
+        // Membership is the core's derived rule, same as the program
+        // buttons below: no Record or hidden = no button (ticket #62).
+        dom.programBtn.hidden =
+          !(machine.hasWindow(QUIZ) && machine.inTaskbar(QUIZ));
         // Pressed = the window is on the desktop; the core derives that
         // from the mode (minimized/hidden are the not-visible modes).
         dom.programBtn.setAttribute('aria-pressed',
@@ -684,10 +702,18 @@
      * when the windowed stage put the window away, 'dialog' when a flow
      * stage asked for the End Program confirmation, false when the gesture
      * was refused. js/shell.js opens the dialog on 'dialog'.
+     *
+     * Ticket #62 narrows the put-away branch to the DESKTOP layout: the
+     * way back from `hidden` is now the window's desktop shortcut (the
+     * taskbar button follows the running-windows-only rule like every
+     * other program's), and the ≤768px layout has no shortcut column and
+     * no desktop to stand a put-away window on. There the [×] keeps
+     * ticket #43's answer, so a hidden-but-unreachable Quiz window is
+     * never one gesture away.
      */
     function close() {
       syncView();   // the decision follows what is actually on screen
-      if (isWindowedView(machine.getState().view)) {
+      if (isWindowedView(machine.getState().view) && !mobileMaximized()) {
         return hide(QUIZ) ? 'hidden' : false;
       }
       return requestClose(QUIZ) ? 'dialog' : false;
@@ -695,9 +721,14 @@
 
     /** A program frame's [×]: put it away (ticket #61). There is no End
      *  Program dialog for the Action Plan or the Deep-Dive Prompt — the
-     *  gesture never ends anything; it hides the frame and the taskbar
-     *  button (or the next ticket's shortcut) brings it back. */
+     *  gesture never ends anything; it hides the frame and its taskbar
+     *  button with it, and the program's desktop shortcut brings the
+     *  window back at its Last Mode and Last Geometry (ticket #62).
+     *  The ≤768px layout has no shortcut column, so the gesture is
+     *  refused there (paintButtons renders the button gray): a hidden
+     *  window would leave the taskbar with no way back. */
     function closeProgram(id) {
+      if (mobileMaximized()) return false;
       return hide(id) ? 'hidden' : false;
     }
 
@@ -809,11 +840,38 @@
       // leaves the bar the moment it is hidden, so the stable fallback is
       // the Quiz program button — the taskbar control that is always there.
       if (focusableEl(trigger)) { trigger.focus(); return true; }
+      // #62: a put-away window loses its taskbar button, so the program's
+      // desktop shortcut — its permanent launcher — is the focus target.
+      var sc = dom && dom.shortcuts && dom.shortcuts[id];
+      if (focusableEl(sc)) { sc.focus(); return true; }
       var refs = frameOf(id);
       var own = refs && refs.taskbarBtn;
       if (own && focusableEl(own)) own.focus();
       else if (dom && focusableEl(dom.programBtn)) dom.programBtn.focus();
       return true;
+    }
+
+    /**
+     * The desktop shortcut launch (ticket #62, spec #58): ONE gesture per
+     * program, keyed by the Record's mode. An unopened program (no Record
+     * — reachable only off the settled-content paths) arrives on top like
+     * any launch; a minimized or hidden Record is restored to its
+     * lastMode AND lastGeometry and then raised; a window already on the
+     * desktop is only raised. The shortcut never opens a second window —
+     * the one-Record model holds.
+     */
+    function launchProgram(id) {
+      if (machine.programIds.indexOf(id) < 0) return false;
+      if (!machine.hasWindow(id)) {
+        if (!openProgram(id, { below: false })) return false;
+        return focusWindow(id);
+      }
+      var mode = machine.windowSnapshot(id).mode;
+      if (mode === 'minimized' || mode === 'hidden') {
+        if (!restore(id)) return false;
+        return focusWindow(id);
+      }
+      return focusWindow(id);
     }
 
     // ── Geometry writes + pointer drag/resize (ticket #60) ─────────────
@@ -1008,6 +1066,7 @@
       recordTrigger: function(id, el) {
         lastTrigger[id || QUIZ] = el || null;
       },
+      launchProgram: launchProgram,
 
       /** Wire the built Quiz shell DOM (js/shell.js calls this after build()). */
       attach: function(refs) {
@@ -1018,22 +1077,23 @@
           wireRaise(dom.windowEl, QUIZ);
         }
         if (dom && dom.programBtn) {
-          // The program button is the way back: it restores a minimized
-          // window (the era's taskbar path, ticket #43) AND a hidden one
-          // (ticket #60 — close on the desktop stage is hide(), so this is
-          // the gesture that brings the window back). Not visible = exactly
-          // those two modes; the core's restore() refuses every other, so
-          // a click on a visible window stays a no-op refocus.
+          // The Quiz taskbar button (ticket #43, refined by #62): a
+          // MINIMIZED window is restored and focused — the era's taskbar
+          // path, and the mobile layout's only restore. Since ticket #62
+          // a HIDDEN Quiz window leaves the bar exactly like the other two
+          // programs (the #60/#61 bridge is gone), so this click never
+          // sees a hidden Record: its desktop shortcut is the way back.
+          // A visible window is refocused.
           on(dom.programBtn, 'click', function() {
             lastTrigger[QUIZ] = dom.programBtn;   // #67: the Escape target
-            // Not visible = exactly the minimized and hidden modes; the
-            // core's restore() refuses every other, so a click on a
-            // visible window stays a no-op refocus. The restore ALWAYS
-            // ends in focus (#67): putting a window back on the desktop
-            // without the floor moving with it would leave a window the
-            // Participant can see but cannot Tab into.
-            if (!machine.isVisible(QUIZ)) controller.restore(QUIZ);
-            controller.focusWindow(QUIZ);
+            // Not visible = exactly the minimized mode once #62 removes a
+            // hidden program's button; the core's restore() refuses every
+            // other mode, so a click on a visible window stays a no-op
+            // refocus. The restore ALWAYS ends in focus (#67).
+            if (!machine.isVisible(QUIZ) && machine.inTaskbar(QUIZ)) {
+              controller.restore(QUIZ);
+            }
+            if (machine.isVisible(QUIZ)) controller.focusWindow(QUIZ);
           });
         }
         // Desktop regime (ticket #60): the title bar drags the window and

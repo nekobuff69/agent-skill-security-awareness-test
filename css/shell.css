@@ -6,7 +6,9 @@
    typeface come from the skin's tokens — no new palette here.
 
    Layering (z-index ladder):
-     .os-window (0)
+     .os-window (0 + the core's stack number)
+       <  .os-shortcuts (900, the icon column: visible even under a
+            maximized window, ticket #62)
        <  .os-taskbar (1000)  <  .os-start-menu (1100)
        <  .os-about-backdrop (1200)
        <  .os-dialog-backdrop (1300)
@@ -177,9 +179,10 @@ body:has(#app > #landing-view:not([hidden])) .os-window {
   filter: brightness(0.96);
 }
 
-/* A closed window is off the desktop (core hide(), ticket #60): no frame,
-   no client area — the bare teal desktop and the taskbar stay, and the
-   program button is the way back. */
+/* A closed window is off the desktop (core hide(), ticket #60) AND off the
+   taskbar (ticket #62, every program): no frame, no client area, no button
+   — the bare teal desktop with the shortcut column stays, and the put-away
+   window's shortcut is the way back (its arrangement waits in the Record). */
 .os-window.is-hidden {
   display: none;
 }
@@ -218,6 +221,58 @@ body:has(#app > #landing-view:not([hidden])) .os-window {
    their Geometry — the same rule the Quiz frame rides (.is-windowed). */
 .os-window.is-windowed .os-window-body {
   max-width: none;
+}
+
+/* ── Desktop shortcuts (ticket #62) ──────────────────────────────────────
+
+   The top-left icon column: one shortcut per program, glyph over label,
+   ALWAYS present on the desktop-width layout — running or not, arrived or
+   not. The ticket's rule is that a window never takes the icons away,
+   "including while a window is maximized over them": the column therefore
+   sits on its own rung of the ladder, ABOVE every program window (their z
+   values are the core's small stack numbers) and BELOW the taskbar (1000),
+   the Start menu (1100) and the dialog rungs, which own the desktop.
+   Double-click, Enter or Space launch; a single click only selects, as on
+   a real desktop. The ≤768px layout removes the column entirely (media
+   block at the bottom): there the taskbar is the only switcher. */
+.os-shortcuts {
+  position: fixed;
+  top: var(--space-2);
+  left: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 96px;
+  z-index: 900;            /* over the windows, under the bar and the dialogs */
+}
+
+.os-shortcut {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  /* An era icon is not a push button: no face, no bevel, no field. */
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--color-text);
+  font-family: var(--font-heading);
+  font-weight: 400;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  text-align: center;
+  cursor: default;         /* one click selects; two launch */
+}
+
+.os-shortcut-glyph {
+  display: block;
+  line-height: 0;          /* the drawn icon hugs its box */
+}
+
+.os-shortcut-label {
+  display: block;
 }
 
 /* ── Title bar ─────────────────────────────────────────────────────────
@@ -667,8 +722,11 @@ body:has(#app > #landing-view:not([hidden])) .os-window {
    inert attribute the controller paints — client area, title-bar buttons
    and any region mounted into the frame — while the title bar and the
    corner grip stay live, so the pointer keeps raising, dragging and
-   resizing exactly as before. */
-.os-window:focus-visible {
+   resizing exactly as before.
+   A desktop icon takes the same dotted ring (ticket #62): the outline sits
+   INSIDE the icon box so it never grows the column. */
+.os-window:focus-visible,
+.os-shortcut:focus-visible {
   outline: 1px dotted var(--color-text);
   outline-offset: -3px;
 }
@@ -766,6 +824,13 @@ body:has(#app > #landing-view:not([hidden])) .os-window {
   /* System dialog command buttons (End Program / Language offer). */
   .os-dialog-btn {
     min-height: 44px;
+  }
+
+  /* Desktop shortcuts (ticket #62) do not exist on this layout: there is
+     no teal desktop to stand icons on — every frame is full-screen and the
+     taskbar is the only switcher between the running programs. */
+  .os-shortcuts {
+    display: none;
   }
 }
 
