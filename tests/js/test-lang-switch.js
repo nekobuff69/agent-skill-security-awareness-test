@@ -1,4 +1,4 @@
-exports.name = 'Instant language switch (issue #55): in-place swap, state preservation, URL sync, prefetch fallback';
+exports.name = 'Instant language switch (issues #55, #56): in-place swap on every view, results/review preservation, URL sync, prefetch fallback';
 
 exports.run = function() {
   var results = [];
@@ -50,11 +50,11 @@ exports.run = function() {
 
   // ── queued timers: quiz beats stay deterministic and synchronous ──────
   var timerQueue = [];
-  globalThis.setTimeout = function(fn, ms) {
+  var fakeSetTimeout = globalThis.setTimeout = function(fn, ms) {
     timerQueue.push({ fn: fn, ms: ms || 0 });
     return timerQueue.length;
   };
-  globalThis.clearTimeout = function(id) {
+  var fakeClearTimeout = globalThis.clearTimeout = function(id) {
     if (timerQueue[id - 1]) timerQueue[id - 1].fn = null;
   };
   function flushTimers() {
@@ -156,6 +156,7 @@ exports.run = function() {
     createElement: function(tag) { return fakeEl(tag); },
     createElementNS: function(ns, tag) { return fakeEl(tag); },
     createTextNode: function(text) { return { nodeType: 3, textContent: String(text) }; },
+    createDocumentFragment: function() { return fakeEl('#fragment'); },
     getElementById: function(id) {
       return Object.prototype.hasOwnProperty.call(byIdMap, id) ? byIdMap[id] : null;
     },
@@ -198,7 +199,7 @@ exports.run = function() {
   // reduced motion → every beat path runs through the queued timers
   var winHandlers = {};
   var idleQueue = [];
-  globalThis.window = {
+  var fakeWin = globalThis.window = {
     matchMedia: function() { return { matches: true }; },
     addEventListener: function(type, fn) {
       (winHandlers[type] = winHandlers[type] || []).push(fn);
@@ -220,9 +221,9 @@ exports.run = function() {
     (docHandlers[type] || []).slice().forEach(function(fn) { fn(); });
   }
 
-  globalThis.location = { href: 'https://quiz.test/', pathname: '/' };
+  var fakeLoc = globalThis.location = { href: 'https://quiz.test/', pathname: '/' };
   var historyEntries = [];
-  globalThis.history = {
+  var fakeHist = globalThis.history = {
     pushState: function(state, title, url) {
       var u = new URL(String(url), globalThis.location.href);
       historyEntries.push({ state: state, url: u.href });
@@ -232,7 +233,7 @@ exports.run = function() {
   };
 
   var store = {};
-  globalThis.localStorage = {
+  var fakeLS = globalThis.localStorage = {
     getItem: function(k) {
       return Object.prototype.hasOwnProperty.call(store, k) ? store[k] : null;
     },
@@ -249,7 +250,7 @@ exports.run = function() {
   // ── fetch seam: bank JSON per URL, corpus text, per-URL failure ───────
   var fetchLog = [];
   var failBankUrls = {};
-  globalThis.fetch = function(url) {
+  var fakeFetch = globalThis.fetch = function(url) {
     var u = String(url);
     fetchLog.push(u);
     if (failBankUrls[u]) return Promise.reject(new Error('network down'));
@@ -279,11 +280,17 @@ exports.run = function() {
   require('../../js/session-store.js');
   require('../../js/wizard-nav.js');
   require('../../js/ast.js');
+  require('../../js/scoring.js');
   require('../../js/lang-pref.js');
   require('../../js/quiz.js');
   require('../../js/main.js');
   require('../../js/shell.js');
   require('../../js/lang-switch.js');
+  require('../../js/prompt-builder.js');
+  require('../../js/fallback.js');
+  require('../../js/extractor.js');
+  require('../../js/action-plan.js');
+  require('../../js/results.js');
 
   var App = globalThis.App;
   var I18n = App.I18n;
@@ -291,10 +298,33 @@ exports.run = function() {
   var Shell = App.Shell;
   var prevLocale = I18n.locale;
 
+  // Sibling suites run their synchronous bodies between this suite's
+  // microtask ticks in the shared runner process, and some delete the
+  // globals they touched when they finish (test-quiz.js deletes
+  // `document`). This suite owns the page under test, so every await
+  // re-asserts its globals before the next assertion reads them.
+  function adoptGlobals() {
+    globalThis.document = fakeDoc;
+    globalThis.window = fakeWin;
+    globalThis.location = fakeLoc;
+    globalThis.history = fakeHist;
+    globalThis.localStorage = fakeLS;
+    globalThis.fetch = fakeFetch;
+    globalThis.setTimeout = fakeSetTimeout;
+    globalThis.clearTimeout = fakeClearTimeout;
+    // The dictionary follows the document language — the same source of
+    // truth js/main.js and js/lang-switch.js apply() use — so a sibling
+    // suite's I18n.use() cannot leak into this suite's assertions.
+    var root = fakeDoc.documentElement;
+    if (root && globalThis.App && globalThis.App.I18n) {
+      globalThis.App.I18n.use(globalThis.App.I18n.baseLocale(root.getAttribute('lang') || 'en'));
+    }
+  }
+
   function settle() {
     var p = Promise.resolve();
     for (var i = 0; i < 30; i++) p = p.then(function() {});
-    return p;
+    return p.then(adoptGlobals);
   }
 
   function walk(node, tag, out) {
@@ -333,6 +363,12 @@ exports.run = function() {
   return (async function() {
     try {
       /* ── Boot through the real DOMContentLoaded path ─────────────────── */
+      // Re-assert this suite's globals as the FIRST queued microtask:
+      // the sibling suites' synchronous bodies (which run after this
+      // function suspends — test-quiz.js deletes `document`) complete
+      // before any microtask runs, and js/main.js's boot fetch resolves
+      // right behind this one.
+      Promise.resolve().then(adoptGlobals);
       fireDoc('DOMContentLoaded');
       await settle();
 
@@ -560,21 +596,419 @@ exports.run = function() {
         fetchCount('questions.zh.json') === zhFetchesBeforeRetry + 1,
         String(fetchCount('questions.zh.json')) + ' vs ' + zhFetchesBeforeRetry);
 
-      /* ── Results view: keeps the #50 record-and-navigate behavior ────── */
-      App.showView('results-view');
-      var entriesBeforeNav = historyEntries.length;
-      var navResult = LangSwitch.toggle();
+      /* ── Results + Review: the tray toggle swaps in place (#56) ──────── */
+
+      // Back to English on the Landing Page so the Completion scores the
+      // English Bank Variant — the state a Participant reaches by
+      // finishing the quiz.
+      var entriesAfterRetry = historyEntries.length;
+      var fetchesAtSectionStart = fetchLog.length;
+      var enFetchesAtStart = fetchCount('questions.json');
+      var zhFetchesAtStart = fetchCount('questions.zh.json');
+      ctl.langSegments.other.click();
       await settle();
-      check('on results the toggle keeps today\'s navigation behavior',
-        navResult === true &&
+      check('the tray returns to English before the Completion',
+        I18n.locale === 'en' &&
+        App.currentView() === 'landing-view' &&
         location.href === hrefAtStart &&
-        historyEntries.length === entriesBeforeNav &&
-        I18n.locale === 'zh',
-        'href=' + location.href + ' entries=' + historyEntries.length +
-        ' locale=' + I18n.locale);
-      check('the navigation path still records the Language Preference',
-        App.LangPref.get().language === 'en',
+        historyEntries.length === entriesAfterRetry + 1 &&
+        historyEntries[historyEntries.length - 1].state.ls === 'en',
+        'locale=' + I18n.locale + ' href=' + location.href +
+        ' entries=' + historyEntries.length);
+
+      // The Completion: score the English Bank Variant with the weakest
+      // pick on every Question, and persist the Session the Review reads.
+      var planLoadingEn = I18n.t('results.planLoading');
+      var weakRun = enBank.questions.map(function() { return 0; });
+      var scored = App.Scoring.computeScores(enBank, weakRun);
+      check('the weak run scores into a Completion report',
+        scored.ok === true && scored.report && scored.report.percentage != null,
+        scored && scored.error);
+      var report = scored.report;
+      App.SessionStore.save(enBank, weakRun);
+
+      // The LLM Path on a controllable promise: one generation per
+      // locale, resolved by hand so an in-flight Narrative can outlive a
+      // language switch (issue #56's no-corruption policy).
+      var realActionPlan = App.ActionPlan;
+      var planCalls = [];
+      var planResolvers = [];
+      App.ActionPlan = {
+        assemble: function(reportArg, bankArg) {
+          planCalls.push({ report: reportArg, bank: bankArg, locale: I18n.locale });
+          return new Promise(function(resolve) { planResolvers.push(resolve); });
+        }
+      };
+
+      var fetchesBeforeResults = fetchLog.length;
+      var entriesBeforeResults = historyEntries.length;
+
+      App.renderResults(enBank, report);
+
+      // ── helpers over the rendered results/review trees ──
+      function tierOf(bank, pct) {
+        var ladder = bank.meta.scoring.titles;
+        for (var i = 0; i < ladder.length; i++) {
+          if (pct >= ladder[i].threshold) return ladder[i];
+        }
+        return ladder[ladder.length - 1];
+      }
+      function qById(bank, id) {
+        for (var i = 0; i < bank.questions.length; i++) {
+          if (bank.questions[i].id === id) return bank.questions[i];
+        }
+        return null;
+      }
+      function classedNodes(viewId, tag, cls) {
+        var nodes = walk(byIdMap[viewId], tag);
+        var out = [];
+        for (var i = 0; i < nodes.length; i++) {
+          if (String(nodes[i].className || '').split(/\s+/).indexOf(cls) >= 0) {
+            out.push(nodes[i]);
+          }
+        }
+        return out;
+      }
+      function titlePct() {
+        var nodes = classedNodes('results-view', 'div', 'results-title-pct');
+        return nodes.length ? nodes[0].textContent : null;
+      }
+      function titleCaption() {
+        var nodes = classedNodes('results-view', 'div', 'results-title-caption');
+        return nodes.length ? nodes[0].textContent : null;
+      }
+      function barPcts() {
+        return classedNodes('results-view', 'div', 'results-bar-pct')
+          .map(function(n) { return n.textContent; });
+      }
+      function narrativeText(viewId) {
+        var nodes = walk(byIdMap[viewId], 'p');
+        var out = [];
+        for (var i = 0; i < nodes.length; i++) {
+          var cls = String(nodes[i].className || '');
+          if (cls.indexOf('results-action-narrative') >= 0 &&
+              cls.indexOf('results-loading') < 0) {
+            out.push(nodes[i].textContent);
+          }
+        }
+        return out.join(' ');
+      }
+      function selectedMarker(viewId) {
+        return classedNodes(viewId, 'div', 'results-review-option-selected').length > 0;
+      }
+      function buttonByClass(viewId, cls) {
+        var btns = classedNodes(viewId, 'button', cls);
+        return btns.length ? btns[0] : null;
+      }
+
+      var tierEn = tierOf(enBank, report.percentage);
+      var tierZh = tierOf(zhBank, report.percentage);
+      var pctText = report.percentage + '%';
+      var enPct = titlePct();
+      var enCaption = titleCaption();
+      var enBars = barPcts();
+      var wq0 = report.weakestQuestions[0];
+      var wq0En = qById(enBank, wq0.id);
+      var wq0Zh = qById(zhBank, wq0.id);
+
+      check('the results view renders the Completion report in English',
+        App.currentView() === 'results-view' &&
+        enPct === pctText &&
+        enCaption === tierEn.emoji + ' ' + tierEn.name &&
+        enBars.length === report.astRanked.length &&
+        viewText('results-view').indexOf(planLoadingEn) >= 0,
+        'pct=' + enPct + ' caption=' + enCaption + ' bars=' + enBars.length);
+
+      /* — the tray toggle on the results screen — */
+      ctl.langSegments.other.click();   // en → zh, in place
+      await settle();
+      var planLoadingZh = I18n.t('results.planLoading');
+
+      check('the tray toggle swaps the results view in place (no navigation)',
+        App.currentView() === 'results-view' &&
+        I18n.locale === 'zh' &&
+        location.href === 'https://quiz.test/zh/' &&
+        historyEntries.length === entriesBeforeResults + 1 &&
+        historyEntries[historyEntries.length - 1].state.ls === 'zh' &&
+        document.documentElement.getAttribute('lang') === 'zh-Hans' &&
+        fakeDoc.title === '智能体安全意识测评',
+        'view=' + App.currentView() + ' locale=' + I18n.locale +
+        ' href=' + location.href + ' entries=' + historyEntries.length +
+        ' lang=' + document.documentElement.getAttribute('lang'));
+
+      check('the Overall Percentage and every per-risk value are unchanged',
+        App.resultsState().report === report &&
+        titlePct() === pctText &&
+        JSON.stringify(barPcts()) === JSON.stringify(enBars) &&
+        viewText('results-view').indexOf(pctText) >= 0,
+        'pct=' + titlePct() + ' bars=' + barPcts().join(','));
+
+      check('the report prose re-renders in Chinese',
+        titleCaption() === tierZh.emoji + ' ' + tierZh.name &&
+        viewText('results-view').indexOf(tierEn.name) < 0 &&
+        viewText('results-view').indexOf(I18n.astName('AST01')) >= 0 &&
+        viewText('results-view').indexOf(I18n.t('results.barsTitle')) >= 0,
+        'caption=' + titleCaption());
+
+      check('the Action Plan waits in the new language for its own Narrative',
+        viewText('results-view').indexOf(planLoadingZh) >= 0 &&
+        viewText('results-view').indexOf(planLoadingEn) < 0,
+        viewText('results-view').slice(0, 160));
+
+      check('the Language Preference records the results switch',
+        App.LangPref.get().language === 'zh' &&
+        JSON.parse(localStorage.getItem('quiz-lang')).language === 'zh',
         JSON.stringify(App.LangPref.get()));
+
+      check('the swap requests exactly one Narrative per language, localized',
+        planCalls.length === 2 &&
+        planCalls[0].locale === 'en' &&
+        planCalls[1].locale === 'zh' &&
+        planCalls[1].report !== report &&
+        planCalls[1].report.percentage === report.percentage &&
+        planCalls[1].report.title.name === tierZh.name &&
+        planCalls[0].report.title.name === tierEn.name &&
+        planCalls[1].report.weakestQuestions[0].scenario === wq0Zh.scenario &&
+        planCalls[1].report.weakestQuestions[0].selectedOption ===
+          wq0Zh.options[wq0En.options.indexOf(wq0.selectedOption)],
+        JSON.stringify(planCalls.map(function(c) { return c.locale; })));
+
+      /* — an in-flight Narrative of the language we left — */
+      planResolvers[0]({
+        ok: true,
+        narrative: 'EN NARRATIVE MARKER',
+        actions: [{ priority: 1, title: 'EN ACTION MARKER', description: 'en desc', ast_source: 'AST01' }]
+      });
+      await settle();
+
+      check('the in-flight English Narrative never paints into the Chinese results',
+        viewText('results-view').indexOf('EN NARRATIVE MARKER') < 0 &&
+        viewText('results-view').indexOf('EN ACTION MARKER') < 0 &&
+        viewText('results-view').indexOf(planLoadingZh) >= 0,
+        viewText('results-view').slice(0, 200));
+
+      planResolvers[1]({
+        ok: true,
+        narrative: 'ZH NARRATIVE MARKER',
+        actions: [{ priority: 1, title: 'ZH ACTION MARKER', description: 'zh desc', ast_source: 'AST01' }]
+      });
+      await settle();
+
+      check('the Chinese Narrative lands when its own generation resolves',
+        viewText('results-view').indexOf('ZH NARRATIVE MARKER') >= 0 &&
+        viewText('results-view').indexOf('ZH ACTION MARKER') >= 0 &&
+        viewText('results-view').indexOf(planLoadingZh) < 0);
+
+      /* — switch back: original language, all data intact — */
+      ctl.langSegments.other.click();
+      await settle();
+
+      check('switching back returns the original language with all report data intact',
+        App.currentView() === 'results-view' &&
+        I18n.locale === 'en' &&
+        location.href === hrefAtStart &&
+        historyEntries.length === entriesBeforeResults + 2 &&
+        historyEntries[historyEntries.length - 1].state.ls === 'en' &&
+        document.documentElement.getAttribute('lang') === 'en' &&
+        fakeDoc.title === 'Agent Security Awareness Quiz' &&
+        titlePct() === pctText &&
+        JSON.stringify(barPcts()) === JSON.stringify(enBars) &&
+        titleCaption() === tierEn.emoji + ' ' + tierEn.name &&
+        viewText('results-view').indexOf('EN NARRATIVE MARKER') >= 0,
+        'locale=' + I18n.locale + ' pct=' + titlePct() + ' caption=' + titleCaption());
+
+      check('the English Narrative came from its slot: no third generation',
+        planCalls.length === 2, String(planCalls.length));
+
+      /* — a repeated switch re-renders both Narratives from their slots — */
+      ctl.langSegments.other.click();   // en → zh again
+      await settle();
+      check('a repeated switch re-renders from the slots, values identical',
+        I18n.locale === 'zh' &&
+        App.currentView() === 'results-view' &&
+        titlePct() === pctText &&
+        JSON.stringify(barPcts()) === JSON.stringify(enBars) &&
+        viewText('results-view').indexOf('ZH NARRATIVE MARKER') >= 0 &&
+        planCalls.length === 2 &&
+        historyEntries.length === entriesBeforeResults + 3,
+        'entries=' + historyEntries.length + ' planCalls=' + planCalls.length);
+
+      /* — Back / Forward on the results view — */
+      var backEntry = historyEntries[historyEntries.length - 2];   // the English entry
+      location.href = backEntry.url;
+      location.pathname = new URL(backEntry.url).pathname;
+      firePopstate(backEntry.state);
+      await settle();
+      check('Back swaps the results view to the previous language in place',
+        I18n.locale === 'en' &&
+        document.documentElement.getAttribute('lang') === 'en' &&
+        App.currentView() === 'results-view' &&
+        historyEntries.length === entriesBeforeResults + 3 &&
+        titlePct() === pctText &&
+        viewText('results-view').indexOf('EN NARRATIVE MARKER') >= 0,
+        'locale=' + I18n.locale + ' entries=' + historyEntries.length);
+
+      var fwdEntry = historyEntries[historyEntries.length - 1];   // the Chinese entry
+      location.href = fwdEntry.url;
+      location.pathname = new URL(fwdEntry.url).pathname;
+      firePopstate(fwdEntry.state);
+      await settle();
+      check('Forward swaps ahead again, report still intact',
+        I18n.locale === 'zh' &&
+        document.documentElement.getAttribute('lang') === 'zh-Hans' &&
+        App.currentView() === 'results-view' &&
+        historyEntries.length === entriesBeforeResults + 3 &&
+        titlePct() === pctText &&
+        viewText('results-view').indexOf('ZH NARRATIVE MARKER') >= 0,
+        'locale=' + I18n.locale);
+
+      /* — the Review screen translates in place — */
+      var reviewBtn = buttonByClass('results-view', 'results-review-btn');
+      check('the results view offers the Review control', !!reviewBtn);
+      reviewBtn.click();
+      await settle();
+
+      var zhQ0 = zhBank.questions[0];
+      var enQ0 = enBank.questions[0];
+      check('the Review opens on the Chinese Bank Variant with the recorded picks',
+        App.currentView() === 'review-view' &&
+        viewText('review-view').indexOf(zhQ0.question) >= 0 &&
+        viewText('review-view').indexOf(zhQ0.options[0].text) >= 0 &&
+        viewText('review-view').indexOf(enQ0.question) < 0 &&
+        selectedMarker('review-view'),
+        viewText('review-view').slice(0, 160));
+
+      var entriesBeforeReviewSwitch = historyEntries.length;
+      ctl.langSegments.other.click();   // zh → en, on the review screen
+      await settle();
+
+      check('the Review translates question, chosen option, feedback and best practice in place',
+        App.currentView() === 'review-view' &&
+        I18n.locale === 'en' &&
+        viewText('review-view').indexOf(enQ0.question) >= 0 &&
+        viewText('review-view').indexOf(enQ0.options[0].text) >= 0 &&
+        viewText('review-view').indexOf(enQ0.options[0].feedback) >= 0 &&
+        viewText('review-view').indexOf(enQ0.best_practice) >= 0 &&
+        viewText('review-view').indexOf(zhQ0.question) < 0 &&
+        viewText('review-view').indexOf(zhQ0.options[0].text) < 0 &&
+        selectedMarker('review-view') &&
+        location.href === hrefAtStart &&
+        historyEntries.length === entriesBeforeReviewSwitch + 1 &&
+        historyEntries[historyEntries.length - 1].state.ls === 'en' &&
+        document.documentElement.getAttribute('lang') === 'en' &&
+        fakeDoc.title === 'Agent Security Awareness Quiz',
+        'view=' + App.currentView() + ' locale=' + I18n.locale +
+        ' entries=' + historyEntries.length);
+
+      ctl.langSegments.other.click();   // en → zh again, on the review screen
+      await settle();
+      check('switching back returns the Chinese Review with every pick intact',
+        App.currentView() === 'review-view' &&
+        I18n.locale === 'zh' &&
+        viewText('review-view').indexOf(zhQ0.question) >= 0 &&
+        viewText('review-view').indexOf(zhQ0.best_practice) >= 0 &&
+        viewText('review-view').indexOf(enQ0.question) < 0 &&
+        selectedMarker('review-view') &&
+        historyEntries.length === entriesBeforeReviewSwitch + 2 &&
+        document.documentElement.getAttribute('lang') === 'zh-Hans',
+        'entries=' + historyEntries.length);
+
+      var reviewBack = buttonByClass('review-view', 'results-review-back-btn');
+      check('the Review back control survives the swaps', !!reviewBack);
+      reviewBack.click();
+      await settle();
+      check('the back control returns to the results view with the report intact',
+        App.currentView() === 'results-view' &&
+        titlePct() === pctText &&
+        JSON.stringify(barPcts()) === JSON.stringify(enBars) &&
+        viewText('results-view').indexOf('ZH NARRATIVE MARKER') >= 0);
+
+      check('the whole results and review swap run refetched nothing',
+        fetchLog.length === fetchesBeforeResults &&
+        fetchCount('questions.json') === enFetchesAtStart &&
+        fetchCount('questions.zh.json') === zhFetchesAtStart &&
+        fetchLog.length === fetchesAtSectionStart,
+        fetchLog.join(','));
+
+      /* — the Deterministic Fallback: one assembly per locale — */
+      ctl.langSegments.other.click();   // → English for a second Completion
+      await settle();
+      check('back on the English results view, Narrative still from the slot',
+        I18n.locale === 'en' &&
+        App.currentView() === 'results-view' &&
+        titlePct() === pctText &&
+        viewText('results-view').indexOf('EN NARRATIVE MARKER') >= 0 &&
+        planCalls.length === 2,
+        'planCalls=' + planCalls.length);
+
+      // Wrap the real module through a replaced pointer — the shared
+      // module object is never mutated, because sibling suites hold
+      // direct references to it.
+      App.ActionPlan = realActionPlan;
+      var realAssemble = realActionPlan.assemble;
+      var assembleCalls = 0;
+      App.ActionPlan = {
+        assemble: function() {
+          assembleCalls++;
+          return realAssemble.apply(null, arguments);
+        }
+      };
+
+      var weakRun2 = enBank.questions.map(function(q, i) { return i % q.options.length; });
+      var scored2 = App.Scoring.computeScores(enBank, weakRun2);
+      check('a second Completion scores into its own report',
+        scored2.ok === true && scored2.report !== report &&
+        scored2.report.percentage !== report.percentage,
+        scored2 && scored2.report && String(scored2.report.percentage));
+      var report2 = scored2.report;
+
+      App.renderResults(enBank, report2);
+      await settle();
+
+      var pct2 = report2.percentage + '%';
+      var enPct2 = titlePct();
+      var enBars2 = barPcts();
+      var enNarrative2 = narrativeText('results-view');
+
+      check('the Deterministic Fallback assembles the English Narrative once',
+        assembleCalls === 1 &&
+        enNarrative2.length > 0 &&
+        enPct2 === pct2 &&
+        viewText('results-view').indexOf(planLoadingEn) < 0,
+        'calls=' + assembleCalls + ' narrative=' + enNarrative2.slice(0, 80));
+
+      ctl.langSegments.other.click();   // en → zh on results
+      await settle();
+      var zhNarrative2 = narrativeText('results-view');
+      check('the swap re-renders the Action Plan in Chinese with identical numbers',
+        App.currentView() === 'results-view' &&
+        I18n.locale === 'zh' &&
+        titlePct() === pct2 &&
+        JSON.stringify(barPcts()) === JSON.stringify(enBars2) &&
+        zhNarrative2.length > 0 &&
+        zhNarrative2 !== enNarrative2 &&
+        assembleCalls === 2,
+        'calls=' + assembleCalls + ' same=' + (zhNarrative2 === enNarrative2));
+
+      ctl.langSegments.other.click();   // zh → en: back to the original language
+      await settle();
+      check('switching back restores the English Narrative without re-assembling',
+        I18n.locale === 'en' &&
+        titlePct() === pct2 &&
+        JSON.stringify(barPcts()) === JSON.stringify(enBars2) &&
+        narrativeText('results-view') === enNarrative2 &&
+        assembleCalls === 2,
+        'calls=' + assembleCalls);
+
+      ctl.langSegments.other.click();   // en → zh again: the slot re-renders
+      await settle();
+      check('the Chinese Narrative is re-rendered from its slot on a repeat switch',
+        I18n.locale === 'zh' &&
+        narrativeText('results-view') === zhNarrative2 &&
+        assembleCalls === 2,
+        'calls=' + assembleCalls);
+
+      App.ActionPlan = realActionPlan;   // leave the module as loaded
 
       /* ── Markup: declared alternates, mirrored across both pages ─────── */
       var fs = require('fs');

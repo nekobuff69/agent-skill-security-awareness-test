@@ -1,4 +1,4 @@
-exports.name = 'Results (retro data-viz contract, ticket #45)';
+exports.name = 'Results (retro data-viz contract, tickets #45, #56)';
 
 exports.run = function() {
   var results = [];
@@ -296,6 +296,106 @@ exports.run = function() {
       return classOf(d).indexOf('results-review-option-selected') >= 0;
     }));
 
+  // ══ Issue #56: prose re-anchors to the active Bank Variant ═════════════
+
+  var enBank56 = {
+    meta: { scoring: { titles: [
+      { threshold: 90, name: 'Sentinel',  emoji: 'S' },
+      { threshold: 50, name: 'Practitioner', emoji: 'P' },
+      { threshold: 0,  name: 'Newcomer',  emoji: 'N' }
+    ] } },
+    questions: [{
+      id: 'q1',
+      scenario: 'EN scenario', question: 'EN question?',
+      best_practice: 'EN best practice.', ast_source_url: 'https://owasp.org/en',
+      options: [
+        { text: 'EN option A', feedback: 'EN feedback A.' },
+        { text: 'EN option B', feedback: 'EN feedback B.' }
+      ]
+    }]
+  };
+  var zhBank56 = {
+    meta: { scoring: { titles: [
+      { threshold: 90, name: '守望者',   emoji: 'S' },
+      { threshold: 50, name: '实干者',   emoji: 'P' },
+      { threshold: 0,  name: '新手',     emoji: 'N' }
+    ] } },
+    questions: [{
+      id: 'q1',
+      scenario: '中文情景', question: '中文问题？',
+      best_practice: '中文最佳实践。', ast_source_url: 'https://owasp.org/zh',
+      options: [
+        { text: '中文选项 A', feedback: '中文反馈 A。' },
+        { text: '中文选项 B', feedback: '中文反馈 B。' }
+      ]
+    }]
+  };
+  var report56 = {
+    percentage: 62,
+    title: { name: 'Practitioner', emoji: 'P', threshold: 50 },
+    astScores: { AST01: { earned: 1, possible: 10, percentage: 10 } },
+    astRanked: [],
+    blindSpotIds: ['AST01'],
+    weakestQuestions: [
+      {
+        id: 'q1', scenario: 'EN scenario', question: 'EN question?',
+        selectedOption: enBank56.questions[0].options[1],
+        bestPractice: 'EN best practice.',
+        astSourceUrl: 'https://owasp.org/en',
+        astRisks: ['AST01']
+      },
+      {
+        id: 'q99', scenario: 'EN orphan scenario', question: 'EN orphan?',
+        selectedOption: { text: 'EN orphan option' },
+        bestPractice: 'EN orphan practice.',
+        astSourceUrl: 'https://owasp.org/orphan',
+        astRisks: ['AST01']
+      }
+    ],
+    totalEarned: 5,
+    totalPossible: 108
+  };
+
+  var shownZh56 = internals.localizedReport(report56, zhBank56, enBank56);
+  check('the Progression Title re-anchors at the same Title Ladder threshold',
+    shownZh56.title.name === '实干者' &&
+    shownZh56.title.emoji === 'P' &&
+    shownZh56.title.threshold === 50,
+    JSON.stringify(shownZh56.title));
+  check('Weakest Question prose re-anchors by Question id',
+    shownZh56.weakestQuestions[0].scenario === '中文情景' &&
+    shownZh56.weakestQuestions[0].question === '中文问题？' &&
+    shownZh56.weakestQuestions[0].bestPractice === '中文最佳实践。' &&
+    shownZh56.weakestQuestions[0].astSourceUrl === 'https://owasp.org/zh',
+    shownZh56.weakestQuestions[0].scenario);
+  check('the chosen Option re-anchors by structural index, not by text',
+    shownZh56.weakestQuestions[0].selectedOption === zhBank56.questions[0].options[1] &&
+    shownZh56.weakestQuestions[0].selectedOptionIndex === 1,
+    shownZh56.weakestQuestions[0].selectedOption.text);
+  check('a Question missing from the Variant keeps its report text',
+    shownZh56.weakestQuestions[1].scenario === 'EN orphan scenario',
+    shownZh56.weakestQuestions[1].scenario);
+  check('every number is the cached report\'s own, never recomputed',
+    shownZh56.percentage === report56.percentage &&
+    shownZh56.astScores === report56.astScores &&
+    shownZh56.blindSpotIds === report56.blindSpotIds &&
+    shownZh56.totalPossible === report56.totalPossible,
+    String(shownZh56.percentage));
+  check('the cached report itself is never mutated by a re-anchor',
+    report56.title.name === 'Practitioner' &&
+    report56.weakestQuestions[0].scenario === 'EN scenario' &&
+    report56.weakestQuestions[0].selectedOption.text === 'EN option B',
+    report56.title.name + '/' + report56.weakestQuestions[0].scenario);
+  check('a Bank without scoring meta returns the report unchanged',
+    internals.localizedReport(report56, { questions: [] }) === report56);
+  check('re-anchoring against the scoring Bank Variant is a no-op for its own prose',
+    (function() {
+      var same = internals.localizedReport(report56, enBank56, enBank56);
+      return same.title.name === 'Practitioner' &&
+        same.weakestQuestions[0].scenario === 'EN scenario' &&
+        same.weakestQuestions[0].selectedOption.text === 'EN option B';
+    })());
+
   // ══ CSS-side style contract (glyphs, field, segmentation) ═══════════════
 
   var fs = require('fs');
@@ -314,6 +414,14 @@ exports.run = function() {
     /\.results-action-item \{[^}]*box-shadow: var\(--bevel-raised\)/.test(css));
 
   // ══ PNG export pipeline: params unchanged for the data ══════════════════
+
+  // Snapshot the real constructors before stubbing them: deleting them
+  // outright (the old cleanup) would strip Node's URL from every later
+  // suite — js/lang-switch.js resolves its URL against global URL.
+  var prevXMLSerializer = globalThis.XMLSerializer;
+  var prevBlob = globalThis.Blob;
+  var prevURL = globalThis.URL;
+  var prevImage = globalThis.Image;
 
   var captured = { serialized: null, passedSvg: null, calls: [], blob: null, a: null };
   globalThis.XMLSerializer = function() {
@@ -377,10 +485,14 @@ exports.run = function() {
     captured.blob.parts[0] === '<svg data-retro-radar/>');
 
   // ── restore globals for the sibling test modules ────────────────────────
-  delete globalThis.XMLSerializer;
-  delete globalThis.Blob;
-  delete globalThis.URL;
-  delete globalThis.Image;
+  function restoreGlobal(name, prev) {
+    if (prev === undefined) delete globalThis[name];
+    else globalThis[name] = prev;
+  }
+  restoreGlobal('XMLSerializer', prevXMLSerializer);
+  restoreGlobal('Blob', prevBlob);
+  restoreGlobal('URL', prevURL);
+  restoreGlobal('Image', prevImage);
   if (prevDoc === undefined) delete globalThis.document;
   else globalThis.document = prevDoc;
 
