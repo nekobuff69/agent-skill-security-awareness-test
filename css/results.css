@@ -103,21 +103,38 @@
   height: auto;
 }
 
-/* ── Buttons row (download / share) ── */
-.results-btn-row {
+/* ── Window menu bar (ticket #65) ──
+
+   The Quiz window's commands live here, in one strip at the head of the
+   body: Download PNG, Share, Review answers, Retake. The items are the
+   command buttons themselves (their .results-*-btn classes keep the skin's
+   raised-bevel button rules in css/theme-retro-os.css), so the bar is just
+   the era's menu strip: a sunken gutter of bevelled buttons. It wraps
+   rather than clipping at narrow widths — the desktop window can be
+   dragged down to its 360px floor, where four commands stack. */
+.results-menu-bar {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-2);
-  justify-content: center;
+  padding: var(--space-2) var(--space-3);
+  margin: 0;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  box-shadow: var(--bevel-raised);
+}
+
+.results-menu-bar .results-menu-item {
+  font-size: 0.875rem;
+  padding: var(--space-2) var(--space-4);
+  cursor: pointer;
 }
 
 .results-download-btn,
 .results-share-btn {
-  font-size: 0.875rem;
-  padding: var(--space-2) var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--border-radius);
   background: var(--color-bg);
-  cursor: pointer;
   transition: all var(--transition-fast);
 }
 
@@ -633,13 +650,9 @@
   background: #FFF5F0;
 }
 
-/* ── Action Button Row (Review + Retake) ── */
-.results-action-btn-row {
-  display: flex;
-  gap: var(--space-3);
-  justify-content: center;
-  margin-top: var(--space-3);
-}
+/* Review and Retake are menu-bar commands now (ticket #65): the row that
+   used to carry them under the sections is gone, and the buttons keep the
+   classes above — the menu bar lays them out. */
 
 .results-review-btn {
   font-size: 0.875rem;
@@ -702,9 +715,5 @@
 @media (max-width: 400px) {
   .results-title-pct {
     font-size: 3rem;
-  }
-  
-  .results-action-btn-row {
-    flex-direction: column;
   }
 }

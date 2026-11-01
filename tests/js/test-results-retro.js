@@ -49,7 +49,11 @@ exports.run = function() {
     createElement: function(tag) { return fakeEl(tag); },
     createElementNS: function(ns, tag) { return fakeEl(tag); },
     createTextNode: function(text) { return { nodeType: 3, textContent: String(text) }; },
-    createDocumentFragment: function() { return fakeEl('#fragment'); }
+    createDocumentFragment: function() { return fakeEl('#fragment'); },
+    // The menu commands reach the Review screen through the live page; the
+    // headless page has no views, so the lookup finds nothing and the
+    // presenters fall through to the view switch the test observes.
+    getElementById: function() { return null; }
   };
 
   var prevDoc = globalThis.document;
@@ -378,6 +382,103 @@ exports.run = function() {
         same.weakestQuestions[0].selectedOption.text === 'EN option B';
     })());
 
+  // ══ Quiz window menu bar (ticket #65) ═════════════════════════════════
+
+  var prevShowView = Results.showView;
+  var prevSessionStore = Results.SessionStore;
+  var prevShare = navigator.share;
+  var viewsShown = [];
+  var sessionClears = 0;
+  var shareCalls = [];
+  Results.showView = function(id) { viewsShown.push(id); };
+  Results.SessionStore = {
+    clear: function() { sessionClears++; },
+    load: function() { return { ok: true, answers: [] }; }
+  };
+  navigator.share = function(payload) { shareCalls.push(payload); return Promise.resolve(); };
+
+  var bar = internals.buildMenuBar(report);
+  var menuBtns = walk(bar, 'button');
+  check('the Quiz menu bar owns the four commands, in order',
+    bar.attrs.role === 'menubar' && menuBtns.length === 4 &&
+      menuBtns.map(function(b) { return b.textContent; }).join('|') ===
+        I18n.t('results.downloadPng') + '|' + I18n.t('results.share') + '|' +
+        I18n.t('results.reviewBtn') + '|' + I18n.t('results.retake'),
+    menuBtns.map(function(b) { return b.textContent; }).join('|'));
+  check('the bar names itself, and the name resolves in both dictionaries',
+    bar.attrs['aria-label'] === I18n.t('results.menuBar') &&
+      I18n.t('results.menuBar') === 'Quiz window menu',
+    bar.attrs['aria-label']);
+  I18n.use('zh');
+  check('the menu bar name resolves in zh too',
+    I18n.t('results.menuBar') === '测验窗口菜单' &&
+      internals.buildMenuBar(report).attrs['aria-label'] === '测验窗口菜单',
+    I18n.t('results.menuBar'));
+  I18n.use('en');
+  check('the bar never re-renders the commands: they are its own children',
+    bar.children.length === 4 &&
+      bar.children.every(function(child) { return child.tagName === 'BUTTON'; }));
+  check('every command is a menuitem and the bar keeps one tab stop',
+    menuBtns.every(function(b) {
+      return b.attrs.role === 'menuitem' && b.attrs.type === 'button';
+    }) && menuBtns[0].attrs.tabindex === '0' &&
+      menuBtns.slice(1).every(function(b) { return b.attrs.tabindex === '-1'; }));
+
+  var prevented = 0;
+  function press(key, target) {
+    bar.handlers.keydown({
+      key: key, target: target, preventDefault: function() { prevented++; }
+    });
+  }
+  press('ArrowRight', menuBtns[0]);
+  check('ArrowRight hands the focus to the next command',
+    menuBtns[1].focused === true &&
+      menuBtns[1].attrs.tabindex === '0' &&
+      menuBtns[0].attrs.tabindex === '-1' && prevented === 1,
+    'prevented=' + prevented);
+  press('ArrowRight', menuBtns[3]);
+  check('the command focus wraps past the last command',
+    menuBtns[0].focused === true && menuBtns[3].attrs.tabindex === '-1');
+  press('ArrowLeft', menuBtns[0]);
+  check('ArrowLeft wraps back from the first command',
+    menuBtns[3].attrs.tabindex === '0');
+  press('Home', menuBtns[3]);
+  check('Home lands on the first command', menuBtns[0].attrs.tabindex === '0');
+  press('End', menuBtns[0]);
+  check('End lands on the last command', menuBtns[3].attrs.tabindex === '0');
+  press('ArrowUp', menuBtns[3]);
+  check('a key the bar does not own is left to the page', prevented === 5,
+    'prevented=' + prevented);
+
+  menuBtns[2].click();
+  check('Review answers reaches the Review stage of the Quiz program',
+    viewsShown[viewsShown.length - 1] === 'review-view', viewsShown.join(','));
+  menuBtns[3].click();
+  check('Retake keeps its behaviour: Session cleared, landing in view',
+    sessionClears === 1 && viewsShown[viewsShown.length - 1] === 'landing-view',
+    viewsShown.join(','));
+  menuBtns[1].click();
+  check('Share hands the Web Share dialog this Completion\'s score',
+    shareCalls.length === 1 && String(shareCalls[0].text).indexOf('62') >= 0,
+    JSON.stringify(shareCalls));
+
+  // Without Web Share the command is not offered — the capability rule the
+  // in-body button followed is the rule the menu follows.
+  delete navigator.share;
+  var noShare = walk(internals.buildMenuBar(report), 'button');
+  check('Share is offered only where the platform can share',
+    noShare.length === 3 &&
+      noShare.map(function(b) { return b.textContent; }).join('|') !==
+        I18n.t('results.downloadPng') + '|' + I18n.t('results.share'),
+    noShare.map(function(b) { return b.textContent; }).join('|'));
+
+  if (prevShowView === undefined) delete Results.showView;
+  else Results.showView = prevShowView;
+  if (prevSessionStore === undefined) delete Results.SessionStore;
+  else Results.SessionStore = prevSessionStore;
+  if (prevShare === undefined) delete navigator.share;
+  else navigator.share = prevShare;
+
   // ══ CSS-side style contract (glyphs, field, segmentation) ═══════════════
 
   var fs = require('fs');
@@ -397,8 +498,14 @@ exports.run = function() {
     /\.results-title-card \{[^}]*box-shadow: var\(--bevel-sunken\)/.test(css) &&
     /\.results-action-item \{[^}]*box-shadow: var\(--bevel-raised\)/.test(css) &&
     css.indexOf('.results-title-window') < 0);
+  // Ticket #65: the commands live in one strip that wraps at the window's
+  // 360px floor, and the two rows that used to carry them are gone.
+  check('the menu bar is a wrapping strip and the old command rows are gone',
+    /\.results-menu-bar \{[^}]*display: flex[^}]*flex-wrap: wrap/.test(css) &&
+      css.indexOf('.results-btn-row') < 0 &&
+      css.indexOf('.results-action-btn-row') < 0);
 
-  // ══ PNG export pipeline: params unchanged for the data ══════════════════
+  // ══ PNG export pipeline: the body sheet, rasterised as before ═════════
 
   // Snapshot the real constructors before stubbing them: deleting them
   // outright (the old cleanup) would strip Node's URL from every later
@@ -448,19 +555,57 @@ exports.run = function() {
     return origCreate(tag);
   };
 
-  var dlBtn = internals.buildDownloadPng(svg);
+  // ── The composed body sheet (ticket #65): what the export renders ────
+  // The window chrome is never snapshotted; the sheet is re-drawn from the
+  // report, so the assertions run on that tree, not on the stubbed
+  // serializer's output.
+  var sheet = internals.buildExportSvg(report);
+  var sheetText = allText(sheet).join(' ');
+  var metrics = internals.exportMetrics(report);
+  check('the export sheet is 800 wide, one row pitch per ranked AST',
+    metrics.w === 800 && metrics.h === 658 + 9 * 24 + 12 + 24 &&
+      sheet.attrs.width === '800' && sheet.attrs.height === String(metrics.h) &&
+      sheet.attrs.viewBox === '0 0 800 ' + metrics.h,
+    JSON.stringify(metrics));
+  check('the sheet carries the score header, the radar and the bars',
+    sheetText.indexOf('X Sentinel') >= 0 &&
+      sheetText.indexOf('Overall') >= 0 &&
+      sheetText.indexOf('62%') >= 0 &&
+      walk(sheet, 'svg').length === 1 &&
+      String(walk(sheet, 'svg')[0].attrs['class']).indexOf('results-radar-svg') >= 0 &&
+      walk(sheet, 'polygon').length === 1 &&
+      sheetText.indexOf(I18n.astName(astRanked[0].id)) >= 0 &&
+      sheetText.indexOf(I18n.astName(astRanked[9].id)) >= 0,
+    sheetText.slice(0, 80));
+  check('the sheet carries no window chrome and no commands',
+    ['results.downloadPng', 'results.share', 'results.reviewBtn', 'results.retake',
+      'results.menuBar'].every(function(id) {
+        return sheetText.indexOf(I18n.t(id)) < 0;
+      }) &&
+      walk(sheet, 'button').length === 0 &&
+      classOf(sheet).indexOf('menu') < 0,
+    sheetText.slice(0, 80));
+
+  var exportBar = internals.buildMenuBar(report);
+  var dlBtn = walk(exportBar, 'button')[0];
   dlBtn.click();
   fakeDoc.createElement = origCreate;
 
-  check('export snapshots the same SVG element (same palette path)',
-    captured.passedSvg === svg);
-  check('export canvas is 800×800 filled #ffffff then draws the SVG at 800×800',
-    fakeCanvas.width === 800 && fakeCanvas.height === 800 &&
+  check('the Download PNG command is the menu bar\'s own',
+    dlBtn.textContent === I18n.t('results.downloadPng') &&
+      dlBtn.attrs.role === 'menuitem');
+  check('export snapshots a freshly composed body sheet, never the live radar',
+    captured.passedSvg !== svg &&
+      captured.passedSvg.attrs.width === '800' &&
+      captured.passedSvg.attrs.height === String(metrics.h) &&
+      walk(captured.passedSvg, 'polygon').length === 1);
+  check('export canvas is the sheet size, filled #ffffff then drawn 1:1',
+    fakeCanvas.width === metrics.w && fakeCanvas.height === metrics.h &&
     canvasCtx.fillStyle === '#ffffff' &&
-    captured.calls[0] && captured.calls[0].join(',') === 'fillRect,0,0,800,800' &&
+    captured.calls[0] && captured.calls[0].join(',') === 'fillRect,0,0,800,' + metrics.h &&
     captured.calls[1] && captured.calls[1][0] === 'drawImage' &&
     typeof captured.calls[1][1] === 'object' &&
-    captured.calls[1].slice(2).join(',') === '0,0,800,800',
+    captured.calls[1].slice(2).join(',') === '0,0,800,' + metrics.h,
     JSON.stringify(captured.calls));
   check('export downloads ast-risk-radar.png as a non-zero image/png blob',
     captured.a && captured.a.download === 'ast-risk-radar.png' &&

@@ -46,7 +46,20 @@ function fakeEl(tag) {
       if (el.disabled) return;
       if (el.handlers.click) el.handlers.click({ target: el, preventDefault: function() {} });
     },
-    focus: function() { el.focused = true; }
+    focus: function() { el.focused = true; },
+    // Class-only deep search, enough for the Review screen's
+    // header.querySelector('.results-review-back-btn').
+    querySelector: function(sel) {
+      var cls = String(sel).replace(/^\./, '');
+      var stack = el.children.slice();
+      while (stack.length) {
+        var n = stack.shift();
+        if (!n || typeof n !== 'object') continue;
+        if (String(n.className || '').split(/\s+/).indexOf(cls) >= 0) return n;
+        if (n.children) stack = stack.concat(n.children);
+      }
+      return null;
+    }
   };
   el.classList = {
     add: function(k) { el.classes[k] = true; },
@@ -86,6 +99,37 @@ function textOf(node, out) {
   }
   (node.children || []).forEach(function(kid) { textOf(kid, out); });
   return out;
+}
+
+// Nodes carrying a given ARIA role, over a list of roots — the menu bar and
+// its commands are asserted through the role a pointer or a keyboard user
+// meets, not through markup.
+function byRole(roots, role, out) {
+  out = out || [];
+  (Array.isArray(roots) ? roots : [roots]).forEach(function(node) {
+    if (!node || typeof node !== 'object') return;
+    if (node.attrs && node.attrs.role === role) out.push(node);
+    (node.children || []).forEach(function(kid) { byRole(kid, role, out); });
+  });
+  return out;
+}
+
+function buttonsUnder(node, out) {
+  out = out || [];
+  if (!node || typeof node !== 'object') return out;
+  if (node.tagName === 'BUTTON') out.push(node);
+  (node.children || []).forEach(function(kid) { buttonsUnder(kid, out); });
+  return out;
+}
+
+function under(root, node) {
+  var stack = [root];
+  while (stack.length) {
+    var cur = stack.pop();
+    if (cur === node) return true;
+    (cur && cur.children || []).forEach(function(kid) { stack.push(kid); });
+  }
+  return false;
 }
 
 exports.run = function() {
@@ -170,10 +214,25 @@ exports.run = function() {
       return visible;
     }
   };
-  globalThis.window = { APP_CONFIG: { proxyUrl: '' }, Corpus: {} };
+  var shareCalls = [];
+  var copyWrites = [];
+  globalThis.window = {
+    APP_CONFIG: { proxyUrl: '' },
+    Corpus: {},
+    Analytics: { track: function() {} }
+  };
   if (typeof globalThis.navigator === 'undefined' || !globalThis.navigator) {
     try { globalThis.navigator = {}; } catch (e) { /* read-only host object */ }
   }
+  // The two platform affordances the Quiz commands ride on, recorded so a
+  // menu item can be fired from a pointer and its payload observed.
+  globalThis.navigator.share = function(payload) {
+    shareCalls.push(payload);
+    return Promise.resolve();
+  };
+  globalThis.navigator.clipboard = {
+    writeText: function(text) { copyWrites.push(text); return Promise.resolve(); }
+  };
 
   require('../../js/i18n.js');
   require('../../i18n/en.js');
@@ -267,6 +326,62 @@ exports.run = function() {
         countById([body], 'results-mount-action-plan').length === 1 &&
         countById([body], 'results-mount-deep-dive').length === 1);
 
+      // ── The Quiz window's menu bar (ticket #65) ───────────────────────
+      var allBars = byRole([body], 'menubar');
+      check('the page carries one menu bar and it stands in the Quiz body',
+        allBars.length === 1 && under(views['results-view'], allBars[0]),
+        'bars=' + allBars.length);
+      var commands = byRole([body], 'menuitem');
+      check('the bar owns the four commands, and nothing else on the page does',
+        commands.length === 4 &&
+        commands.map(function(c) { return c.textContent; }).join('|') ===
+          ['results.downloadPng', 'results.share', 'results.reviewBtn',
+            'results.retake'].map(function(id) { return App.I18n.t(id); }).join('|'),
+        commands.map(function(c) { return c.textContent; }).join('|'));
+      check('no command leaks out of the bar into the body below it',
+        buttonsUnder(views['results-view']).length === 4 &&
+        buttonsUnder(views['results-view']).every(function(b) {
+          return allBars[0].children.indexOf(b) >= 0;
+        }),
+        'buttons=' + buttonsUnder(views['results-view']).length);
+      check('the other two windows own no commands at all',
+        byRole([planFrame.windowEl], 'menubar').length === 0 &&
+        byRole([planFrame.windowEl], 'menuitem').length === 0 &&
+        buttonsUnder(planFrame.bodyEl).length === 0 &&
+        byRole([ddFrame.windowEl], 'menubar').length === 0 &&
+        byRole([ddFrame.windowEl], 'menuitem').length === 0);
+      check('the Deep-Dive Prompt keeps its Copy control in its own body',
+        buttonsUnder(ddFrame.bodyEl).map(function(b) { return b.textContent; })
+          .indexOf(App.I18n.t('results.copy')) >= 0,
+        buttonsUnder(ddFrame.bodyEl).map(function(b) { return b.textContent; }).join('|'));
+      App.SessionStore = { clear: function() {}, load: function() { return { ok: true, answers: [] }; } };
+      var copyBtn = buttonsUnder(ddFrame.bodyEl)[0];
+      copyBtn.click();
+      await Promise.resolve(); await Promise.resolve();
+      check('the Copy control still answers with its copied state',
+        copyWrites.length === 1 && copyBtn.textContent === App.I18n.t('results.copied'),
+        copyBtn.textContent);
+
+      // Keyboard traversal inside the bar, and a pointer click that runs a
+      // command: Review reaches the Review stage, Back returns.
+      commands[0].focus();
+      allBars[0].handlers.keydown({
+        key: 'ArrowRight', target: commands[0], preventDefault: function() {}
+      });
+      check('an arrow key hands the focus along the bar',
+        commands[1].focused === true);
+      commands[2].click();
+      check('Review answers reaches the Review stage of the Quiz program',
+        views['review-view'].hidden === false && views['results-view'].hidden === true);
+      views['review-view'].querySelector('.results-review-back-btn').click();
+      check('Back returns to the results stage',
+        views['results-view'].hidden === false && views['review-view'].hidden === true);
+      commands[1].click();
+      check('Share hands the Web Share dialog this Completion\'s score',
+        shareCalls.length === 1 &&
+        String(shareCalls[0].text).indexOf(scored.report.percentage + '%') >= 0,
+        JSON.stringify(shareCalls));
+
       // ── Switching programs from the taskbar ───────────────────────────
       ddFrame.taskbarBtn.click();
       check('the taskbar button restores and focuses the minimized window',
@@ -285,9 +400,22 @@ exports.run = function() {
       var planWinBefore = ctl.geometry('action-plan');
       var quizModeBefore = ctl.getState('quiz').mode;
       App.I18n.use('zh');
+      var zhCommands = ['results.downloadPng', 'results.share',
+        'results.reviewBtn', 'results.retake'].map(function(id) {
+          return App.I18n.t(id);
+        });
       check('the language switch re-renders in place', App.rerenderResults() === true);
       await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
       App.I18n.use('en');
+      var reBar = byRole([body], 'menubar');
+      check('the re-render rebuilds one menu bar, its commands in the new language',
+        reBar.length === 1 &&
+        byRole([reBar[0]], 'menuitem').map(function(c) { return c.textContent; })
+          .join('|') === zhCommands.join('|') &&
+        buttonsUnder(views['results-view']).length === 4 &&
+        byRole([ddFrame.bodyEl], 'menuitem').length === 0 &&
+        buttonsUnder(ddFrame.bodyEl).length === 1,
+        'bars=' + reBar.length + ' ddButtons=' + buttonsUnder(ddFrame.bodyEl).length);
       check('the re-rendered Action Plan stays in its own window',
         textOf(planFrame.bodyEl).join(' ').indexOf(PLAN_HEAD) >= 0 &&
         textOf(views['results-view']).join(' ').indexOf(PLAN_HEAD) < 0);
@@ -342,6 +470,20 @@ exports.run = function() {
         ctl.getState('deep-dive').mode === 'minimized' &&
         planFrame.bodyEl.children.length === 1 &&
         ddFrame.bodyEl.children.length === 1);
+
+      // ── Retake, last of the four commands (ticket #65) ────────────────
+      var retakeClears = 0;
+      App.SessionStore = {
+        clear: function() { retakeClears++; },
+        load: function() { return { ok: true, answers: [] }; }
+      };
+      var finalCommands = byRole([views['results-view']], 'menuitem');
+      finalCommands[finalCommands.length - 1].click();
+      check('Retake still clears the Session and hands the page back to the opening view',
+        retakeClears === 1 &&
+        views['landing-view'].hidden === false &&
+        views['results-view'].hidden === true,
+        'clears=' + retakeClears);
     } catch (err) {
       check('program-window block ran without throwing', false, err && err.stack || String(err));
     } finally {
@@ -358,6 +500,13 @@ exports.run = function() {
       else globalThis.document = prev.document;
       if (prev.window === undefined) delete globalThis.window;
       else globalThis.window = prev.window;
+      // The share/clipboard affordances were added to the host's own
+      // navigator object, so restoring the reference is not enough — take
+      // the properties back and a sibling suite sees the platform it expects.
+      try {
+        delete globalThis.navigator.share;
+        delete globalThis.navigator.clipboard;
+      } catch (e) { /* read-only host object */ }
       if (prev.navigator === undefined) { try { delete globalThis.navigator; } catch (e) {} }
       else globalThis.navigator = prev.navigator;
       if (prev.locale) App.I18n.use(prev.locale);

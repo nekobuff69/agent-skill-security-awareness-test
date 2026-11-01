@@ -73,11 +73,12 @@
   /* ── Results header panel ── */
 
   /**
-   * The window's first body panel (ticket #60): the Progression Title and
-   * the Overall Percentage merged into one sunken-white client field. The
-   * fake Title Card window of #45 is gone — the shell frame IS the window
-   * now, its navy title bar carries the program title, so the tier name
-   * rides the body panel again via .results-title-name (css/
+   * The window's first content panel under the menu bar (tickets #60, #65):
+   * the Progression Title and the Overall Percentage merged into one
+   * sunken-white client field. The fake Title Card window of #45 is gone —
+   * the shell frame IS the window now, its navy title bar carries the
+   * program title, so the tier name rides the body panel again via
+   * .results-title-name (css/
    * theme-retro-os.css keeps its rule) and no second title bar exists.
    *
    * The tier data path (title.emoji / title.name / percentage) and the
@@ -698,22 +699,146 @@
     return wrap;
   }
 
+  /* ── PNG export composition (ticket #65) ──────────────────────────────
+
+     The export sheet shows the Quiz window's BODY only: the score header,
+     the Risk Radar and the Blind-Spot Bars. The window chrome (title bar
+     and menu bar) and the taskbar are never part of it — no snapshot of
+     the window is taken; the body content is RE-DRAWN from the report
+     through the same pure builders the window itself uses (buildRadar,
+     scoreColor, the localized AST names, the heading token stack), so the
+     exported sheet and the window cannot drift apart. SVG graphics inside
+     an <img>-decoded export render through their palette constants and the
+     font-family attribute, the same rule the radar already follows. */
+
+  /* The sheet is one layout, and the numbers ARE the design: an 800-wide
+     column, the radar centred at its natural 400×400, the Blind-Spot rows
+     ruled on a fixed pitch under it. */
+  var EXPORT_W = 800;
+  var EXPORT_X = 20;               // text column
+  var EXPORT_NAME_Y = 56;          // Progression Title
+  var EXPORT_OVERALL_Y = 82;       // Overall caption
+  var EXPORT_PCT_Y = 122;          // Overall Percentage
+  var EXPORT_RADAR_TITLE_Y = 164;
+  var EXPORT_RADAR_Y = 184;        // the 400×400 chart, centred
+  var EXPORT_BARS_TITLE_Y = 626;
+  var EXPORT_ROW_FIRST = 658;      // first Blind-Spot row's text baseline
+  var EXPORT_ROW_PITCH = 24;       // one Blind-Spot row's height
+  var EXPORT_ROW_BOX = 12;         // one Blind-Spot track's height
+  var EXPORT_TRACK_X = 330;
+  var EXPORT_TRACK_W = 370;
+  var EXPORT_BOTTOM = 24;          // pad under the last row
+
+  /** The sheet's raster size for a report: 800 wide, one row pitch per
+   *  ranked AST below the header and radar blocks. */
+  function exportMetrics(report) {
+    var rows = ((report && report.astRanked) || []).length;
+    return {
+      w: EXPORT_W,
+      h: EXPORT_ROW_FIRST + Math.max(rows - 1, 0) * EXPORT_ROW_PITCH +
+         EXPORT_ROW_BOX + EXPORT_BOTTOM
+    };
+  }
+
+  /** The full body sheet as one SVG document: score header, Risk Radar,
+   *  Blind-Spot Bars — body content only, no chrome. */
+  function buildExportSvg(report) {
+    var ns = 'http://www.w3.org/2000/svg';
+    var m = exportMetrics(report);
+    var svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('width', String(m.w));
+    svg.setAttribute('height', String(m.h));
+    svg.setAttribute('viewBox', '0 0 ' + m.w + ' ' + m.h);
+
+    var bg = document.createElementNS(ns, 'rect');
+    bg.setAttribute('x', '0');
+    bg.setAttribute('y', '0');
+    bg.setAttribute('width', String(m.w));
+    bg.setAttribute('height', String(m.h));
+    bg.setAttribute('fill', '#FFFFFF');
+    svg.appendChild(bg);
+
+    var font = headingFont();
+
+    function text(x, y, size, content, fill) {
+      var n = document.createElementNS(ns, 'text');
+      n.setAttribute('x', String(x));
+      n.setAttribute('y', String(y));
+      n.setAttribute('font-size', String(size));
+      n.setAttribute('font-family', font);
+      n.setAttribute('font-weight', '400');
+      n.setAttribute('fill', fill);
+      n.textContent = content;
+      svg.appendChild(n);
+      return n;
+    }
+
+    function rect(x, y, w, h, fill, stroke) {
+      var r = document.createElementNS(ns, 'rect');
+      r.setAttribute('x', String(x));
+      r.setAttribute('y', String(y));
+      r.setAttribute('width', String(w));
+      r.setAttribute('height', String(h));
+      r.setAttribute('fill', fill);
+      if (stroke) r.setAttribute('stroke', stroke);
+      return r;
+    }
+
+    // Score header — the tier name, the Overall caption, the band-coloured
+    // percentage: the same three fields .results-title-card shows.
+    text(EXPORT_X, EXPORT_NAME_Y, 20, report.title.emoji + ' ' + report.title.name, '#000000');
+    text(EXPORT_X, EXPORT_OVERALL_Y, 14, t('results.overall'), '#000000');
+    text(EXPORT_X, EXPORT_PCT_Y, 38, report.percentage + '%', scoreColor(report.percentage));
+
+    // Risk Radar — a fresh data-viz snapshot, embedded 1:1 at 400×400.
+    text(EXPORT_X, EXPORT_RADAR_TITLE_Y, 16, t('results.radarTitle'), '#000000');
+    var radar = buildRadar(report);
+    radar.setAttribute('x', String((EXPORT_W - 400) / 2));
+    radar.setAttribute('y', String(EXPORT_RADAR_Y));
+    radar.setAttribute('width', '400');
+    radar.setAttribute('height', '400');
+    svg.appendChild(radar);
+
+    // Blind-Spot Bars — weakest first, the localized full names, the same
+    // band colours: the sheet's mirror of .results-bars.
+    text(EXPORT_X, EXPORT_BARS_TITLE_Y, 16, t('results.barsTitle'), '#000000');
+    var ranked = ((report && report.astRanked) || []);
+    for (var i = 0; i < ranked.length; i++) {
+      var pct = ranked[i].percentage || 0;
+      var rowY = EXPORT_ROW_FIRST + i * EXPORT_ROW_PITCH;
+      text(EXPORT_X, rowY, 11, app.I18n.astName(ranked[i].id), '#000000');
+      svg.appendChild(rect(EXPORT_TRACK_X, rowY - 11, EXPORT_TRACK_W,
+        EXPORT_ROW_BOX, '#FFFFFF', '#808080'));
+      svg.appendChild(rect(EXPORT_TRACK_X, rowY - 11, EXPORT_TRACK_W * pct / 100,
+        EXPORT_ROW_BOX, scoreColor(pct)));
+      text(EXPORT_TRACK_X + EXPORT_TRACK_W + 8, rowY, 11, pct + '%', scoreColor(pct));
+    }
+
+    return svg;
+  }
+
   /* ── PNG Download ── */
-  function buildDownloadPng(svgEl) {
-    var btn = el('button', { className: 'results-download-btn', textContent: t('results.downloadPng') });
+  function buildDownloadPng(report) {
+    var btn = el('button', {
+      className: 'results-download-btn results-menu-item',
+      textContent: t('results.downloadPng'),
+      role: 'menuitem'
+    });
     btn.addEventListener('click', function() {
-      var svgStr = new XMLSerializer().serializeToString(svgEl);
+      var svg = buildExportSvg(report);
+      var svgStr = new XMLSerializer().serializeToString(svg);
       var blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
       var url = URL.createObjectURL(blob);
       var img = new Image();
       img.onload = function() {
+        var m = exportMetrics(report);
         var canvas = document.createElement('canvas');
-        canvas.width = 800;
-        canvas.height = 800;
+        canvas.width = m.w;
+        canvas.height = m.h;
         var ctx = canvas.getContext('2d');
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, 800, 800);
-        ctx.drawImage(img, 0, 0, 800, 800);
+        ctx.fillRect(0, 0, m.w, m.h);
+        ctx.drawImage(img, 0, 0, m.w, m.h);
         canvas.toBlob(function(pngBlob) {
           URL.revokeObjectURL(url);
           if (!pngBlob) return;
@@ -733,7 +858,11 @@
   /* ── Share Button ── */
   function buildShareBtn(report) {
     if (!navigator.share) return null;
-    var btn = el('button', { className: 'results-share-btn', textContent: t('results.share') });
+    var btn = el('button', {
+      className: 'results-share-btn results-menu-item',
+      textContent: t('results.share'),
+      role: 'menuitem'
+    });
     btn.addEventListener('click', function() {
       navigator.share({
         title: t('results.shareTitle'),
@@ -750,7 +879,11 @@
 
   /* ── Retake Button ── */
   function buildRetake() {
-    var btn = el('button', { className: 'results-retake-btn', textContent: t('results.retake') });
+    var btn = el('button', {
+      className: 'results-retake-btn results-menu-item',
+      textContent: t('results.retake'),
+      role: 'menuitem'
+    });
     btn.addEventListener('click', function() {
       App.SessionStore.clear();
       // Ticket #63: the desktop Record describes the run this Retake ends —
@@ -805,12 +938,81 @@
   }
 
   function buildReviewBtn() {
-    var btn = el('button', { className: 'results-review-btn', textContent: t('results.reviewBtn') });
+    var btn = el('button', {
+      className: 'results-review-btn results-menu-item',
+      textContent: t('results.reviewBtn'),
+      role: 'menuitem'
+    });
     btn.addEventListener('click', function() {
       populateReview();
       if (app.showView) app.showView('review-view');
     });
     return btn;
+  }
+
+  /* ── Window menu bar (ticket #65) ─────────────────────────────────────
+
+     The Quiz window's four commands — Download PNG, Share, Review answers,
+     Retake — live in ONE menu bar at the head of the window body, so the
+     body below it carries only the score header, the Risk Radar and the
+     Blind-Spot Bars. The bar is built by the Quiz presenter and mounted
+     into the Quiz body alone: the Action Plan and the Deep-Dive Prompt are
+     sections of their own windows and own no commands, and the Deep-Dive
+     Copy control stays in that window's body.
+
+     Keyboard: the bar is a `menubar` of `menuitem`s with a roving tabindex,
+     so Arrow/Home/End move the command focus and Enter/Space (native button
+     activation) runs it. Tabbing into the bar lands on the remembered
+     command; nothing here reaches into the window chrome (js/shell.js owns
+     the frame, and the frame owns focus-in/raise on pointer interaction).
+
+     The command labels are the existing `results.*` Chrome Strings — the
+     menu speaks with the same words the buttons used, so no second copy of
+     each label exists to drift. Only the bar's own accessible name is new
+     (`results.menuBar`), and it resolves in both dictionaries like every
+     other id (ADR 0015). */
+  function buildMenuBar(shown) {
+    var items = [buildDownloadPng(shown)];
+    var share = buildShareBtn(shown);
+    if (share) items.push(share);
+    items.push(buildReviewBtn());
+    items.push(buildRetake());
+
+    var bar = el('div', {
+      className: 'results-menu-bar',
+      role: 'menubar',
+      'aria-label': t('results.menuBar')
+    });
+
+    // The four builders arrive as menu items already (role and class); the
+    // bar owns how they enter the page's tab order: one tab stop, and the
+    // bar's own key handler moves it.
+    for (var i = 0; i < items.length; i++) {
+      items[i].setAttribute('type', 'button');
+      items[i].setAttribute('tabindex', i === 0 ? '0' : '-1');
+      bar.appendChild(items[i]);
+    }
+
+    bar.addEventListener('keydown', function(event) {
+      var key = event && event.key;
+      var at = -1;
+      for (var i = 0; i < items.length; i++) {
+        if (items[i] === event.target) { at = i; break; }
+      }
+      if (at < 0) return;
+      var next = -1;
+      if (key === 'ArrowRight') next = (at + 1) % items.length;
+      else if (key === 'ArrowLeft') next = (at - 1 + items.length) % items.length;
+      else if (key === 'Home') next = 0;
+      else if (key === 'End') next = items.length - 1;
+      else return;
+      if (event.preventDefault) event.preventDefault();
+      items[at].setAttribute('tabindex', '-1');
+      items[next].setAttribute('tabindex', '0');
+      if (typeof items[next].focus === 'function') items[next].focus();
+    });
+
+    return bar;
   }
 
   /* ── Section mount points (tickets #59, #61) ────────────────────────── */
@@ -927,6 +1129,10 @@
     var scoringBank = _scoredBank || bank;
     var shown = localizedReport(report, bank, scoringBank);
 
+    // The window menu bar owns the four commands (ticket #65); the body
+    // under it is the score header, the Risk Radar and the Blind-Spot Bars.
+    view.appendChild(buildMenuBar(shown));
+
     // Results header panel (ticket #60)
     view.appendChild(buildResultsHeader(shown));
 
@@ -937,13 +1143,6 @@
     var svg = buildRadar(report);
     radarWrap.appendChild(svg);
     radarSection.appendChild(radarWrap);
-
-    // Buttons row
-    var btnRow = el('div', { className: 'results-btn-row' });
-    btnRow.appendChild(buildDownloadPng(svg));
-    var shareBtn = buildShareBtn(shown);
-    if (shareBtn) btnRow.appendChild(shareBtn);
-    radarSection.appendChild(btnRow);
     view.appendChild(radarSection);
 
     // Blind-Spot Bars
@@ -971,11 +1170,8 @@
     ddSection.appendChild(buildDeepDive(shown));
     mountSection('deep-dive', ddSection, view);
 
-    // Button row: Review + Retake
-    var actionBtnRow = el('div', { className: 'results-action-btn-row' });
-    actionBtnRow.appendChild(buildReviewBtn());
-    actionBtnRow.appendChild(buildRetake());
-    view.appendChild(actionBtnRow);
+    // Review and Retake left the body with ticket #65: they are menu-bar
+    // commands now, mounted once at the head of the window.
 
     // Switch views (hide quiz/landing, show results) FIRST: the desktop
     // stage is what the arriving windows stand on, and the Window Manager
@@ -1064,6 +1260,9 @@
     buildReview: buildReview,
     buildDeepDive: buildDeepDive,
     buildDownloadPng: buildDownloadPng,
+    buildMenuBar: buildMenuBar,
+    buildExportSvg: buildExportSvg,
+    exportMetrics: exportMetrics,
     localizedReport: localizedReport
   };
 
