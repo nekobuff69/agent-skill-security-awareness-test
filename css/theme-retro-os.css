@@ -1,7 +1,9 @@
 /* ── Retro OS Theme (Windows 95) ──────────────────────────────────────────
 
    Override skin, linked near the end of every HTML page (css/boot.css and
-   css/shell.css follow it; css/cjk.css is last on the Chinese page). The
+   css/shell.css follow it; the Chinese typographic overrides live at the
+   end of this file, gated on html[lang^="zh"], so both pages share one
+   stylesheet list). The
    base structure stylesheets (styles.css, css/quiz.css, css/results.css)
    keep their semantic token aliases — --color-bg, --color-accent,
    --color-score-*, --color-success/--color-warning/--color-error —
@@ -53,10 +55,65 @@
   /* The face maps CJK codepoints to placeholder (tofu-lookalike) glyphs, so
      font fallback would never hand Han text to the CJK faces further down the
      stack. Pin the claimed coverage to Latin + typographic marks: any codepoint
-     outside this range skips W95FA entirely and falls through to the SimSun-first
-     CJK stack (css/cjk.css on the zh page, the CJK fallbacks in --font-heading
-     everywhere else). */
+     outside this range skips W95FA entirely and falls through to the CJK faces
+     (the Fusion Pixel subset below on the zh page, the system CJK fallbacks in
+     --font-heading everywhere else). */
   unicode-range: U+0020-007E, U+00A0-024F, U+2000-206F, U+2122, U+25A0-25FF;
+}
+
+/* ── Display face ─────────────────────────────────────────────────────
+
+   Silkscreen by Jason Kottke, SIL Open Font License 1.1 — a compact pixel
+   display face for headline/splash use. Served as the Google Fonts static
+   builds re-encoded to woff2 locally (see fonts/PROVENANCE.md); the OFL
+   text is committed beside it as fonts/Silkscreen-OFL.txt. Self-hosted
+   under fonts/: no third-party runtime request (ADR 0001).
+
+   Same Latin pin as W95FA — the face carries Latin (and Greek/Latin-1
+   extension) glyphs only, so pinning it to the same unicode-range keeps
+   every non-Latin codepoint falling through to the CJK faces below. */
+@font-face {
+  font-family: 'Silkscreen';
+  src: url('../fonts/Silkscreen-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0020-007E, U+00A0-024F, U+2000-206F, U+2122, U+25A0-25FF;
+}
+
+@font-face {
+  font-family: 'Silkscreen';
+  src: url('../fonts/Silkscreen-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0020-007E, U+00A0-024F, U+2000-206F, U+2122, U+25A0-25FF;
+}
+
+/* ── Simplified Chinese pixel face (subset) ───────────────────────────
+
+   Fusion Pixel 12px proportional (Simplified Chinese build) by TakWolf,
+   SIL Open Font License 1.1, subset to the exact CJK codepoints the zh
+   dictionary and Bank Variant render (see fonts/PROVENANCE.md and
+   scripts/subset-fusion-pixel.py for the regeneration procedure; the
+   committed inventory is
+   fonts/fusion-pixel-12px-proportional-sc-subset.codepoints.json, and
+   tests/js/test-cjk-font-subset.js fails when a required glyph is
+   missing).
+
+   The unicode-range deliberately EXCLUDES Latin and the typographic
+   punctuation U+2000–206F: those runs stay on W95FA (or the system
+   stacks) exactly as before, so the English page never fetches this face
+   and mixed zh/Latin chrome still resolves Latin to the W95FA pixel
+   face. */
+@font-face {
+  font-family: 'Fusion Pixel 12 SC';
+  src: url('../fonts/fusion-pixel-12px-proportional-sc-subset.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-303F, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF,
+                 U+FE30-FE4F, U+FF00-FFEF;
 }
 
 :root {
@@ -680,4 +737,267 @@ button:disabled {
   .results-bar-fill {
     transition: none;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Chinese typography overrides (consolidated from css/cjk.css, #51)
+
+   css/cjk.css used to repair four treatments that are actively wrong
+   for Chinese when the shared skin re-points --font-heading to a pixel
+   face; it was a stylesheet that only the Chinese page linked, so a
+   page that switches language at runtime could leave the document on
+   the wrong sheet. The overrides now live here, gated on
+   html[lang^="zh"] (matches lang="zh" and lang="zh-Hans"/"zh-CN"), so
+   both pages share one stylesheet list and the gate is decided by the
+   document language itself.
+
+   SCOPE: every rule below is gated on html[lang^="zh"]. An
+   html[lang="en"] document matches none of these selectors, so the
+   English rendering is unchanged by construction.
+
+   FACES: --font-heading leads with the self-hosted Fusion Pixel 12 SC
+   subset (@font-face above): its unicode-range is pinned to CJK
+   codepoints, so Han chrome renders on the pixel face. Latin runs
+   (digits, AST IDs, A–D badges, English switch labels) skip the subset
+   and land on W95FA, the same Latin pixel face the English page uses.
+   --font-body stays the SimSun-first system stack: prose reads
+   period-accurate and legible instead of pixel-fuzzy at reading sizes.
+   Everything named below is either self-hosted under fonts/ or a
+   system install — nothing to download over the network.
+
+   The rule catalogue below is preserved from css/cjk.css, including
+   the origin-file comments for every override.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Font stacks ───────────────────────────────────────────────────
+
+   Heading stack: Fusion Pixel subset → W95FA → the era CJK chain
+   (SimSun first, then the real CJK installs per platform — Songti on
+   macOS, YaHei on Windows, Noto/Source Han on Android and Linux), so
+   the generic keyword is never reached while a proper CJK face is
+   installed and an out-of-subset glyph never renders as tofu.
+
+   Body stack: SimSun first, as the era face of the Win95 idiom; prose
+   keeps a readable system face instead of the 12px pixel design at
+   paragraph sizes.
+
+   Mono stack: W95FA carries no CJK at all, and the prompt/pre blocks
+   are the one place a Chinese run is expected inside a monospaced
+   surface.
+   ────────────────────────────────────────────────────────────────── */
+
+html[lang^="zh"] {
+  --font-heading: 'Fusion Pixel 12 SC', 'W95FA', 'SimSun', '宋体',
+                  'Songti SC', 'STSong', 'Microsoft YaHei', '微软雅黑',
+                  'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC',
+                  'Source Han Sans SC', 'Noto Sans SC', sans-serif;
+  --font-body: 'SimSun', '宋体', 'Songti SC', 'STSong',
+               'Microsoft YaHei', '微软雅黑', 'PingFang SC',
+               'Hiragino Sans GB', 'Noto Sans CJK SC', 'Source Han Sans SC',
+               'Noto Sans SC', sans-serif;
+  --font-mono: 'Sarasa Mono SC', 'Noto Sans Mono CJK SC', 'Microsoft YaHei',
+               'PingFang SC', 'Noto Sans CJK SC', 'Source Han Sans SC',
+               'Noto Sans SC', monospace;
+}
+
+html[lang^="zh"] pre,
+html[lang^="zh"] code,
+html[lang^="zh"] kbd,
+html[lang^="zh"] samp {
+  font-family: var(--font-mono);
+}
+
+
+/* ── 2. Neutralise negative letter-spacing ─────────────────────────────────
+
+   Overrides, in the files they originate from (css/theme-retro-os.css
+   declares letter-spacing: normal on every heading it touches, so it adds no
+   entry here):
+     css/results.css:29       .results-title-name      letter-spacing: -0.02em
+     styles.css:88            #landing-view h1         letter-spacing: -0.02em
+     styles.css:148           #landing-view h1 (≤480px) letter-spacing: -0.01em
+
+   Han glyphs are monospaced squares with no side bearing to absorb tightening, so a
+   negative em value pulls neighbouring strokes into each other. `normal` is the
+   correct neutral value for the script; it is not "no tracking" by omission.
+   ────────────────────────────────────────────────────────────────── */
+
+html[lang^="zh"] h1,
+html[lang^="zh"] h2,
+html[lang^="zh"] h3,
+html[lang^="zh"] h4,
+html[lang^="zh"] h5,
+html[lang^="zh"] h6,
+html[lang^="zh"] #landing-view h1,
+html[lang^="zh"] .results-title-name,
+html[lang^="zh"] .results-title-pct,
+html[lang^="zh"] .results-section-title,
+html[lang^="zh"] .results-deep-dive-heading {
+  letter-spacing: normal;
+}
+
+html[lang^="zh"] body,
+html[lang^="zh"] p,
+html[lang^="zh"] li,
+html[lang^="zh"] button,
+html[lang^="zh"] a {
+  letter-spacing: normal;
+}
+
+
+/* ── 3. Uppercase micro-labels ────────────────────────────────────────────
+
+   Overrides, in the files they originate from:
+     css/quiz.css:218-219      .quiz-label        uppercase + letter-spacing 0.06em
+     css/results.css:393-394   .results-review-phase  uppercase + 0.05em
+     styles.css:104-105        #landing-view .meta  uppercase + 0.05em
+
+   text-transform: uppercase is a no-op on Han characters, so a translated label
+   keeps no visual weight advantage while still paying the wide tracking that was
+   only ever paired with the uppercase Latin form. Both halves of the pair are reset
+   together: dropping the tracking while leaving the transform would fix neither.
+   ────────────────────────────────────────────────────────────────── */
+
+html[lang^="zh"] .quiz-label,
+html[lang^="zh"] .results-review-phase,
+html[lang^="zh"] #landing-view .meta {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* The remaining chips and counters carry wide positive tracking for the same
+   Latin-micro-label reason; reset the tracking so a Chinese label is not stranded
+   mid-air, but leave text-transform alone since these never declare one. */
+html[lang^="zh"] .quiz-chrome-chip,
+html[lang^="zh"] .quiz-chrome-counter,
+html[lang^="zh"] .quiz-number-chip,
+html[lang^="zh"] .results-ast-chip {
+  letter-spacing: normal;
+}
+
+
+/* ── 4. Line-height ───────────────────────────────────────────────────────
+
+   Tight line-heights this overrides, in the files they originate from
+   (css/theme-retro-os.css declares no line-heights of its own):
+     styles.css:11            body                 1.6
+     styles.css:86            #landing-view h1      1.1
+     styles.css:96            #landing-view .subtitle 1.4
+     css/quiz.css:82                         .quiz-scenario        1.55
+     css/quiz.css:91                         .quiz-question        1.4
+     css/quiz.css:109                        .quiz-option-btn      1.45
+     css/results.css:169                     .results-action-narrative 1.6
+     css/results.css:226                     .results-action-desc  1.5
+     css/results.css:273                     .results-deep-dive-sub 1.5
+     css/results.css:303                     .results-prompt-pre   1.5
+     css/results.css:401                     .results-review-scenario 1.5
+     css/results.css:415                     .results-review-option 1.5
+     css/results.css:436                     .results-review-feedback 1.5
+     css/results.css:449                     .results-review-best  1.5
+
+   A Latin line box is sized around ascender/descender and needs ~1.15 to sit
+   cleanly; a CJK glyph occupies nearly the full em square, so the same ratio clips
+   the visual gap between consecutive lines. Body copy goes to 1.75 and the largest
+   display type is floored at 1.4 rather than tracking the Latin 1.1/1.2.
+   ────────────────────────────────────────────────────────────────── */
+
+html[lang^="zh"] body {
+  line-height: 1.75;
+}
+
+html[lang^="zh"] p,
+html[lang^="zh"] li,
+html[lang^="zh"] dd,
+html[lang^="zh"] blockquote,
+html[lang^="zh"] .subtitle,
+html[lang^="zh"] .error,
+html[lang^="zh"] .quiz-notice {
+  line-height: 1.75;
+}
+
+/* Headings — floored at 1.4, opened up further as the type grows. */
+html[lang^="zh"] h1,
+html[lang^="zh"] #landing-view h1,
+html[lang^="zh"] .results-title-name {
+  line-height: 1.4;
+}
+
+html[lang^="zh"] h2,
+html[lang^="zh"] h3,
+html[lang^="zh"] h4,
+html[lang^="zh"] h5,
+html[lang^="zh"] h6,
+html[lang^="zh"] .results-section-title,
+html[lang^="zh"] .results-deep-dive-heading {
+  line-height: 1.5;
+}
+
+/* The 120px Progression Title percentage is digit-only and is deliberately left on
+   the original 0.9 — it holds no CJK glyph, and the single line never wraps. */
+
+/* Question Card and its children. */
+html[lang^="zh"] .quiz-card,
+html[lang^="zh"] .quiz-scenario,
+html[lang^="zh"] .quiz-question,
+html[lang^="zh"] .quiz-option-btn,
+html[lang^="zh"] .quiz-option-text {
+  line-height: 1.7;
+}
+
+html[lang^="zh"] .quiz-back-btn {
+  line-height: 1.7;
+}
+
+/* Results prose: Action Plan, Narrative, Deep-Dive, Review, Best Practice. */
+html[lang^="zh"] .results-action-narrative,
+html[lang^="zh"] .results-action-title,
+html[lang^="zh"] .results-action-desc,
+html[lang^="zh"] .results-deep-dive-sub,
+html[lang^="zh"] .results-review-summary,
+html[lang^="zh"] .results-review-scenario,
+html[lang^="zh"] .results-review-question,
+html[lang^="zh"] .results-review-option,
+html[lang^="zh"] .results-review-feedback,
+html[lang^="zh"] .results-review-best,
+html[lang^="zh"] .results-review-link,
+html[lang^="zh"] .results-narrative-summary,
+html[lang^="zh"] .results-prompt-summary {
+  line-height: 1.7;
+}
+
+/* Buttons in the results view are single-line controls, but their labels can be
+   Chinese; 1.7 keeps them optically consistent with the prose above them. */
+html[lang^="zh"] .results-download-btn,
+html[lang^="zh"] .results-share-btn,
+html[lang^="zh"] .results-copy-btn,
+html[lang^="zh"] .results-review-btn,
+html[lang^="zh"] .results-review-back-btn,
+html[lang^="zh"] .results-retake-btn {
+  line-height: 1.7;
+}
+
+/* Deep-Dive Prompt and any other preformatted block. */
+html[lang^="zh"] pre,
+html[lang^="zh"] .results-prompt-pre,
+html[lang^="zh"] code {
+  line-height: 1.7;
+}
+
+
+/* ── 5. Risk Radar axis labels ────────────────────────────────────────────
+
+   js/results.js buildRadar() sets a font-family presentation attribute on both
+   tspans of every axis label. A presentation attribute is the weakest thing in the
+   author origin — it sits below every selector-based rule — so this stylesheet rule
+   wins over it without !important. It carries the CJK-capable heading stack for
+   the Chinese page only (Latin AST IDs and digits stay on the W95FA pixel face,
+   Han glyphs land on the Fusion Pixel subset); the attribute keeps applying
+   unchanged on the English page.
+   ────────────────────────────────────────────────────────────────── */
+
+html[lang^="zh"] .results-radar-svg text,
+html[lang^="zh"] .results-radar-svg tspan,
+html[lang^="zh"] .results-radar-svg text tspan {
+  font-family: var(--font-heading);
+  letter-spacing: normal;
 }
