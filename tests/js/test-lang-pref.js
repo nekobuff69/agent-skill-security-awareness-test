@@ -9,6 +9,14 @@ exports.run = function() {
     results.push({ pass: !!pass, message: msg });
   }
 
+  var fs = require('fs');
+  var path = require('path');
+  var repo = path.join(__dirname, '..', '..');
+
+  function read(rel) {
+    return fs.readFileSync(path.join(repo, rel), 'utf8');
+  }
+
   var store = {};
   globalThis.localStorage = {
     get length() { return Object.keys(store).length; },
@@ -33,8 +41,9 @@ exports.run = function() {
   // 1. An untouched browser reports no preference rather than throwing.
   reset();
   var empty = LP.get();
-  check('no stored preference reads as no language and no dismissals',
-    empty.language === null && Array.isArray(empty.dismissed) && empty.dismissed.length === 0,
+  check('no stored preference reads as no language',
+    empty.language === null &&
+    Object.keys(empty).sort().join(',') === 'language',
     JSON.stringify(empty));
 
   // 2. The chosen language round-trips, normalized to its base form, so a tag
@@ -61,32 +70,22 @@ exports.run = function() {
     mismatches.length === 0,
     mismatches.length ? 'mismatched: ' + JSON.stringify(mismatches) : 'checked ' + tags.length + ' tags');
 
-  // 4. Dismissals are per-prompt and permanent.
+  // 4. The dismissed-prompt surface is gone (ticket #54): no dismissal
+  //    operations on the module and no bookkeeping in the shipped source.
   reset();
-  check('an undismissed prompt reads as not dismissed',
-    LP.isDismissed('lang-offer') === false);
-  LP.dismiss('lang-offer');
-  check('a dismissed prompt reads as dismissed',
-    LP.isDismissed('lang-offer') === true);
-  check('dismissing one prompt does not dismiss another',
-    LP.isDismissed('some-other-prompt') === false);
+  check('the module exposes no dismissal operation',
+    LP.dismiss === undefined && LP.isDismissed === undefined);
+  check('lang-pref.js carries no dismissal bookkeeping',
+    read('js/lang-pref.js').indexOf('dismiss') === -1);
 
-  // 5. Dismissals accumulate without duplicating, and survive a language choice.
+  // 5. A record written by an earlier schema (with a dismissed list) keeps
+  //    only the language choice.
   reset();
-  LP.dismiss('lang-offer');
-  LP.dismiss('lang-offer');
-  LP.dismiss('lang-offer');
-  check('repeated dismissal is stored once',
-    LP.get().dismissed.length === 1,
-    JSON.stringify(LP.get().dismissed));
-  LP.setLanguage('en');
-  check('a language choice preserves dismissals',
-    LP.isDismissed('lang-offer') === true && LP.get().language === 'en',
-    JSON.stringify(LP.get()));
-  LP.dismiss('second-prompt');
-  check('further dismissals accumulate',
-    LP.get().dismissed.length === 2,
-    JSON.stringify(LP.get().dismissed));
+  store[KEY] = JSON.stringify({ language: 'zh', dismissed: ['a', 7, null, 'a', '', 'b'] });
+  var legacy = LP.get();
+  check('a legacy record keeps only the language choice',
+    legacy.language === 'zh' && Object.keys(legacy).sort().join(',') === 'language',
+    JSON.stringify(legacy));
 
   // 6. The preference is independent of the Session in both directions.
   reset();
@@ -98,25 +97,22 @@ exports.run = function() {
     LP.get().language === 'zh', LP.get().language);
   SS.clear();
   check('Retaking does not alter the language preference',
-    LP.get().language === 'zh' && LP.isDismissed('lang-offer') === false,
-    JSON.stringify(LP.get()));
+    LP.get().language === 'zh', JSON.stringify(LP.get()));
 
   // 7. A bank edit resets Sessions. The language preference must survive it.
   reset();
   LP.setLanguage('zh');
-  LP.dismiss('lang-offer');
   SS.save({ questions: [{ id: 'q1', options: [{ score: 0 }] }], phases: [] }, [0]);
   var stale = SS.load({ questions: [{ id: 'q1', options: [{ score: 3 }] }], phases: [] });
   check('an Option re-score does reset the Session',
     stale.ok === false && stale.reason === 'stale',
     JSON.stringify(stale));
   check('the language preference survives the Session reset',
-    LP.get().language === 'zh' && LP.isDismissed('lang-offer') === true,
-    JSON.stringify(LP.get()));
+    LP.get().language === 'zh', JSON.stringify(LP.get()));
   check('the preference lives under its own key and carries no assessment data',
     Object.keys(store).indexOf(KEY) !== -1 &&
     KEY !== SESSION_KEY &&
-    Object.keys(JSON.parse(store[KEY])).sort().join(',') === 'dismissed,language',
+    Object.keys(JSON.parse(store[KEY])).sort().join(',') === 'language',
     Object.keys(store).join(',') + ' record=' + store[KEY]);
 
   // 8. exists() reports the Session without needing a bank to read it.
@@ -129,32 +125,26 @@ exports.run = function() {
   SS.clear();
   check('exists() is false again after Retake',
     SS.exists() === false);
+
   // 9. Corrupt or hostile stored data must degrade to "no preference" rather
   //    than throw on a path that runs before the page renders.
   reset();
   store[KEY] = '{bad json';
   var corrupt = LP.get();
   check('corrupt JSON reads as no preference',
-    corrupt.language === null && corrupt.dismissed.length === 0,
-    JSON.stringify(corrupt));
-  check('isDismissed on corrupt data is false, not a throw',
-    LP.isDismissed('lang-offer') === false);
+    corrupt.language === null, JSON.stringify(corrupt));
 
   reset();
   store[KEY] = JSON.stringify({ language: 42, dismissed: 'not-an-array' });
   var hostile = LP.get();
   check('wrongly typed fields degrade to a usable shape',
-    hostile.language === null && hostile.dismissed.length === 0,
-    JSON.stringify(hostile));
+    hostile.language === null, JSON.stringify(hostile));
 
   reset();
-  store[KEY] = JSON.stringify({ language: 'zh', dismissed: ['a', 7, null, 'a', '', 'b'] });
-  var cleaned = LP.get();
-  check('dismissal ids that are not non-empty strings are dropped, and not duplicated',
-    JSON.stringify(cleaned.dismissed) === JSON.stringify(['a', 'b']),
-    JSON.stringify(cleaned.dismissed));
-  check('a valid language survives alongside unusable dismissal entries',
-    cleaned.language === 'zh', String(cleaned.language));
+  store[KEY] = JSON.stringify({ language: 'zh', junk: [1, 2, 3] });
+  var extra = LP.get();
+  check('a valid language survives unknown extra fields',
+    extra.language === 'zh', JSON.stringify(extra));
 
   // 10. Unavailable storage must never throw.
   reset();
@@ -170,8 +160,6 @@ exports.run = function() {
   try {
     LP.get();
     LP.setLanguage('zh');
-    LP.dismiss('lang-offer');
-    LP.isDismissed('lang-offer');
     LP.clear();
     SS.exists();
   } catch (e) {
@@ -184,7 +172,6 @@ exports.run = function() {
   // 11. clear() removes the record.
   reset();
   LP.setLanguage('zh');
-  LP.dismiss('lang-offer');
   LP.clear();
   check('clear() removes the stored preference',
     store[KEY] === undefined && LP.get().language === null);
