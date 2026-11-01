@@ -209,7 +209,10 @@
     aboutEl.setAttribute('aria-labelledby', 'os-about-title');
 
     var aboutTitleBar = createEl(doc, 'div', 'os-titlebar');
-    aboutTitleBar.appendChild(createEl(doc, 'span', 'os-titlebar-title', strings['shell.aboutTitle']));
+    // Named because refreshLang() re-resolves it after an in-place
+    // language switch — the unassigned span made every switch throw.
+    var aboutTitle = createEl(doc, 'span', 'os-titlebar-title', strings['shell.aboutTitle']);
+    aboutTitleBar.appendChild(aboutTitle);
     aboutEl.appendChild(aboutTitleBar);
 
     var aboutBody = createEl(doc, 'div', 'os-about-body');

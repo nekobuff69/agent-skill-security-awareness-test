@@ -4,15 +4,26 @@
   var app = global.App || {};
   global.App = app;
 
-  /* ── Instant language switch (issue #55) ──────────────────────────────
+  /* ── Instant language switch (issues #55, #56) ─────────────────────────
 
-     The taskbar's language toggle no longer navigates. On the Landing Page
-     and the Answering Screen it swaps the Chrome String dictionary and the
-     Bank Variant in place — App.activateBank re-renders whichever view is
-     visible from current state (issue #48), so the current Question, every
-     recorded answer and the scroll position survive — and updates <html
-     lang>, document.title and the URL path, pushing a history entry per
-     switch so Back and Forward swap languages correctly.
+     The taskbar's language toggle never navigates: on every view — the
+     Landing Page, the Answering Screen, the results and the review — it
+     swaps the Chrome String dictionary and the Bank Variant in place.
+     App.activateBank re-renders whichever view is visible from current
+     state (issue #48), so the current Question, every recorded answer,
+     the Completion's score report and the scroll position survive — and
+     updates <html lang>, document.title and the URL path, pushing a
+     history entry per switch so Back and Forward swap languages
+     correctly.
+
+     On the results screen the score report is the same object re-rendered
+     with its Progression Title and Weakest Question prose re-anchored to
+     the active Bank Variant (js/results.js, #56), so the Overall
+     Percentage and every AST Score are untouched; the Action Plan
+     Narrative is generated once per locale and cached there, never
+     duplicated or painted into the wrong language by a switch. On the
+     review screen every Question, chosen Option, Feedback and Best
+     Practice is re-read from the swapped Bank Variant.
 
      The alternate dictionary and Bank Variant are prefetched once the
      browser is idle, so the first toggle shows no loading stall. If the
@@ -21,9 +32,9 @@
 
      Every URL, dictionary and bank location comes from the page markup
      (data-lang-alt* on <html>, mirrored by hand across the two HTML files);
-     no path arithmetic lives here. On the results and review views the
-     toggle keeps the pre-#55 record-and-navigate behavior (the same action
-     as js/shell.js recordChoice); instant presence there is ticket #56. */
+     no path arithmetic lives here. An unknown view keeps the pre-#55
+     record-and-navigate action (the same action as js/shell.js
+     recordChoice). */
 
   var boot = null;          // captured at start(): the page's own locale
   var decl = null;          // the alternate as the markup declares it
@@ -272,9 +283,11 @@
     var d = resolveDecl();
     if (!d) return false;
     var view = app.currentView ? app.currentView() : null;
-    // Splash + answering screen: instant, in place. Results and review keep
-    // the #50 navigation until #56 makes them instant too.
-    if (view !== 'landing-view' && view !== 'quiz-view') {
+    // Landing, answering, results and review all swap in place. An unknown
+    // view (or no current view) keeps the pre-#55 record-and-navigate action
+    // — the same action as js/shell.js recordChoice.
+    if (view !== 'landing-view' && view !== 'quiz-view' &&
+        view !== 'results-view' && view !== 'review-view') {
       return legacyNavigate(urlFor(d, otherLocale(d)));
     }
     swapTo(otherLocale(d), { push: true });

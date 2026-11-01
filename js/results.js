@@ -368,8 +368,121 @@
     return wrap;
   }
 
+  /* ── Report re-anchoring (issue #56) ────────────────────────────────────
+
+     A Completion's score report is scored once against one Bank Variant
+     (ADR 0002) and its numeric fields — the Overall Percentage, every AST
+     Score, Total Earned/Possible — are facts, never recomputed. Two fields
+     are authored prose carried across a Bank Variant swap though: the
+     Progression Title (read from the scoring Bank's Title Ladder at
+     scoring time) and the Weakest Questions' text (Scenario, Question,
+     chosen Option, Best Practice, OWASP link — captured from the scoring
+     Bank at computeScores time). Both are re-anchored here by structural
+     identity (ADR 0015): the same Title Ladder threshold, the same
+     Question id, the same chosen Option index. A missing structural
+     anchor leaves the field untouched — a re-anchor never invents text. */
+
+  function questionById(bank, id) {
+    var questions = (bank && bank.questions) || [];
+    for (var i = 0; i < questions.length; i++) {
+      if (questions[i].id === id) return questions[i];
+    }
+    return null;
+  }
+
+  function reanchorTitle(report, bank) {
+    var ladder = bank.meta && bank.meta.scoring && bank.meta.scoring.titles;
+    if (!Array.isArray(ladder) || !ladder.length) return report.title;
+    var title = ladder[0];   // same rule as the Scoring Engine (ADR 0004)
+    for (var i = 0; i < ladder.length; i++) {
+      if (report.percentage >= ladder[i].threshold) {
+        title = ladder[i];
+        break;
+      }
+    }
+    return { name: title.name, emoji: title.emoji, threshold: title.threshold };
+  }
+
+  function reanchorWeakest(report, bank, scoringBank) {
+    var weakest = report.weakestQuestions;
+    if (!Array.isArray(weakest)) return weakest;
+    var source = scoringBank || bank;
+    var reanchored = [];
+    for (var i = 0; i < weakest.length; i++) {
+      var wq = weakest[i];
+      var q = questionById(bank, wq.id);
+      if (!q) { reanchored.push(wq); continue; }
+      // The chosen Option travels as an object of the Variant the report
+      // was scored against; its index is recovered there by identity and
+      // applied to this Variant — structural identity makes the same index
+      // the same Option (ADR 0015). An object the scoring Bank no longer
+      // owns keeps its own text: a re-anchor never invents.
+      var index = -1;
+      var sourceQ = questionById(source, wq.id);
+      if (sourceQ && sourceQ.options && wq.selectedOption) {
+        index = sourceQ.options.indexOf(wq.selectedOption);
+      }
+      var entry = {
+        id: wq.id,
+        scenario: q.scenario,
+        question: q.question,
+        selectedOption: (index >= 0 && q.options && q.options[index])
+          ? q.options[index]
+          : wq.selectedOption,
+        bestPractice: q.best_practice,
+        astSourceUrl: q.ast_source_url,
+        astRisks: wq.astRisks
+      };
+      if (index >= 0) entry.selectedOptionIndex = index;
+      reanchored.push(entry);
+    }
+    return reanchored;
+  }
+
+  /**
+   * The score report as the active Bank Variant should show it: authored
+   * prose re-anchored, every number the cached report's own (issue #56).
+   * `scoringBank` is the Variant the report was scored against — it
+   * defaults to the active one, because a first render scores and renders
+   * the same Bank. Returns a shallow copy — the cached report is never
+   * mutated. The report is returned unchanged when the active Bank
+   * carries no scoring meta (headless renders and direct-caller tests).
+   */
+  function localizedReport(report, bank, scoringBank) {
+    if (!report || !bank || !bank.meta || !bank.meta.scoring) return report;
+    var shown = {};
+    for (var key in report) {
+      if (Object.prototype.hasOwnProperty.call(report, key)) shown[key] = report[key];
+    }
+    shown.title = reanchorTitle(report, bank);
+    shown.weakestQuestions = reanchorWeakest(report, bank, scoringBank);
+    return shown;
+  }
+
   /* ── Action Plan ── */
-  function buildActionPlan(report, bank) {
+
+  /* The Narrative slot: one per (Completion report, locale) — issue #56.
+     The LLM Path prompt embeds the current dictionary, so one Completion
+     needs at most one Action Plan generation per locale, never one per
+     render. A completed slot re-renders instantly and locally on every
+     later visit or language switch; an in-flight slot keeps the
+     localized `results.planLoading` shown until its own resolution
+     lands. Late resolutions from superseded renders are dropped by the
+     render id — a language switch can neither paint the old language's
+     Narrative into the new view nor duplicate the generation. */
+  var _planSlots = {};        // locale → { report, promise, narrative, actions }
+  var _planRenderId = 0;      // the live Action Plan render; 0 = none
+
+  function planSlot(locale) {
+    var slot = _planSlots[locale];
+    if (!slot) {
+      slot = { report: null, promise: null, narrative: null, actions: null };
+      _planSlots[locale] = slot;
+    }
+    return slot;
+  }
+
+  function buildActionPlan(report, bank, scoringBank) {
     var wrap = el('div', { className: 'results-action-plan' });
     var proxyUrl = window.APP_CONFIG && window.APP_CONFIG.proxyUrl;
     var corpus = window.Corpus;
@@ -378,11 +491,38 @@
     // microtask so this never visibly paints.
     wrap.appendChild(el('p', { className: 'results-action-narrative results-loading', textContent: t('results.planLoading') }));
 
-    // The Action Plan module owns the path decision and retry policy
-    App.ActionPlan.assemble(report, bank, corpus, window.APP_CONFIG)
-      .then(function(plan) {
-        renderPlanContent(wrap, plan.narrative, plan.actions);
-      });
+    var locale = app.I18n.locale;
+    var slot = planSlot(locale);
+    var renderId = ++_planRenderId;
+
+    if (slot.report === report && slot.narrative !== null) {
+      // This Completion's plan for this locale already exists — re-render
+      // from the slot: no generation, no fetch.
+      renderPlanContent(wrap, slot.narrative, slot.actions);
+      return wrap;
+    }
+
+    if (slot.report !== report || !slot.promise) {
+      // A new Completion, or this locale's first request for it.
+      slot.report = report;
+      slot.promise = null;
+      slot.narrative = null;
+      slot.actions = null;
+      // The Action Plan module owns the path decision and retry policy
+      slot.promise = App.ActionPlan.assemble(localizedReport(report, bank, scoringBank), bank, corpus, window.APP_CONFIG);
+    }
+
+    var mine = slot.promise;
+    mine.then(function(plan) {
+      if (slot.promise !== mine) return;  // a newer Completion took the slot
+      slot.narrative = plan.narrative;
+      slot.actions = plan.actions;
+      // A newer render superseded this one (another language switch, a
+      // Retake, a Bank refresh): the late resolution must not paint into
+      // an evicted view.
+      if (_planRenderId !== renderId) return;
+      renderPlanContent(wrap, plan.narrative, plan.actions);
+    });
     return wrap;
   }
 
@@ -644,6 +784,11 @@
   /* ── Review Screen ── */
   var _lastBank = null;
   var _lastReport = null;
+  // The Variant the current report was SCORED against — kept across the
+  // Bank Variant swaps of an in-place language switch (#56), because the
+  // report embeds authored text (chosen Option objects) from that Variant
+  // and a re-anchor recovers their index there by identity.
+  var _scoredBank = null;
 
   function populateReview() {
     var reviewView = document.getElementById('review-view');
@@ -683,11 +828,21 @@
     view.innerHTML = '';
 
     // Cache for review screen
+    // A fresh Completion was scored against this Variant; a re-render of
+    // the same report (a language swap, #56) keeps the Variant it was
+    // scored against so authored prose re-anchors by structural identity.
+    if (bank && report && report !== _lastReport) _scoredBank = bank;
     _lastBank = bank;
     _lastReport = report;
 
+    // Issue #56: prose-bearing fields re-anchored to this Bank Variant;
+    // every number is the cached report's own, so a language switch can
+    // never drift the Overall Percentage or an AST Score.
+    var scoringBank = _scoredBank || bank;
+    var shown = localizedReport(report, bank, scoringBank);
+
     // Title Card
-    view.appendChild(buildTitleCard(report));
+    view.appendChild(buildTitleCard(shown));
 
     // Section: Risk Radar
     var radarSection = el('div', { className: 'results-section' });
@@ -700,7 +855,7 @@
     // Buttons row
     var btnRow = el('div', { className: 'results-btn-row' });
     btnRow.appendChild(buildDownloadPng(svg));
-    var shareBtn = buildShareBtn(report);
+    var shareBtn = buildShareBtn(shown);
     if (shareBtn) btnRow.appendChild(shareBtn);
     radarSection.appendChild(btnRow);
     view.appendChild(radarSection);
@@ -714,13 +869,15 @@
     // Action Plan
     var actionSection = el('div', { className: 'results-section' });
     actionSection.appendChild(el('h2', { className: 'results-section-title', textContent: t('results.actionPlanTitle') }));
-    actionSection.appendChild(buildActionPlan(report, bank));
+    // The raw report is the slot identity; the localized prose and the
+    // scoring Variant travel with it for the plan's prompt (#56).
+    actionSection.appendChild(buildActionPlan(report, bank, scoringBank));
     view.appendChild(actionSection);
 
     // Deep-Dive Prompt
     var ddSection = el('div', { className: 'results-section' });
     ddSection.appendChild(el('h2', { className: 'results-section-title', textContent: t('results.deepDiveTitle') }));
-    ddSection.appendChild(buildDeepDive(report));
+    ddSection.appendChild(buildDeepDive(shown));
     view.appendChild(ddSection);
 
     // Button row: Review + Retake
@@ -753,6 +910,9 @@
    * re-render of the results view.
    */
   function renderReview(bank, report) {
+    // Same scoring-Variant bookkeeping as renderResults (#56): only a
+    // fresh report moves the anchor; a swap re-renders the same one.
+    if (bank && report && report !== _lastReport) _scoredBank = bank;
     if (bank) _lastBank = bank;
     if (report) _lastReport = report;
     populateReview();
@@ -796,7 +956,8 @@
     buildBars: buildBars,
     buildReview: buildReview,
     buildDeepDive: buildDeepDive,
-    buildDownloadPng: buildDownloadPng
+    buildDownloadPng: buildDownloadPng,
+    localizedReport: localizedReport
   };
 
   if (typeof module !== 'undefined') module.exports = app;
