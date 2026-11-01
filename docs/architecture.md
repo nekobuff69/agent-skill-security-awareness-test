@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-A no-build web app delivering a self-assessment quiz on AI agent skill security, grounded in the [OWASP Agentic Skills Top 10](https://owasp.org/www-project-agentic-skills-top-10/top10). Two-pass UX: answer all questions → see your profile → review with explanations. One codebase serves both shipped languages — an English page and a Simplified Chinese page — each declaring its own Question Bank and its own locale dictionary at the page level (ADR 0015).
+A no-build web app delivering a self-assessment quiz on AI agent skill security, grounded in the [OWASP Agentic Skills Top 10](https://owasp.org/www-project-agentic-skills-top-10/top10). Two-pass UX: answer all questions → see your profile → review with explanations. One codebase serves both shipped languages — an English page and a Simplified Chinese page — each declaring its own Question Bank and its own locale dictionary at the page level (ADR 0015). The taskbar's **Language Toggle** moves a Participant between the two without a page load: it swaps the Chrome String dictionary and the Bank Variant in place and re-renders the live view (ADR 0019).
 
 **Design philosophy:** Self-assessment, not knowledge test. Every option reflects a real behavioral choice. Scoring reveals blind spots, not trivia gaps. There are no letter grades — results render as a shareable risk radar and a progression title ("Sentinel", "Newcomer", …), because a mirror shows where you haven't looked yet, not what you failed.
 
@@ -27,8 +27,22 @@ Each page's bank is the **database**, declared by the page itself via `data-bank
 Two `fetch()`es on page load — the page's declared Question Bank and the Grounding Corpus — parsed once, used everywhere. The locale dictionary is not fetched: it is loaded as a `<script>` alongside the other modules and registers itself, so interface copy resolves at render time with no network round-trip:
 
 ```
-<html lang="…" data-bank="questions.json" data-corpus="…" data-lang-alt="…">
-    │  the page declares its own bank, its corpus, and its language route
+<html lang="…" data-bank="questions.json" data-corpus="…"
+      data-lang-alt="zh/" data-lang-alt-locale="zh" data-lang-alt-lang="zh-Hans"
+      data-lang-alt-dict="i18n/zh.js" data-lang-alt-bank="questions.zh.json">
+    │  the page declares its own bank, its corpus, and the whole alternate
+    ├─→ App.LangRouting + App.LangPref (js/lang-routing.js, js/lang-pref.js)
+    │     first visit only: a stored Language Preference (`quiz-lang`) or an
+    │     in-progress Session stops routing; otherwise the system language
+    │     decides once and is recorded — never a second time (ADR 0018)
+    │
+    ├─→ App.LangSwitch (js/lang-switch.js) — the Language Toggle's action
+    │     idle-prefetches the alternate dictionary + Bank Variant, then on a
+    │     click swaps both in place: dictionary, bank, <html lang>, title,
+    │     re-render of the live view, one pushState entry per language; a
+    │     failed load keeps the language and shows a dismissible notice
+    │     (ADR 0019)
+    │
     ├─→ App.I18n (js/i18n.js + i18n/<lang>.js)
     │     selects the dictionary from document.documentElement.lang
     │     resolves Chrome Strings by id — interface copy and AST Risk
@@ -97,11 +111,12 @@ questions.json — or a Bank Variant, e.g. questions.zh.json (each loaded once)
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Landing Page                                           │
-│  "Based on OWASP Agentic Skills Top 10"                 │
+│  Welcome Splash (compact wizard card, issue #53)        │
+│  eye icon · two-line display headline                   │
+│  Bank title as subtitle · rule · one body line          │
 │  "20 questions, 8-12 minutes"  ← from meta              │
-│  "Not a test — a mirror."                               │
-│  [Start →]                                              │
+│  [Start]   (the only language affordance is the         │
+│            taskbar Language Toggle, on every view)      │
 └─────────────────────┬───────────────────────────────────┘
                       ↓
 ┌─────────────────────────────────────────────────────────┐
@@ -182,6 +197,7 @@ questions.json — or a Bank Variant, e.g. questions.zh.json (each loaded once)
 - **Auto-advance on the first answer only (ADR 0020).** Select → save → the **Advance Transition** (client-area card wipe, ~160 ms inside the 200 ms beat; instant under prefers-reduced-motion). A revisit re-marks in place and never moves the card. The **pinned window footer** moves both ways: [< Back] from Q2, [Next >] between cards, and [Finish] — enabled exactly at 20/20 — is the sole Completion trigger.
 - **The Quiz Chrome never stacks.** One status bar, pinned inside the window below the scrolling body: Progress Fill + Question Counter (the question being *viewed*) + phase name updating in place. No phase header cards near the Question.
 - **Review is voluntary, on its own screen.** Reached from the results page; navigate back freely; skip it entirely if you want.
+- **The Language Toggle never navigates (ADR 0019).** One click on the taskbar's EN/中文 control swaps the Chrome String dictionary and the Bank Variant in place on any view the app knows — the current Question, every recorded answer, the score report and the scroll position survive — updates `<html lang>`, `document.title` and the URL with one history entry per switch, and records the Language Preference. A failed load keeps the current language and says so in a dismissible, non-blocking notice.
 - **The Deep-Dive Prompt is the hero artifact.** The thing the Participant takes away and uses.
 - **The radar is the shareable moment.** PNG download + Web Share API — results travel without a backend. Severity never renders on the charts; score-band colors alone encode performance.
 
@@ -191,13 +207,14 @@ The interface is a Windows 95 desktop, delivered as a pure CSS override skin (`c
 
 | Module | File | Role |
 | ------ | ---- | ---- |
-| Boot | `js/boot.js` | Splash gate: a sessionStorage flag (`quiz-os-booted`) decides whether a tab sees the boot splash (1350ms, then a 200ms fade) or an instant load; reduced motion or a prior visit answers "already booted". The overlay masks but never gates data fetching — only rendering waits. |
-| Shell | `js/shell.js` + `css/shell.css` | Wraps `#app` in the `.os-window` frame (navy title bar, drawn [—][□][×] marks) and mounts the taskbar: Start button, program button, clock. Owned window controls (minimize/restore/zoom, ticket #43) live here. |
+| Boot | `js/boot.js` | Boot-splash gate — the load animation, distinct from the **Welcome Splash**, which is the landing view itself: a sessionStorage flag (`quiz-os-booted`) decides whether a tab sees the boot splash (1350ms, then a 200ms fade) or an instant load; reduced motion or a prior visit answers "already booted". The overlay masks but never gates data fetching — only rendering waits. |
+| Shell | `js/shell.js` + `css/shell.css` | Wraps `#app` in the `.os-window` frame — a navy title bar whose [—][□][×] controls draw real glyphs (#49), over a window of fixed height so only the client area scrolls and the quiz's status bar stays pinned inside the window (#52) — and mounts the taskbar: Start button, program button, and the two-segment EN/中文 **Language Toggle** that replaced the tray clock (#50). Owned window controls (minimize/restore/zoom, ticket #43) live here. |
 | Windows | `js/windows.js` | The dialog primitive: `App.Windows.openSystemDialog` renders a Win95 system dialog — red warn / navy info circles, beveled command buttons, closes only via its buttons or Escape. One dialog at a time; the backdrop dims the desktop. The shell controller and the state machine are pure modules, testable headlessly. |
 | Sound | `js/sound.js` | Period system sounds (e.g. the click that marks an Option). Purely additive — every interaction works silently. |
 | WizardNav | `js/wizard-nav.js` | The pure decision core behind the quiz's wizard row (`tapOption`, `canFinish`, `next`, `prev`, the one-fire commit gate behind [Finish], ADR 0020). |
+| Language | `js/lang-pref.js` + `js/lang-routing.js` + `js/lang-switch.js` | The locale pair of modules plus its switch: first-visit routing decides once from the system language and records the **Language Preference** (`quiz-lang`, ADR 0018); after that the taskbar **Language Toggle** performs the **Locale Swap** — alternate dictionary + Bank Variant prefetched while idle, applied in place, the live view rebuilt through the issue #48 `App.activateBank` seam, URL and history kept in sync, failure degraded to a notice (ADR 0019). |
 
-Non-theming contract kept deliberately: the skin only re-points token values and repaints components; the semantic aliases (`--color-bg`, `--color-accent`, `--color-score-*`, `--color-success/--color-warning/--color-error`) keep their names, so the base stylesheets never learn the skin's palette. Motion is era-mechanical or none: the view trace, the card wipes and the Progress Fill run as `steps()` animations and are each disabled under `prefers-reduced-motion` (disjoint selector gates, no `!important`). On mobile (≤480px) the policy is "maximize": the app window fills the viewport above the taskbar, like a foregrounded program; dialog anatomy stacks and buttons wrap. The chrome typefaces are self-hosted (OFL 1.1, `fonts/` with provenance record): W95FA for Latin UI chrome, Silkscreen for display headlines, and a Fusion Pixel 12 SC subset for Han chrome/headings — each pinned by `unicode-range` (W95FA/Silkscreen to Latin + typographic marks, the Fusion subset to CJK ranges) so Han text never lands on a Latin pixel face and Latin runs never land on a CJK one. On the Chinese page the `--font-heading` cascade leads with the Fusion subset (SimSun → 宋体 → Microsoft YaHei → PingFang SC behind it), prose stays on the SimSun-first system stack, and all of the CJK typography overrides are gated on `html[lang^="zh"]` inside `theme-retro-os.css` — both pages link the same stylesheet list. Every visual value is extracted and recorded in the root `design-dna-retro-os.json`; `404.html` restates the dialog idiom script-free (its system-error dialog is plain links) rather than loading app JS.
+Non-theming contract kept deliberately: the skin only re-points token values and repaints components; the semantic aliases (`--color-bg`, `--color-accent`, `--color-score-*`, `--color-success/--color-warning/--color-error`) keep their names, so the base stylesheets never learn the skin's palette. Motion is era-mechanical or none: the view trace, the card wipes and the Progress Fill run as `steps()` animations and are each disabled under `prefers-reduced-motion` (disjoint selector gates, no `!important`). On mobile (≤480px) the policy is "maximize": the app window fills the viewport above the taskbar, like a foregrounded program; dialog anatomy stacks and buttons wrap. The chrome typefaces are self-hosted (OFL 1.1, `fonts/` with provenance record): W95FA for Latin UI chrome, Silkscreen for the Welcome Splash's display catchphrase, and a Fusion Pixel 12 SC subset for Han chrome/headings — each pinned by `unicode-range` (W95FA/Silkscreen to Latin + typographic marks, the Fusion subset to CJK ranges) so Han text never lands on a Latin pixel face and Latin runs never land on a CJK one. On the Chinese page the `--font-heading` cascade leads with the Fusion subset (SimSun → 宋体 → Microsoft YaHei → PingFang SC behind it), prose stays on the SimSun-first system stack, and all of the CJK typography overrides are gated on `html[lang^="zh"]` inside `theme-retro-os.css` — both pages link the same stylesheet list. Every visual value is extracted and recorded in the root `design-dna-retro-os.json`; `404.html` restates the dialog idiom script-free (its system-error dialog is plain links) rather than loading app JS.
 
 ---
 
@@ -224,7 +241,8 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 | 0015 | Chrome Strings and Bank Variants — narrow the single-source rule to content; interface copy is a dictionary, a missing id throws | [0015-chrome-strings-and-bank-variants.md](adr/0015-chrome-strings-and-bank-variants.md) |
 | 0016 | Language-scoped Session storage — `quiz-session:<language>` — **superseded by 0017** | [0016-language-scoped-session-storage.md](adr/0016-language-scoped-session-storage.md) |
 | 0017 | Universal Session storage — one `quiz-session` record shared by every Bank Variant; the version stamp hashes bank structure, never authored text | [0017-universal-session-storage.md](adr/0017-universal-session-storage.md) |
-| 0018 | First-visit language routing — a Language Preference stored apart from the Session, automatic routing on a strong browser-language signal, and a dismissible offer otherwise | [0018-first-visit-language-routing.md](adr/0018-first-visit-language-routing.md) |
+| 0018 | First-visit language routing — a Language Preference stored apart from the Session, and one one-way routing decision made from the system language (the dismissible offer is retired) | [0018-first-visit-language-routing.md](adr/0018-first-visit-language-routing.md) |
+| 0019 | In-page locale switching — the Language Toggle swaps dictionary and Bank Variant in place, with idle prefetch, one history entry per switch, and a notice on failure | [0019-in-page-locale-switching.md](adr/0019-in-page-locale-switching.md) |
 | 0020 | Wizard navigation with explicit commit — one Option per Question, auto-advance only on a first answer, [Finish] as the single Completion path | [0020-wizard-navigation-with-explicit-commit.md](adr/0020-wizard-navigation-with-explicit-commit.md) |
 | 0021 | Retro-OS skin replaces the editorial skin — Windows 95 presentation layer with an OS shell, zero-dependency constraint kept | [0021-retro-os-skin-replaces-editorial-skin.md](adr/0021-retro-os-skin-replaces-editorial-skin.md) |
 
@@ -232,7 +250,7 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 
 ## 5. Deployment
 
-├── index.html               # English page — declares data-bank / data-lang-alt
+├── index.html               # English page — declares data-bank + the five data-lang-alt* attributes (ADR-0019)
 ├── zh/
 │   └── index.html           # Simplified Chinese page — same app, Bank Variant
 ├── config.js
@@ -240,7 +258,7 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 ├── 404.html                 # system error dialog — script-free, links the skin's tokens
 ├── og-card.png              # 1200×630 share card, browser capture of the retro results view
 ├── design-dna-retro-os.json # design-DNA record for the retro-OS skin (values traced to its CSS)
-├── fonts/                  # self-hosted chrome typeface + license + provenance
+├── fonts/                  # self-hosted faces + licenses + provenance: W95FA, Silkscreen, the Fusion Pixel 12 SC subset and its codepoint inventory (fonts/PROVENANCE.md)
 ├── questions.json           # Question Bank (English)
 ├── questions.zh.json        # Bank Variant (Simplified Chinese)
 ├── i18n/
@@ -253,7 +271,7 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 │   ├── results.css
 │   ├── theme-retro-os.css  # retro-OS (Win95) skin + CJK typography gated on html[lang^="zh"], linked last as override layer
 │   ├── boot.css        # splash overlay — sunken groove, stepped navy fill, fade handoff
-│   └── shell.css        # retro-OS window frame, taskbar, tray chip, dialogs
+│   └── shell.css        # retro-OS fixed-height window frame, taskbar with the two-segment Language Toggle, dialogs
 ├── js/
 │   ├── analytics.js      # analytics helpers
 │   ├── ast.js            # AST Risk registry — canonical ids + severities; display names are Chrome Strings (ADR-0013, ADR-0015)
@@ -262,8 +280,9 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 │   ├── quiz.js           # quiz status bar + pinned footer, question cards, back nav, localStorage
 │   ├── scoring.js        # deterministic scoring, title lookup, ranked views
 │   ├── session-store.js  # one Session per Participant, structural-hash versioned (ADR-0017)
-│   ├── lang-pref.js      # remembered language choice + prompt dismissals (ADR-0018)
-│   ├── lang-routing.js   # first-visit routing decision + offer dialog (ADR-0018)
+│   ├── lang-pref.js      # remembered Language Preference under `quiz-lang`, stored apart from the Session (ADR-0018)
+│   ├── lang-routing.js   # first-visit routing decision — system language decides once, then is never consulted again (ADR-0018)
+│   ├── lang-switch.js    # the Locale Swap — idle prefetch, in-place dictionary + Bank Variant swap, view re-render, pushState/popstate sync, failure notice (ADR-0019)
 │   ├── boot.js           # splash gate — sessionStorage flag, masked fetches, one-trace handoff (tickets #39/#42)
 │   ├── shell.js          # os-window wrap, taskbar, Start menu + About window (tickets #38/#43)
 │   ├── windows.js        # window controls state machine + system dialog primitive (ticket #43)
@@ -288,18 +307,25 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 │       ├── test-extractor.js
 │       ├── test-validator.js
 │       ├── test-i18n.js            # dictionary contract — missing id throws, no English fallback
+│       ├── test-lang-pref.js       # Language Preference roundtrip + tag normalization; independence from the Session lifecycle (ADR-0018)
+│       ├── test-lang-routing.js    # first-visit routing: stored preference / in-progress Session / unknown language / single-language page all suppress it; no offer machinery remains (ADR-0018)
+│       ├── test-lang-switch.js     # the Locale Swap: state preservation on every view, URL/pushState sync, popstate reconcile, idle prefetch, failure notice, markup contract (ADR-0019)
 │       ├── test-action-plan-budget.js  # Action Plan prompt stays within llm.budget, trim ladder deterministic
 │       ├── test-boot.js            # splash gate — decide(landedFirst, hasFlag, reducedMotion), exactly-once flag, storage fail-open
+│       ├── test-quiz.js            # Welcome Splash render, Question Cards, the in-window status bar and pinned footer, and the gates that keep the retired floating chrome and the retired language offer from coming back (ADR-0020)
+│       ├── test-rerender.js        # the issue #48 seam — bank swap re-renders the live view from current state, one rebuild per activation
 │       ├── test-wizard-nav.js      # tapOption/canFinish/prev/next decisions + the one-fire Finish commit gate (ADR-0020)
-│       ├── test-shell.js           # clock/tick cadence, title-bar button delegation, program button, Start menu via DOM stubs
+│       ├── test-shell.js           # taskbar Language Toggle build, title-bar glyph delegation, program button, Start menu via DOM stubs
 │       ├── test-windows.js         # window state machine (minimize/restore/zoom/close confirm), dialog primitive, trace classes
 │       ├── test-sound.js           # audible() matrix, voice table, mute persistence
 │       ├── test-results-retro.js   # retro results: Title Card window frame, radar SVG + dither, review disclosures
+│       ├── test-cjk-font-subset.js # the committed Fusion Pixel subset covers every Han codepoint the Chinese dictionary and Bank Variant render (fonts/PROVENANCE.md)
 │       ├── test-theme-retro-os.js  # static skin/token/integration checks for every entry point
 │       └── test-grounding.js   # gates the shipped Grounding Corpus itself
 ├── scripts/
 │   ├── preflight.sh
-│   └── deploy.sh
+│   ├── deploy.sh
+│   └── subset-fusion-pixel.py   # offline, repo-side regeneration of the Chinese subset face + its codepoint inventory (fonts/PROVENANCE.md, ADR-0001 amendment)
 ├── worker/
 │   ├── src/index.js
 │   └── wrangler.toml
@@ -309,7 +335,7 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
     ├── architecture.md
     ├── TESTING.md
     ├── owasp-ast-full.md       # Grounding Corpus
-    ├── adr/                    # one decision per note — 0001–0018 + 0020–0021
+    ├── adr/                    # one decision per note — 0001–0021
     └── agents/                 # issue-tracker, triage-labels, domain consumer rules
 ```
 
@@ -330,6 +356,6 @@ npx wrangler pages deploy ./ --project-name=agent-security-quiz
 
 Multilingual delivery is built (ADR 0015, ADR 0017), so it is no longer an item here. What localization makes possible next, and what remains open:
 
-- **More languages.** Adding a language is now one bank file, one dictionary file, one page, and a stylesheet — no code changes and no build step. The gate picks up the new bank automatically. The open question is which language, and whether the Simplified Chinese AST Risk and Progression Title terminology sets are reviewed by a native speaker before a third set is coined (ADR 0015 verifies structure, not currency).
+- **More languages.** Adding a language is now one bank file, one dictionary file, one page, and the page's five `data-lang-alt*` declarations — no code changes and no build step (ADR 0019 reads the declaration; the in-page toggle handles exactly two locales per page today, so a third language also needs the switch widened to more than "the other one"). The gate picks up the new bank automatically. The open question is which language, and whether the Simplified Chinese AST Risk and Progression Title terminology sets are reviewed by a native speaker before a third set is coined (ADR 0015 verifies structure, not currency).
 - **Translation currency.** The one gap localization did not close: no check can tell whether a Bank Variant still says what its source bank says. A shared diff-review step or a per-language freshness signal is the candidate.
 - **Shareable result URLs**, retake tracking (ADR 0017 notes the storage shape can extend without changing the versioning mechanism), finer Grounding Corpus retrieval, an aggregate admin dashboard, and an embeddable widget for agent platform marketplaces.

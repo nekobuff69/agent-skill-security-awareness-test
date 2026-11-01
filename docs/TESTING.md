@@ -333,31 +333,46 @@ has five grounding rules.
 
 ### Expected Check Count (per Bank Variant, drifts with content)
 
+Counted on the banks as shipped (ticket #57):
+
 - Section 2: 660 checks per Bank Variant (per-field expansion across 20 Questions and their 80 Options, plus global checks)
 - Section 3: 12 checks per Bank Variant (4 fixture cases + 4 edge cases + sub-assertions)
-- Section 3d: 128 checks **per non-source Variant** (the source-language bank is its own reference and is skipped) — 6 per Question plus Phase membership, Severity Weights, Title Ladder, and fixtures
+- Section 3d: 129 checks **per non-source Variant** (the source-language bank is its own reference and is skipped) — 6 per Question (120) plus Question-id coverage, Question array order, one per Phase membership (3), Severity Weights, Title Ladder thresholds, Title Ladder emoji, and the fixture shapes. The runner prints this section under the label `Section 3b: Variant Equivalence`
 - Section 4: 7 checks per Bank Variant (the five grounding rules)
-- **Two banks as shipped: 1486 checks** with `--llm` (660 + 660 schema, 12 + 12 scoring, 128 equivalence, 7 + 7 grounding); **1472 without**. With *n* discovered Banks the total scales with *n*, and every check carries its Bank Variant's filename.
+- **Two banks as shipped: 1473 checks** without `--llm` (660 + 660 schema, 12 + 12 scoring, 129 equivalence) and **1487 with** (those 1473 plus 7 + 7 grounding). With *n* discovered Banks the total scales with *n*, and every check carries its Bank Variant's filename.
 
 
 ---
 
 ## 6. Node Module Gate — `tests/js/run-tests.js`
 
-Zero-dependency runner over the JS modules (pure functions, no browser). Discovers `tests/js/test-*.js`; each file exports `name` + `run()` returning `[{pass, message}]`, or a Promise of that list for async modules (the Action Plan module tests). Exit 0/1. Covered:
+Zero-dependency runner over the JS modules (pure functions, no browser). Discovers `tests/js/test-*.js`; each file exports `name` + `run()` returning `[{pass, message}]`, or a Promise of that list for the async suites (`test-action-plan.js`, `test-rerender.js`, `test-lang-switch.js`). Exit 0/1. **As shipped at ticket #57 the gate runs 23 module tests and 757 checks** — `node tests/js/run-tests.js` ends with `757 passed, 0 failed, 757 total`. Covered:
 
-| Module test | Asserts |
-|---|---|
-| `test-scoring.js` | Fixtures (all-zero 2.8%/Uncharted, all-best 100%/Sentinel, common-user, security-aware), 108 Total Possible, Multi-Mapping aggregation, graceful error states, weakest questions, ranked views (`astRanked` weakest-first with AST-ID tie-break, `blindSpotIds` = AST Risks below 70%) |
-| `test-session-store.js` | Save/load roundtrip; the structural hash is identical across Bank Variants and changes on Question reorder / Option re-score / Severity Weight change but not on rewording; stale-hash soft reset; corrupt/empty storage; answer-payload validation; migration from the ADR-0016 language-scoped keys (most-advanced record wins, legacy keys deleted, live record never overwritten); `exists()` reports a Session without a bank |
-| `test-lang-pref.js` | Language Preference roundtrip and tag normalization, pinned against the dictionary normalizer on every tag; dismissals accumulate once and are per-prompt; independence from the Session lifecycle and survival of a stale-Session reset; corrupt and wrongly-typed stored data degrade to a usable shape; every operation survives unavailable storage |
-| `test-lang-routing.js` | Automatic routing on a strong signal, including tag variants and the mirror-image page; a recorded preference, an in-progress Session, an unknown browser language and a single-language page each suppress it; a failure degrades silently; the offer is due only for a browser language that is neither offered page, is suppressed by a choice or a dismissal, renders the alternate link, and records accept/dismiss (ADR-0018) |
-| `test-prompt-builder.js` | Four sections in order, ≤ 3000 chars, Weakest Questions carried, weakest-first profile order from `astRanked` |
-| `test-fallback.js` | Schema parity with LLM output, weakest-first ordering from `blindSpotIds`, valid AST attribution |
-| `test-action-plan.js` | Path decision and retry policy at the module seam: no proxy / no corpus → fallback, LLM success → pass-through, one retry then fallback (ADR-0009), thrown adapter → fallback |
-| `test-extractor.js` | Per-AST slicing (description / evidence / mitigations) |
-| `test-validator.js` | Accepts valid output; rejects malformed JSON, unknown AST refs, short narrative; tolerates one markdown fence |
-| `test-grounding.js` | The shipped `docs/owasp-ast-full.md` yields all 10 AST Risks with non-empty Description/Evidence/Mitigations — a corpus edit that breaks extraction fails the gate |
+| Module test | Checks | Asserts |
+|---|---|---|
+| `test-scoring.js` | 43 | Fixtures (all-zero 2.8%/Uncharted, all-best 100%/Sentinel, common-user, security-aware), 108 Total Possible, Multi-Mapping aggregation, graceful error states, weakest questions, ranked views (`astRanked` weakest-first with AST-ID tie-break, `blindSpotIds` = AST Risks below 70%) |
+| `test-session-store.js` | 30 | Save/load roundtrip; the structural hash is identical across Bank Variants and changes on Question reorder / Option re-score / Severity Weight change but not on rewording; stale-hash soft reset; corrupt/empty storage; answer-payload validation; migration from the ADR-0016 language-scoped keys (most-advanced record wins, legacy keys deleted, live record never overwritten); `exists()` reports a Session without a bank |
+| `test-lang-pref.js` | 21 | Language Preference roundtrip and tag normalization, pinned against the dictionary normalizer on every tag; no dismissal operation and no dismissal bookkeeping anywhere, with a legacy record keeping only the language choice; independence from the Session lifecycle and survival of a stale-Session reset; corrupt and wrongly-typed stored data degrade to a usable shape; every operation survives unavailable storage (ADR-0018 as amended by #54) |
+| `test-lang-routing.js` | 24 | Automatic routing on the browser's primary language, including tag variants and the mirror-image page; a recorded preference, an in-progress Session, an unknown browser language and a single-language page each suppress it; a failure degrades silently; the decision is recorded once and can never route back; no offer entry point, offer code path or offer copy id survives in either module or either dictionary (ADR-0018 as amended by #54) |
+| `test-lang-switch.js` | 74 | The Locale Swap (ADR-0019): in-place dictionary + Bank Variant swap on the splash, answering, results and review views with the Question, answers, score report and scroll position preserved; `<html lang>`, `document.title` and URL sync with one `pushState` entry per switch and `popstate` reconciliation; the per-locale Action Plan Narrative slot — an in-flight request waits behind its own localized loading string, never paints into the other language, and never generates twice; idle prefetch and its silent failure; the dismissible non-blocking notice and its auto-dismiss; one swap at a time; the unknown-view record-and-navigate fallback; the authored `data-lang-alt*` markup contract |
+| `test-i18n.js` | 35 | Dictionary contract — the required Chrome String ids resolve in both locales (including `lang.switchUnavailable`), a missing id throws, no English fallback, `baseLocale` normalization |
+| `test-prompt-builder.js` | 6 | Four sections in order, ≤ 3000 chars, Weakest Questions carried, weakest-first profile order from `astRanked` |
+| `test-fallback.js` | 7 | Schema parity with LLM output, weakest-first ordering from `blindSpotIds`, valid AST attribution |
+| `test-action-plan.js` | 21 | Path decision and retry policy at the module seam: no proxy / no corpus → fallback, LLM success → pass-through, one retry then fallback (ADR-0009), thrown adapter → fallback |
+| `test-action-plan-budget.js` | 32 | Action Plan prompt stays within `t('llm.budget')` in both locales, worst-case and real-report sizing, the trim ladder is deterministic, the budget is read from the dictionary as a number |
+| `test-extractor.js` | 21 | Per-AST slicing (description / evidence / mitigations) |
+| `test-validator.js` | 25 | Accepts valid output; rejects malformed JSON, unknown AST refs, short narrative; tolerates one markdown fence |
+| `test-grounding.js` | 13 | The shipped `docs/owasp-ast-full.md` yields all 10 AST Risks with non-empty Description/Evidence/Mitigations — a corpus edit that breaks extraction fails the gate |
+| `test-boot.js` | 17 | Splash gate — `decide(landedFirst, hasFlag, reducedMotion)` across fresh landing, flagged tab, mid-quiz/review restore and reduced motion; the `quiz-os-booted` flag is namespaced and written exactly once; throwing or missing storage fails open to an instant boot |
+| `test-quiz.js` | 57 | The Welcome Splash renders the compact card with no language offer wired in; Question Card scaffolding; the in-window status bar (phase pane, Progress Fill, Question Counter) and pinned footer in order, with the retired floating chrome kept out of the DOM; `quiz.css` keeps exactly one scrolling element; wizard row behavior on revisit |
+| `test-rerender.js` | 32 | The issue #48 seam: `activateBank` rebuilds the visible view — splash, answering, results, Review — from current state after a bank swap, keeping the Question position, every recorded answer, the viewed counter, the answered fill and the same cached score report (never recomputed); `loadBankFrom` swaps a caller-supplied bank and re-renders in place; `fetchBank` surfaces HTTP failures to the caller |
+| `test-wizard-nav.js` | 33 | `tapOption`/`canFinish`/`prev`/`next` decisions + the one-fire Finish commit gate (ADR-0020) |
+| `test-shell.js` | 42 | Taskbar build and refresh (Start button, program button, the two-segment Language Toggle that replaced the tray clock), title-bar button delegation and its real glyphs, Start menu, `recordChoice`'s record-then-navigate fallback (tickets #43/#49/#50) |
+| `test-windows.js` | 64 | Window state machine (minimize/restore/zoom/close confirm), the system-dialog primitive (one at a time, button/Escape only), trace classes |
+| `test-sound.js` | 27 | `audible()` matrix, voice table, mute persistence |
+| `test-results-retro.js` | 46 | Retro results: Title Card rendered as a window frame with the shell's drawn [—][□][×] marks and localized aria-labels, radar SVG geometry + score-band dither + AST-ID/percentage labels with no severity anywhere, Blind-Spot bars, Review disclosures with square [+]/[-] glyphs, PNG export sizing, and #56's re-anchor — the Progression Title and Weakest Question prose re-anchor to the active Bank Variant while every number stays the cached report's own and the report itself is never mutated |
+| `test-cjk-font-subset.js` | 8 | The committed Fusion Pixel subset and its codepoint inventory exist; every CJK-range codepoint `i18n/zh.js` and `questions.zh.json` render is in the inventory, and no unused codepoint is left in it — both directions say "re-run `scripts/subset-fusion-pixel.py`" (`fonts/PROVENANCE.md`) |
+| `test-theme-retro-os.js` | 79 | Static skin/token/integration checks for every entry point: the linked stylesheet list, token re-pointing, bevel and dialog anatomy, `prefers-reduced-motion` gates, `unicode-range` pins |
 
 ---
 

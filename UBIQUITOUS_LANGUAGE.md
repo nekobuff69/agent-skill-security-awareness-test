@@ -1,6 +1,6 @@
 # Ubiquitous Language
 
-Domain vocabulary for the Agent Skills Security Self-assessment — extracted from the design session, `docs/architecture.md`, `docs/TESTING.md`, `questions.json`, the OWASP Agentic Skills Top 10 corpus, the post-redesign implementation rounds (UX redesign #13–#18, LLM pipeline hardening), and the localization round (Bank Variants and Chrome Strings).
+Domain vocabulary for the Agent Skills Security Self-assessment — extracted from the design session, `docs/architecture.md`, `docs/TESTING.md`, `questions.json`, the OWASP Agentic Skills Top 10 corpus, the post-redesign implementation rounds (UX redesign #13–#18, LLM pipeline hardening), the localization round (Bank Variants and Chrome Strings), and the retro-OS shell and locale rounds (#38–#56: window chrome, faces, one-way first-visit routing, the in-page Locale Swap).
 
 ## Assessment content
 
@@ -25,13 +25,13 @@ Domain vocabulary for the Agent Skills Security Self-assessment — extracted fr
 | **Session**     | One quiz attempt persisted locally under the single key `quiz-session`, shared by every Bank Variant and versioned by the bank's structural hash — Question order, Option Scores, Severity Weights, AST Risk mappings, Phase membership — never by authored text | Saved answers, localStorage state, per-language Session |
 | **Completion**  | The hand-off to results, committed by the Finish Commit once every Question has an Option selected; triggers scoring and the Action Plan request | Submission (bare), auto-completion    |
 | **Retake**      | The results-page control that clears the Session and returns to the landing view     | Restart, redo              |
-| **Language Preference** | The Participant's remembered language choice and the set of first-visit prompts they have dismissed, held under `quiz-lang` independently of their Session — never version-stamped, never reset by a Question Bank change | Locale setting, language cookie, per-language state |
+| **Language Preference** | The Participant's remembered language choice, held under `quiz-lang` independently of their Session — never version-stamped, never reset by a Question Bank change, written by first-visit routing and by every Locale Swap | Locale setting, language cookie, per-language state, dismissed-prompt record (retired by #54) |
 
 ## Quiz experience
 
 | Term                 | Definition                                                                                     | Aliases to avoid                     |
 | -------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------ |
-| **Quiz Chrome**      | The in-window status bar during the quiz (ticket #52): phase name in the left pane, segmented Progress Fill + Question Counter in the right pane | Header (overloaded), toolbar, HUD    |
+| **Quiz Chrome**      | The status bar pinned inside the window during the quiz (ticket #52): phase name in the left pane, segmented Progress Fill + Question Counter in the right pane. The window has a fixed height, so only the client area scrolls and this bar, the Question Card and the pinned wizard footer are the window's three parts — the counter counts the Question being *viewed*, the Fill counts Questions *answered*; they are two different signals | Header (overloaded), toolbar, HUD, floating/sticky chrome (retired pre-#52) |
 | **Question Counter** | The "N / 20" text showing the question currently being viewed, 1-indexed                         | Progress text, answered count        |
 | **Progress Fill**    | The thin bar showing answered questions / 20; reaches 100% before the results hand-off           | Progress bar (bare)                  |
 | **Phase Chip**       | The phase name in the Quiz Chrome's left pane showing the current Phase; swaps text, never appends | Phase header (retired card), badge   |
@@ -40,6 +40,9 @@ Domain vocabulary for the Agent Skills Security Self-assessment — extracted fr
 | **Finish Commit**    | The [Finish] click on the last Question Card — the single trigger for Completion: enabled only when all 20 Questions are answered, `quiz_completed` fires exactly there, never automatically | Auto-finish, submit button, implicit completion |
 | **Advance Transition** | The client-area card wipe (~160ms CSS) replacing the outgoing Question Card on advance and Back; instant under prefers-reduced-motion | Animation, transition effect, slide-up + fade (retired) |
 | **Chrome String** | A translatable interface string, resolved by id from the locale dictionary (`i18n/<lang>.js`) and kept strictly separate from Question Bank content; a missing id throws rather than falling back | Copy (bare), localized string, bank copy, display data, title (bare) |
+| **Welcome Splash** | The compact title screen of the Landing Page (ticket #53): eye icon, two-line display headline, the Bank's title as subtitle, a rule, one body line with the Question count and time estimate from `meta`, and a single default [Start] — a wizard card inside the window, not a full-height editorial page | Landing hero, title screen (vague), start page |
+| **Language Toggle** | The taskbar's two-segment EN/中文 control (#50, replaced the tray clock) — the app's only language affordance on every view; pressing either segment performs a **Locale Swap** to that language, records the **Language Preference**, and keeps the current view and state | Language tray chip (retired name), switch link (retired mechanism), offer (retired dialog) |
+| **Locale Swap** | The in-place language change (#55/#56, ADR 0019): register the alternate Chrome String dictionary, load its Bank Variant, update `<html lang>`, `document.title` and the URL with one history entry, then re-render the visible view from current state — no navigation, no reload, no lost answers, and a dismissible notice instead when the alternate cannot be loaded | Language switch (bare — it no longer switches pages), redirect, reload |
 
 ## Scoring
 
@@ -112,7 +115,8 @@ The ten names are a fixed terminology set per language, not text assembled per f
 - A **Question** belongs to exactly one **Phase** and maps to one or more **AST Risks**.
 - An **Option** belongs to exactly one **Question** and carries exactly one **Option Score**, one **Feedback**, and one letter badge (A–D).
 - A **Session** records exactly one **Option** per **Question**; a structural bank change version-stamps stale Sessions while authored-text changes do not; **Wizard Navigation** moves both ways — re-answers overwrite in place and the card stays put (no advance on a revisit), and **Finish Commit** is the single path to **Completion**. One **Participant** has one Session for the whole assessment — every **Bank Variant** reads and writes the same record, so switching language resumes in place rather than starting a second run, and rewriting prose never costs anyone their progress (ADR 0017).
-- The **Quiz Chrome** updates in place: the **Question Counter** shows the question being viewed, the **Progress Fill** shows answered/20, the **Phase Chip** swaps the Phase title — nothing stacks, nothing appends.
+- The **Quiz Chrome** updates in place: the **Question Counter** shows the question being viewed, the **Progress Fill** shows answered/20, the **Phase Chip** swaps the Phase title — nothing stacks, nothing appends, and the bar stays pinned inside the fixed-height window while only the client area scrolls (#52).
+- The **Language Toggle** performs a **Locale Swap**: dictionary, then Bank Variant, then `<html lang>`, `document.title` and the URL with one history entry, then a rebuild of the visible view from current state. The **Session**, the current **Question**, the **Completion**'s score report and the scroll position all survive it; a swap that cannot load its alternate leaves the language alone and says so in a dismissible notice (ADR 0019). Every successful swap writes the **Language Preference**, which is what keeps the swap the override over first-visit routing (ADR 0018).
 - A **Completion** consumes one **Session**, produces exactly one **Progression Title** and one Action Plan request; the **Progress Fill** holds 100% for a beat before the hand-off.
 - A **Blind Spot** is one **Participant**'s low **AST Score** on one **AST Risk**; a Multi-Mapping Question feeds every mapped **AST Score**, so one bad answer can open two Blind Spots.
 - A **Best Practice** is Question-level; a **Mitigation** is AST-Risk-level (corpus). The **Deterministic Fallback** distills Best Practices into Actions; **Grounding Excerpts** carry Mitigations.
@@ -130,6 +134,10 @@ The ten names are a fixed terminology set per language, not text assembled per f
 > **Dev:** "They went back and changed their answer on question 3 — does the **Session** keep both answers?"
 
 > **Domain expert:** "One **Option** per **Question**, always — the new pick overwrites the stored one, the radio re-marks, and the card stays put: re-answering never auto-advances. Picks stay free until the **Finish Commit**."
+
+> **Dev:** "Mid-quiz they hit 中文 in the **Language Toggle** and the page jumped back to the **Welcome Splash** — reload bug?"
+
+> **Domain expert:** "There is no reload any more. A **Locale Swap** registers the other Chrome String dictionary, loads the other **Bank Variant**, updates `<html lang>`, the title and the URL, then rebuilds the view they were looking at — same **Question**, same answers, same scroll (ADR 0019). If you saw the Splash, they pressed it from the Splash; the toggle acts on whatever view is visible. And if it ever *appears* to navigate, that is the one deliberate case left: a view the swap module does not know, which keeps the old record-and-navigate action."
 
 > **Dev:** "Where did the **Review** go? It used to sit right under the Action Plan."
 
@@ -153,6 +161,8 @@ The ten names are a fixed terminology set per language, not text assembled per f
 - **"score" is never bare** — Option Score, Weighted Score, AST Score, and Overall Percentage are four distinct numbers. Always qualify.
 - **"grade" is retired** — Progression Titles replaced it. Must not reappear.
 - **"header" became overloaded after the redesign** — three surfaces: the landing header (title, subtitle, Start button), the retired **phase header card**, and the **Quiz Chrome**. The phase header card is retired vocabulary: the Phase now appears only as the **Phase Chip** inside the Quiz Chrome. Never re-add a phase block near the Question card.
+- **"switching language" is a Locale Swap, not a navigation** — no document, comment or test may claim the language switch reloads or navigates: the two pages still exist and stay directly linkable, but the **Language Toggle** changes the language in place (ADR 0019), with the unknown-view record-and-navigate fallback as its single exception.
+- **Retired interface vocabulary** — the first-visit **offer** dialog and its dismissal record (#54), the taskbar tray **clock** the **Language Toggle** replaced (#50), the "language tray chip" name for that toggle (#50), the floating/sticky quiz chrome bar the pinned **Quiz Chrome** replaced (#52), and the separate Chinese stylesheet `css/cjk.css` (#51 — Chinese typography is now a rule set inside `css/theme-retro-os.css`, gated on `html[lang^="zh"]`, because a runtime Locale Swap rewrites `<html lang>`). Say **Language Toggle**, **Locale Swap**, **Welcome Splash**, **Quiz Chrome**.
 - **"progress bar" vs "counter"** — two different signals: the **Question Counter** shows the question being *viewed*; the **Progress Fill** shows answered/20. They were conflated before the redesign (the "quiz ended at 19/20" confusion) — never use bare "progress".
 - **Severity Chip is retired from visuals** — owner decision: severity (critical / high / medium) no longer renders in the Risk Radar or Blind-Spot Bars; it lives only as bank/corpus metadata and as prompt data. Score-band colors alone encode the Participant's performance.
 - **"upstream" vs "provider"** — ADR text says "upstream LLM endpoint"; in domain conversation say **Provider**. "Upstream" is acceptable only as infrastructure phrasing inside the Proxy Worker's code and ADRs.

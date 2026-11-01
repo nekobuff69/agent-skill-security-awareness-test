@@ -55,19 +55,20 @@
     "typography": {
       "type_scale": {
         "title_bar": { "size": "14px", "weight": "400", "font": "W95FA", "line_height": "1", "tracking": "normal" },
-        "chrome_label": { "size": "14px", "weight": "400", "font": "W95FA", "usage": "counters, chips, buttons, Start/clock" },
-        "headline": { "size": "64px / 44px / 32px by breakpoint", "weight": "400", "font": "W95FA via --font-heading", "line_height": "1.1", "letter_spacing": "normal (pixel faces carry their own rhythm)" },
+        "chrome_label": { "size": "14px", "weight": "400", "font": "W95FA", "usage": "counters, chips, buttons, Start/language-toggle segments" },
+        "headline": { "size": "64px / 44px / 32px by breakpoint", "weight": "400", "font": "W95FA via --font-heading, except the Welcome Splash catchphrase which runs Silkscreen 32px (uppercase, 36px on the Chinese page)", "line_height": "1.1", "letter_spacing": "normal (pixel faces carry their own rhythm)" },
         "subtitle": { "size": "24px / 20px / 18px", "weight": "400", "font": "body stack" },
         "body": { "size": "16px", "weight": "400", "line_height": "1.6", "font": "system sans" },
         "meta": { "size": "13px", "weight": "400", "font": "ui-monospace stack", "tracking": "0.05em uppercase" },
         "micro_label": { "size": "small", "color": "#404040", "usage": "field micro-labels" }
       },
       "font_families": {
-        "heading": "W95FA (chrome only), fallback Segoe UI/SimSun",
+        "heading": "W95FA (Latin chrome) / Fusion Pixel 12 SC subset (Han chrome on the Chinese page, leading --font-heading under html[lang^=\"zh\"]), fallback Segoe UI/SimSun",
+        "display": "Silkscreen — the Welcome Splash catchphrase only, Latin-pinned",
         "body": "system sans stack",
         "mono": "ui-monospace / Cascadia Mono / Consolas"
       },
-      "font_style_notes": "W95FA is a pixel re-creation of the original MS Sans Serif by Alina Sava (OFL 1.1, self-hosted under fonts/ with PROVENANCE.md — no third-party network dependency, ADR 0001). UI chrome only; prose stays on the readable body stack."
+      "font_style_notes": "All three faces are self-hosted under fonts/ with their OFL 1.1 texts and fonts/PROVENANCE.md — W95FA (Alina Sava, pixel re-creation of MS Sans Serif), Silkscreen (Jason Kottke, bitmap display face), Fusion Pixel 12px proportional SC (TakWolf) as an offline repo-side subset of the pinned release. Each is pinned by unicode-range so Latin and Han runs never land on the other's face; no third-party network dependency (ADR 0001, ADR 0021 amended by #51). UI chrome only; prose stays on the readable body stack."
     },
     "spacing": {
       "base_unit": "8px",
@@ -130,12 +131,14 @@
     },
     "components": [
       "os-window (raised frame around #app on the teal desktop)",
-      "title bar (navy→#1084D0 gradient, 14px W95FA label, drawn disabled [—][□][×])",
-      "taskbar (start button + program button + clock tray; pressed-state flip on minimize)",
+      "title bar (navy→#1084D0 gradient, 14px W95FA label, [—][□][×] controls drawn as inline-SVG era glyphs — 6×2 bar, 9×9 square, 8×7 cross in currentColor, black live / gray disabled, #49)",
+      "taskbar (start button + program button + the two-segment EN/中文 Language Toggle that replaced the clock tray, #50; pressed-state flip on minimize)",
       "start menu popup and about/system dialog primitive (js/windows.js App.Windows.openSystemDialog: backdrop dims desktop 25%, one dialog at a time, closes only by button/Escape)",
       "boot splash (sunken groove, segmented navy stepped fill, status line)",
-      "quiz status bar (pinned inside the window, quiz view only: segmented navy Progress Fill + question counter + phase name; segmented = repeating gradient trick)",
-      "question card / wizard (sunken scenario field, radiogroup rows with etched dial glyphs; pinned footer [< Back] [Next >] / [Finish])",
+      "welcome splash (the compact landing wizard card, #53: 64px inline eye glyph, two-line uppercase catchphrase on the Silkscreen display face — 32px, the Fusion Pixel subset carrying it on the Chinese page at 36px — the Bank's title as subtitle, a hairline rule, one body line + time estimate, a single default [Start] — the language affordance is the taskbar toggle, never a dialog)",
+      "locale-swap failure notice (`.quiz-notice` inside the current view: raised bevel strip, localized copy naming the other language, a beveled dismiss button, auto-dismissed; the language never changes unless the swap succeeds, #55/#56)",
+      "quiz status bar (pinned inside the fixed-height window, quiz view only, 22px: segmented navy Progress Fill + question counter + phase name; segmented = repeating gradient trick; only .quiz-body scrolls)",
+      "question card / wizard (a flat grouping element since #52 — the raised card frame is gone; the sunken scenario field and the radiogroup rows with etched dial glyphs carry the depth; pinned footer [< Back] [Next >] / [Finish])",
       "title card (results window: navy bar + sunken white client field, percentage in --color-score-*)",
       "risk radar (sunken white field, black-on-white vector chart)",
       "blind-spot bars (sunken dithered track — 1px repeating-conic dither, graphics-only; square dark fills)",

@@ -18,6 +18,8 @@ _Amended 2026-09-10: five events — `quiz_started` added on quiz Start (drop-of
 
 Note: the gate suite is now two runners — `run_tests.py` (stdlib Python, bank + grounding) and `tests/js/run-tests.js` (zero-dependency Node, JS module contracts) — executed together by `scripts/preflight.sh`.
 
+_Amended 2026-11-02 (ticket #51, recorded by #57): "no build step" still means no page build. The Chinese pixel face ships as a subset produced by an offline, repo-side script (`scripts/subset-fusion-pixel.py`, FontTools + Brotli in a throwaway venv) whose outputs — the woff2 and its codepoint inventory — are committed under `fonts/` beside the license. Nothing runs at deploy or at page load, and no font is fetched over the network; the procedure and its rationale live in `fonts/PROVENANCE.md`._
+
 ## Consequences
 
 - Any text editor deploys the app; no node_modules, no bundler config, no transpiler.
