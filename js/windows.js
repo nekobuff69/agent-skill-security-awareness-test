@@ -71,6 +71,20 @@
    * focus call, a raise or a scroll; the Deep-Dive Prompt opens minimized
    * at the Finish Commit and shows as a taskbar button only.
    *
+   * Keyboard floor (ticket #67): only the FOCUSED window answers the
+   * keyboard. paintFrame puts the inert attribute on everything inside
+   * every other window — the client area, the title-bar controls, and any
+   * region a later ticket mounts into the frame — except its two pointer
+   * handles. Tab therefore never lands inside a window the Participant is
+   * not working in, while raise-on-interaction, the title-bar drag and the
+   * corner-grip resize stay untouched: a press on an inert control
+   * retargets to the live frame root, which raises the window and lifts
+   * the floor before the pointer comes back up. Escape's window tier
+   * (escapeFocused) puts the focused window away — hide(), never a dialog —
+   * and hands focus back to the taskbar button or the shortcut the
+   * Participant came through. No aria-modal on a window, no Alt+Tab
+   * interception, no focus trap: the desktop stays one Tab order.
+   *
    * Layering: js/desktop-core.js is the pure transition table (no DOM, no
    * timers, fully headless-testable). create() wraps it with the DOM
    * rendering (button disabled states, trace classes, program-button bevel)
@@ -315,6 +329,13 @@
    * attachProgram(id, refs) supplies one program frame's DOM (ticket #61):
    *   windowEl, bodyEl, titleBar, titleText, resizeGrip, taskbarBtn,
    *   buttons {minimize, maximize, close}
+   * The keyboard floor (ticket #67) needs no new wiring: it paints the
+   * inert attribute on every child of the frame except its pointer handles
+   * (the title bar and the corner grip) plus the three title-bar buttons,
+   * so a background window's controls — and any region a later ticket
+   * mounts into it — stay out of the Tab order. `bodyEl` is named only so
+   * a stub DOM that never assembles children still gets its client area
+   * covered.
    */
   function create(deps) {
     deps = deps || {};
@@ -324,6 +345,71 @@
     var dom = null;                   // the Quiz frame (tickets #52/#60 shape)
     var programs = {};                // id → its frame refs (ticket #61)
     var traceTokens = {};             // id → invalidates stale trace callbacks
+
+    /**
+     * Ticket #67: where keyboard focus came back from. When a taskbar
+     * button (or a keyboard shortcut, via recordTrigger()) sends a window
+     * away — Escape being the hiding gesture — focus returns to that
+     * control. One entry per program id; the frame wiring writes it before
+     * the transition, the Escape floor reads it after.
+     */
+    var lastTrigger = {};
+
+    /** The inert floor (ticket #67): every control of a window that is NOT
+     *  the active one wears the inert attribute, so Tab lands only inside
+     *  the focused window's controls. The FLOOR IS PAINTED ON THE PARTS,
+     *  never on the frame root, because the root has two pointer jobs the
+     *  keyboard floor must not steal: it answers raise-on-interaction
+     *  (wireRaise) and it carries the title bar drag and the corner-grip
+     *  resize. A pointer press on an inert control retargets to its
+     *  nearest non-inert ancestor — the live frame root — so pressing
+     *  anywhere in a background window raises it exactly as it did before
+     *  the floor existed, and by the time the pointer comes back up the
+     *  window is focused, its controls are live again, and the click
+     *  lands. paintFrame applies the floor on every render: it follows the
+     *  core's active Id and is never a second copy of state here. The
+     *  attribute (not the IDL property) is what the paint writes, so the
+     *  headless fake DOMs read the same contract the browser does. */
+    function setPartInert(el, inert) {
+      if (!el || typeof el.setAttribute !== 'function') return;
+      var has = typeof el.getAttribute === 'function' &&
+        el.getAttribute('inert') !== null;
+      if (inert) {
+        if (!has) el.setAttribute('inert', '');
+        return;
+      }
+      if (has && typeof el.removeAttribute === 'function') {
+        el.removeAttribute('inert');
+      }
+    }
+
+    function paintInertFloor(refs, active) {
+      var inert = !active;
+      // Everything the frame contains EXCEPT its pointer handles wears the
+      // floor: the client area (a program frame's body, the Quiz frame's
+      // #app) and anything else mounted into the frame — a later ticket's
+      // menu bar or status bar is covered without new wiring. The title
+      // bar and the corner grip stay live (they are the drag and resize
+      // handles) and the frame root stays live, so the raised press of an
+      // inert control lands on a listener that still answers.
+      var targets = [];
+      var win = refs.windowEl;
+      if (win && win.children) {
+        for (var i = 0; i < win.children.length; i++) {
+          var kid = win.children[i];
+          if (kid === refs.titleBar || kid === refs.resizeGrip) continue;
+          targets.push(kid);
+        }
+      }
+      var client = refs.bodyEl;
+      if (client && targets.indexOf(client) < 0) targets.push(client);
+      for (var t = 0; t < targets.length; t++) setPartInert(targets[t], inert);
+      if (refs.buttons) {
+        setPartInert(refs.buttons.minimize, inert);
+        setPartInert(refs.buttons.maximize, inert);
+        setPartInert(refs.buttons.close, inert);
+      }
+    }
 
     var schedule = typeof deps.schedule === 'function' ? deps.schedule :
       function(fn, ms) {
@@ -429,6 +515,8 @@
       var active = exists && machine.core.canFocus(id);
       if (active) win.classList.add('is-active');
       else win.classList.remove('is-active');
+      // The keyboard floor (#67): Tab stops at the focused window.
+      paintInertFloor(refs, active);
       if (refs.titleBar) {
         refs.titleBar.setAttribute('data-active', active ? 'true' : 'false');
       }
@@ -666,7 +754,10 @@
     /**
      * The taskbar button click (ticket #61): a running window becomes the
      * active one; a minimized window is restored AND focused. Hidden
-     * windows have no button at all, so this never sees one.
+     * windows have no button at all, so this never sees one. Keyboard
+     * activation (Enter/Space on the button, ticket #67) runs the same
+     * click — the window switches or restores, and the button is recorded
+     * as where this window's focus came from.
      */
     function activateProgram(id) {
       if (!machine.hasWindow(id)) return false;
@@ -676,6 +767,53 @@
         return focusWindow(id);
       }
       return focusWindow(id);
+    }
+
+    /** True while an element can take focus back (fake DOMs agree). */
+    function focusableEl(el) {
+      return !!el && typeof el.focus === 'function' &&
+        el.disabled !== true && el.hidden !== true;
+    }
+
+    /**
+     * Escape's window tier (ticket #67), the FLOOR of the Escape stack:
+     * the system dialog, About and the Start menu all own Escape above it
+     * (js/shell.js handleKeydown asks them first). It hides the window
+     * with focus — the core's hide(), the same put-away [×] draws on the
+     * desktop stage — and hands focus back to the taskbar button or
+     * shortcut the Participant came through. A hidden program has no
+     * button left in the bar, so the fallback is the Quiz program button,
+     * the taskbar's permanent control: focus never lands on nothing, and
+     * the window comes back through exactly the path that opens it.
+     * Refused off the desktop stage (the flow views put no window away —
+     * their [×] is the End Program dialog), while a dialog owns the
+     * desktop, and when the focused window is already minimized or hidden.
+     */
+    function escapeFocused() {
+      // The window tier answers on the DESKTOP stage (results/review),
+      // mobile included: hide() is a mode change the core accepts on both
+      // regimes, so Escape puts the focused window away exactly as [×]
+      // does. The flow views (landing/quiz) have no desktop to hide from.
+      if (!isWindowedView(machine.getState().view)) return false;
+      var id = machine.activeId();
+      if (!id || !machine.hasWindow(id)) return false;
+      if (machine.getState(id).confirmOpen) return false;
+      var snap = machine.windowSnapshot(id);
+      if (!snap || (snap.mode !== 'normal' && snap.mode !== 'maximized')) {
+        return false;
+      }
+      var trigger = lastTrigger[id] || null;
+      if (!hide(id)) return false;
+      // The window came through a taskbar button or a shortcut: hand focus
+      // back to it when it is still reachable. A program window's OWN button
+      // leaves the bar the moment it is hidden, so the stable fallback is
+      // the Quiz program button — the taskbar control that is always there.
+      if (focusableEl(trigger)) { trigger.focus(); return true; }
+      var refs = frameOf(id);
+      var own = refs && refs.taskbarBtn;
+      if (own && focusableEl(own)) own.focus();
+      else if (dom && focusableEl(dom.programBtn)) dom.programBtn.focus();
+      return true;
     }
 
     // ── Geometry writes + pointer drag/resize (ticket #60) ─────────────
@@ -811,6 +949,7 @@
     function wireTaskbarBtn(btn, id) {
       if (!btn) return;
       on(btn, 'click', function() {
+        lastTrigger[id] = btn;     // the keyboard route back is this button
         controller.activateProgram(id);
       });
     }
@@ -861,6 +1000,14 @@
       deepDiveArrived: deepDiveArrived,
       focusWindow: focusWindow,
       activateProgram: activateProgram,
+      // The keyboard floor (ticket #67): Escape's window tier — hides the
+      // focused window and returns focus to its taskbar button or the
+      // shortcut that opened it — plus the shortcut seam: whatever control
+      // opens a window records itself here so the tier can hand focus back.
+      escapeFocused: escapeFocused,
+      recordTrigger: function(id, el) {
+        lastTrigger[id || QUIZ] = el || null;
+      },
 
       /** Wire the built Quiz shell DOM (js/shell.js calls this after build()). */
       attach: function(refs) {
@@ -878,8 +1025,15 @@
           // those two modes; the core's restore() refuses every other, so
           // a click on a visible window stays a no-op refocus.
           on(dom.programBtn, 'click', function() {
+            lastTrigger[QUIZ] = dom.programBtn;   // #67: the Escape target
+            // Not visible = exactly the minimized and hidden modes; the
+            // core's restore() refuses every other, so a click on a
+            // visible window stays a no-op refocus. The restore ALWAYS
+            // ends in focus (#67): putting a window back on the desktop
+            // without the floor moving with it would leave a window the
+            // Participant can see but cannot Tab into.
             if (!machine.isVisible(QUIZ)) controller.restore(QUIZ);
-            else controller.focusWindow(QUIZ);
+            controller.focusWindow(QUIZ);
           });
         }
         // Desktop regime (ticket #60): the title bar drags the window and

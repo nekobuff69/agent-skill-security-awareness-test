@@ -655,9 +655,22 @@ body:has(#app > #landing-view:not([hidden])) .os-window {
 /* Focus ring: era dotted rectangle (matches the skin's button focus). */
 .os-dialog-btn:focus-visible,
 .os-titlebar-btn:focus-visible,
-.os-program-btn:focus-visible {
+.os-program-btn:focus-visible,
+.os-start-btn:focus-visible {
   outline: 1px dotted var(--color-text);
   outline-offset: -4px;
+}
+
+/* The keyboard floor (#67): a window frame is focusable through its own
+   grouping (restore() lands focus there, so the Participant knows WHICH
+   program Tab will walk next). Every other window's CONTROLS wear the
+   inert attribute the controller paints — client area, title-bar buttons
+   and any region mounted into the frame — while the title bar and the
+   corner grip stay live, so the pointer keeps raising, dragging and
+   resizing exactly as before. */
+.os-window:focus-visible {
+  outline: 1px dotted var(--color-text);
+  outline-offset: -3px;
 }
 
 /* ── Reduced motion (ticket #43 extension of the #42 contract) ─────────

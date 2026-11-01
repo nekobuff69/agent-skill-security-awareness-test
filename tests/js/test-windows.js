@@ -22,6 +22,7 @@ exports.run = function() {
       getAttribute: function(n) {
         return Object.prototype.hasOwnProperty.call(el.attrs, n) ? el.attrs[n] : null;
       },
+      removeAttribute: function(n) { delete el.attrs[n]; },
       appendChild: function(c) { el.children.push(c); c.parentNode = el; return c; },
       removeChild: function(c) {
         el.children = el.children.filter(function(x) { return x !== c; });
@@ -852,6 +853,205 @@ exports.run = function() {
     I18n.t('windows.endProgramMessage') === '确定要结束这个程序吗？' &&
     I18n.t('windows.yes') === '是' && I18n.t('windows.no') === '否');
   I18n.use('en');
+
+  // ── Keyboard floor (ticket #67) ───────────────────────────────────────
+  // Behaviour, not markup: which window's controls wear the inert
+  // attribute as the active window moves, what the taskbar buttons do from
+  // the keyboard, what Escape hides and where focus lands afterwards, and
+  // that the pointer gesture (raise, drag, resize) survives a window the
+  // keyboard cannot enter.
+
+  function floorParts(refs) {
+    return [refs.buttons.minimize, refs.buttons.maximize,
+      refs.buttons.close, refs.bodyEl];
+  }
+  function floorClear(refs) {
+    // The frame root stays live to the pointer by design: it answers
+    // raise-on-interaction and carries the drag and resize handles.
+    return refs.windowEl.getAttribute('inert') === null &&
+      floorParts(refs).every(function(el) {
+        return el.getAttribute('inert') === null;
+      });
+  }
+  function floorDown(refs) {
+    return refs.windowEl.getAttribute('inert') === null &&
+      floorParts(refs).every(function(el) {
+        return el.getAttribute('inert') === '';
+      });
+  }
+
+  var kdoc = fakeDoc();
+  var kpend = [];
+  var kctl = Windows.create({
+    doc: kdoc,
+    schedule: function(fn) { kpend.push(fn); },
+    viewport: function() { return VP61; }
+  });
+  var krefs = programFrame();
+  krefs.programBtn = fakeEl('button');      // the Quiz frame's taskbar button
+  var plan67 = programFrame();
+  var dd67 = programFrame();
+  kctl.attach(krefs);
+  kctl.attachProgram('action-plan', plan67);
+  kctl.attachProgram('deep-dive', dd67);
+  kctl.setView('results-view');
+  kctl.actionPlanArrived();
+  kctl.deepDiveArrived();
+  while (kpend.length) kpend.shift()();
+
+  check('the focused window is the only one whose controls Tab can reach',
+    floorClear(krefs) && floorDown(plan67) && floorDown(dd67));
+
+  // The taskbar switch moves the floor with the active window. A keyboard
+  // Enter/Space on the button runs the same click as a pointer does.
+  plan67.taskbarBtn.click();
+  check('switching windows moves the floor: the focused window is live again',
+    kctl.snapshot().active === 'action-plan' &&
+    floorClear(plan67) && floorDown(krefs) && floorDown(dd67));
+
+  // A window born minimized is restored from the keyboard through the
+  // same button — and takes the floor as it comes back.
+  dd67.taskbarBtn.click();
+  while (kpend.length) kpend.shift()();
+  check('the taskbar button restores a minimized window and focuses it',
+    kctl.getState('deep-dive').mode === 'normal' &&
+    kctl.snapshot().active === 'deep-dive' &&
+    dd67.windowEl.focused === true &&
+    floorClear(dd67) && floorDown(plan67) && floorDown(krefs));
+
+  // Escape, window tier: the focused window goes away and focus lands on
+  // the taskbar. The program's own button leaves the bar with it, so the
+  // Quiz program button — the taskbar's permanent control — takes focus.
+  krefs.programBtn.focused = false;
+  check('Escape hides the focused window',
+    kctl.escapeFocused() === true &&
+    kctl.getState('deep-dive').mode === 'hidden' &&
+    dd67.taskbarBtn.hidden === true);
+  check('focus returns to the taskbar instead of the void',
+    krefs.programBtn.focused === true);
+
+  krefs.programBtn.click();
+  while (kpend.length) kpend.shift()();
+  krefs.programBtn.focused = false;
+  check('Escape hides the Quiz window too and returns focus to its button',
+    kctl.escapeFocused() === true && kctl.getState().mode === 'hidden' &&
+    krefs.programBtn.focused === true);
+  krefs.programBtn.click();
+  while (kpend.length) kpend.shift()();
+  check('the button brings the Quiz window back, floor and all',
+    kctl.getState().mode === 'normal' &&
+    kctl.snapshot().active === 'quiz' && floorClear(krefs));
+
+  // The tiers above the window tier are untouched: the flow views have no
+  // desktop to put a window away from, and a dialog owns Escape outright.
+  kctl.setView('quiz-view');
+  krefs.programBtn.focused = false;
+  check('the flow stage has no window to put away: the tier refuses',
+    kctl.escapeFocused() === false && kctl.getState().mode === 'normal' &&
+    krefs.programBtn.focused === false && floorClear(krefs));
+
+  kctl.setView('results-view');
+  kctl.actionPlanArrived();
+  kctl.deepDiveArrived();
+  kctl.requestClose();                       // the End Program dialog owns the desktop
+  check('while a system dialog owns the desktop the window tier stands aside',
+    kctl.getState().confirmOpen === true &&
+    kctl.escapeFocused() === false &&
+    kctl.getState().mode === 'normal' &&
+    kctl.getState('action-plan').mode === 'normal');
+  kctl.cancelClose();
+
+  // The shortcut seam: whatever control opened a window records itself,
+  // and Escape hands focus back to it (ticket #62 wires the shortcuts).
+  var shortcut67 = fakeEl('button');
+  kctl.recordTrigger('action-plan', shortcut67);
+  kctl.activateProgram('action-plan');
+  check('Escape hands focus back to the shortcut that opened the window',
+    kctl.escapeFocused() === true && shortcut67.focused === true &&
+    kctl.getState('action-plan').mode === 'hidden' &&
+    kctl.snapshot().active === 'quiz');
+
+  // The pointer contract: a window whose controls are inert still raises,
+  // drags and resizes, because the floor never covers the frame root or
+  // its handles. The Action Plan re-arrives below the focused Quiz window.
+  kctl.actionPlanArrived();
+  var planG67 = kctl.geometry('action-plan');
+  p61(plan67.titleBar, 'pointerdown', 500, 300);
+  p61(plan67.titleBar, 'pointermove', 560, 340);
+  p61(plan67.titleBar, 'pointerup', 560, 340);
+  var planMoved = kctl.geometry('action-plan');
+  check('a background window drags from its title bar and takes the floor',
+    planMoved.x === planG67.x + 60 && planMoved.y === planG67.y + 40 &&
+    kctl.snapshot().active === 'action-plan' &&
+    floorClear(plan67) && floorDown(krefs),
+    JSON.stringify(planMoved) + ' vs ' + JSON.stringify(planG67));
+
+  // The corner grip resizes the window the keyboard had left behind.
+  var quizBeforeGrip = kctl.geometry('quiz');
+  kctl.activateProgram('quiz');
+  var planSized = kctl.geometry('action-plan');
+  p61(plan67.resizeGrip, 'pointerdown', 800, 700);
+  p61(plan67.resizeGrip, 'pointermove', 900, 780);
+  p61(plan67.resizeGrip, 'pointerup', 900, 780);
+  check('the corner grip resizes a background window through the core',
+    kctl.geometry('action-plan').w === planSized.w + 100 &&
+    kctl.geometry('action-plan').h === planSized.h + 80 &&
+    kctl.geometry('action-plan').x === planSized.x &&
+    kctl.geometry('quiz').x === quizBeforeGrip.x &&
+    kctl.snapshot().active === 'action-plan');
+
+  // A press anywhere in the body retargets to the live frame root, which
+  // is what wireRaise listens on: the window raises and its controls come
+  // back live for the rest of the gesture.
+  kctl.activateProgram('quiz');
+  var planAfterGrip = kctl.geometry('action-plan');
+  plan67.windowEl.handlers.pointerdown({
+    target: plan67.windowEl, pointerId: 11, clientX: 640, clientY: 520,
+    button: 0, isPrimary: true, preventDefault: function() {}
+  });
+  check('a press on an inert control retargets to the live root and raises',
+    kctl.snapshot().active === 'action-plan' &&
+    floorClear(plan67) && floorDown(krefs) &&
+    kctl.geometry('action-plan').x === planAfterGrip.x &&
+    kctl.geometry('action-plan').w === planAfterGrip.w &&
+    kctl.geometry('quiz').x === quizBeforeGrip.x);
+
+  // The floor walks the FRAME, so any region the frame assembles — the
+  // client area today, a menu bar or a status bar tomorrow — is covered
+  // without new wiring, while the two pointer handles stay live.
+  var wdoc = fakeDoc();
+  var wctl = Windows.create({
+    doc: wdoc,
+    schedule: function(fn) { fn(); },
+    viewport: function() { return VP61; }
+  });
+  var wbase = programFrame();
+  wbase.programBtn = fakeEl('button');
+  var wframe = programFrame();
+  wframe.windowEl.appendChild(wframe.titleBar);
+  var extraRegion = fakeEl('div');          // a region the frame owns
+  wframe.windowEl.appendChild(extraRegion);
+  wframe.windowEl.appendChild(wframe.bodyEl);
+  wframe.windowEl.appendChild(wframe.resizeGrip);
+  wctl.attach(wbase);
+  wctl.attachProgram('action-plan', wframe);
+  wctl.setView('results-view');
+  wctl.actionPlanArrived();
+  check('the floor covers every region of a background window, handles excepted',
+    extraRegion.getAttribute('inert') === '' &&
+    wframe.bodyEl.getAttribute('inert') === '' &&
+    wframe.buttons.minimize.getAttribute('inert') === '' &&
+    wframe.buttons.maximize.getAttribute('inert') === '' &&
+    wframe.buttons.close.getAttribute('inert') === '' &&
+    wframe.titleBar.getAttribute('inert') === null &&
+    wframe.resizeGrip.getAttribute('inert') === null &&
+    wframe.windowEl.getAttribute('inert') === null);
+  wctl.activateProgram('action-plan');
+  check('focusing the window lifts the floor off every region it covers',
+    [extraRegion, wframe.bodyEl, wframe.buttons.minimize,
+      wframe.buttons.maximize, wframe.buttons.close].every(function(el) {
+      return el.getAttribute('inert') === null;
+    }) && wctl.snapshot().active === 'action-plan');
 
   return results;
 };
