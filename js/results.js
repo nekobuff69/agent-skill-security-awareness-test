@@ -731,8 +731,56 @@
     view.hidden = false;
   }
 
+  /**
+   * Snapshot of what the results/review side is currently built from: the
+   * Question Bank Variant and the score report it last rendered. Returns
+   * null before any Completion has rendered (issue #48).
+   */
+  function resultsState() {
+    if (!_lastBank) return null;
+    return { bank: _lastBank, report: _lastReport };
+  }
+
+  /**
+   * Rebuild the Review screen in place against a (possibly different) Bank
+   * Variant — the same score report travels with the render so a Bank
+   * Variant swap can hand both surfaces over without a page load (issue
+   * #48). The Review shows no scores: the report rides along purely so the
+   * caller passes one state bundle, and it is cached for a later
+   * re-render of the results view.
+   */
+  function renderReview(bank, report) {
+    if (bank) _lastBank = bank;
+    if (report) _lastReport = report;
+    populateReview();
+    if (app.showView) app.showView('review-view');
+  }
+
+  /**
+   * Re-render the results view in place from the cached state — the exact
+   * report object last scored, never recomputed, so the same numbers
+   * re-render under a different Bank Variant or dictionary (issue #48).
+   */
+  function rerenderResults() {
+    if (!_lastBank || !_lastReport) return false;
+    renderResults(_lastBank, _lastReport);
+    return true;
+  }
+
+  /** Re-render the Review screen in place from the cached state. */
+  function rerenderReview() {
+    if (!_lastBank) return false;
+    populateReview();
+    if (app.showView) app.showView('review-view');
+    return true;
+  }
+
   // --- Exports ---
-  app.renderResults = renderResults;
+  app.renderResults    = renderResults;
+  app.renderReview     = renderReview;
+  app.rerenderResults  = rerenderResults;
+  app.rerenderReview   = rerenderReview;
+  app.resultsState     = resultsState;
 
   /* Test seam (tests/js/test-results-retro.js, fakeEl pattern): the pure
      DOM builders plus the two palette helpers. Not used by the page. */

@@ -368,6 +368,32 @@
     }, 4000);
   }
 
+  /* ── The Quiz Chrome: progress + counter + phase chip ─────────────── */
+
+  /* Built in place inside the given view — shared by the fresh run
+     (renderQuiz) and the in-place re-render (rerenderQuiz) so both paint
+     the identical chrome structure. */
+  function buildChrome(view) {
+    // ── Sticky chrome bar: progress + counter + phase chip ──
+    var chrome = makeEl('div', 'quiz-chrome');
+
+    // Progress track + fill
+    var track = makeEl('div', 'quiz-chrome-track');
+    chromeFill = makeEl('div', 'quiz-chrome-fill');
+    track.appendChild(chromeFill);
+    chrome.appendChild(track);
+
+    // Counter: "N / 20"
+    chromeCounter = makeEl('span', 'quiz-chrome-counter');
+    chrome.appendChild(chromeCounter);
+
+    // Phase chip: "Phase 1 · Should I Install This?"
+    chromeChip = makeEl('span', 'quiz-chrome-chip');
+    chrome.appendChild(chromeChip);
+
+    view.appendChild(chrome);
+  }
+
   /* ── renderQuiz (public) ─────────────────────────────────────────── */
 
   function renderQuiz(b) {
@@ -390,24 +416,7 @@
     if (!view) return;
     view.innerHTML = '';
 
-    // ── Sticky chrome bar: progress + counter + phase chip ──
-    var chrome = makeEl('div', 'quiz-chrome');
-
-    // Progress track + fill
-    var track = makeEl('div', 'quiz-chrome-track');
-    chromeFill = makeEl('div', 'quiz-chrome-fill');
-    track.appendChild(chromeFill);
-    chrome.appendChild(track);
-
-    // Counter: "N / 20"
-    chromeCounter = makeEl('span', 'quiz-chrome-counter');
-    chrome.appendChild(chromeCounter);
-
-    // Phase chip: "Phase 1 · Should I Install This?"
-    chromeChip = makeEl('span', 'quiz-chrome-chip');
-    chrome.appendChild(chromeChip);
-
-    view.appendChild(chrome);
+    buildChrome(view);
 
     // Session resume — one Session per Participant, shared by every Bank
     // Variant, so a Participant who switches language mid-assessment returns
@@ -467,9 +476,58 @@
   }
 
 
+  /* ── re-render seam (issue #48) ───────────────────────────────────── */
+
+  /**
+   * Snapshot of the answering view's live state: the Question Bank it is
+   * rendering from, the Question being viewed, and every recorded answer.
+   * A caller that wants to rebuild this view in place (a Bank Variant
+   * swap, a locale change) hands these three back to rerenderQuiz
+   * untouched. Returns null before the quiz has rendered at all.
+   */
+  function quizState() {
+    if (!bank) return null;
+    return { bank: bank, currentIdx: currentIdx, answers: answers.slice() };
+  }
+
+  /**
+   * Re-render the answering view from explicit state — the in-place
+   * rebuild seam (issue #48). The current Question and every recorded
+   * answer come back exactly as passed: no Session reload, no
+   * "first unanswered" search, and no commit-gate reset — a re-render is
+   * not a new run, and the recorded answers were already persisted pick
+   * by pick. Chrome Strings re-resolve at render time, so the same call
+   * rebuilds the screen in another language (ADR 0015).
+   */
+  function rerenderQuiz(b, qIndex, recordedAnswers) {
+    bank      = b;
+    questions = bank.questions;
+    phases    = bank.phases;
+    activeBtns = [];
+    currentCard = null;
+    advancing   = false;
+    swapPending = false;
+    backBtnEl   = null;
+    finishBtnEl = null;
+    chromeFill = null;
+    chromeCounter = null;
+    chromeChip = null;
+    answers = Array.isArray(recordedAnswers) ? recordedAnswers.slice() : [];
+
+    var view = byId('quiz-view');
+    if (!view) return;
+    view.innerHTML = '';
+
+    buildChrome(view);
+    // Bounds are WizardNav's contract — the same clamp renderQuestion uses.
+    renderQuestion(qIndex);
+  }
+
   /* ── Exports ─────────────────────────────────────────────────────── */
 
   app.renderQuiz    = renderQuiz;
   app.renderLanding = renderLanding;
+  app.rerenderQuiz  = rerenderQuiz;
+  app.quizState     = quizState;
 
 })(globalThis);
