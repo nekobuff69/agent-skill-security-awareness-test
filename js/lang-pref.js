@@ -4,8 +4,7 @@
   globalThis.App = globalThis.App || {};
 
   /**
-   * The Participant's language choice, and which first-visit prompts they have
-   * already dismissed.
+   * The Participant's remembered language choice.
    *
    * Deliberately not part of the Session. A Session is version-stamped against
    * the Question Bank's structure and is discarded when that structure
@@ -35,16 +34,9 @@
       var parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== 'object') return null;
       var language = typeof parsed.language === 'string' ? baseLocale(parsed.language) : '';
-      var dismissed = [];
-      if (Array.isArray(parsed.dismissed)) {
-        for (var i = 0; i < parsed.dismissed.length; i++) {
-          var id = parsed.dismissed[i];
-          if (typeof id === 'string' && id && dismissed.indexOf(id) === -1) {
-            dismissed.push(id);
-          }
-        }
-      }
-      return { language: language || null, dismissed: dismissed };
+      // Any other fields in the record (leftovers from an earlier schema,
+      // for example) are ignored: the choice is the only fact kept.
+      return { language: language || null };
     } catch (e) {
       // unavailable or corrupt — treat as no preference rather than throwing
       return null;
@@ -61,31 +53,20 @@
 
   /** The stored preference. Always returns a usable shape, never null. */
   function get() {
-    return read() || { language: null, dismissed: [] };
+    return read() || { language: null };
   }
 
   /**
    * Record a deliberate language choice, normalizing the tag. This is what a
-   * Participant using the language switch, or accepting the offer, sets — and
-   * it is what stops first-visit routing from ever moving them again.
+   * Participant using the language switch — or the first-visit routing
+   * deciding on the matching page — sets, and it is what stops first-visit
+   * routing from ever moving them again.
    */
   function setLanguage(lang) {
     var state = get();
     state.language = baseLocale(lang) || null;
     write(state);
     return state.language;
-  }
-
-  /** True once this Participant has dismissed the named prompt for good. */
-  function isDismissed(promptId) {
-    return get().dismissed.indexOf(promptId) !== -1;
-  }
-
-  function dismiss(promptId) {
-    if (typeof promptId !== 'string' || !promptId) return;
-    var state = get();
-    if (state.dismissed.indexOf(promptId) === -1) state.dismissed.push(promptId);
-    write(state);
   }
 
   function clear() {
@@ -100,8 +81,6 @@
     baseLocale: baseLocale,
     get: get,
     setLanguage: setLanguage,
-    isDismissed: isDismissed,
-    dismiss: dismiss,
     clear: clear
   };
   if (typeof module !== 'undefined') module.exports = globalThis.App.LangPref;

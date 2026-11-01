@@ -9,6 +9,14 @@ exports.run = function() {
     results.push({ pass: !!pass, message: msg });
   }
 
+  var fs = require('fs');
+  var path = require('path');
+  var repo = path.join(__dirname, '..', '..');
+
+  function read(rel) {
+    return fs.readFileSync(path.join(repo, rel), 'utf8');
+  }
+
   var store = {};
   globalThis.localStorage = {
     get length() { return Object.keys(store).length; },
@@ -33,38 +41,8 @@ exports.run = function() {
   var navigatedTo = null;
 
   /**
-   * The system-dialog primitive (js/windows.js) as a seam: true to its
-   * contract — one dialog at a time, close() routes once to onOk or onCancel.
-   * The real primitive's rendering and keyboard contract live in
-   * tests/js/test-windows.js; here the dialog layer exists so the offer's
-   * WIRING — which ids it resolves, what it records — is what gets asserted.
-   */
-  var offered = { opts: null, ctl: null };
-  var savedWindows = globalThis.App.Windows;
-  globalThis.App.Windows = {
-    isDialogOpen: function() { return !!(offered.ctl && offered.ctl.isOpen()); },
-    openSystemDialog: function(opts) {
-      if (globalThis.App.Windows.isDialogOpen()) return null;
-      var open = true;
-      offered.opts = opts;
-      offered.ctl = {
-        isOpen: function() { return open; },
-        close: function(result) {
-          if (!open) return false;
-          open = false;
-          offered.ctl = null;
-          if (result === 'ok' && typeof opts.onOk === 'function') opts.onOk();
-          else if (result === 'cancel' && typeof opts.onCancel === 'function') opts.onCancel();
-          return true;
-        }
-      };
-      return offered.ctl;
-    }
-  };
-
-  /**
-   * A DOM node good enough to assert against: records children, attributes and
-   * click handlers, so the offer can genuinely be rendered and used.
+   * A DOM node good enough to assert against: records children, attributes
+   * and click handlers, so a page can genuinely be built and inspected.
    */
   function fakeEl() {
     var el = {
@@ -145,11 +123,9 @@ exports.run = function() {
     setPage();
     setBrowserLanguages(languages || ['en-US']);
     I18n.use('en');
-    offered.opts = null;
-    offered.ctl = null;
   }
 
-  // ── init(): automatic routing ───────────────────────────────────────────
+  // ── init(): the first-visit decision (ADR 0018, ticket #54) ────────────
 
   // 1. The core case: a Chinese-primary browser lands on the English page.
   reset(['zh-CN', 'zh']);
@@ -162,28 +138,45 @@ exports.run = function() {
   check('the redirect records the language choice',
     LP.get().language === 'zh', String(LP.get().language));
 
-  // 3. A visitor already reading the page is left completely alone.
+  // 3. The recorded decision is one-way: on the destination the stored
+  //    choice stops routing before the browser language is even read.
+  setPage({ lang: 'zh', 'data-lang-alt': '../', 'data-lang-alt-locale': 'en' });
+  check('the recorded choice makes the decision one-way',
+    LR.init() === 'stored-preference' && navigatedTo === null,
+    LR.init());
+
+  // 4. A visitor already reading the page is left where they are — and the
+  //    system language matching the page records the choice.
   reset(['en-US']);
   check('an English-primary visitor on the English page is not moved',
     LR.init() === 'browser-matches-page' && navigatedTo === null,
     LR.init());
+  check('staying on the matching page records the language choice',
+    LP.get().language === 'en', String(LP.get().language));
 
-  // 4. A stored Language Preference is a decision already made.
+  // 5. …so a later arrival with the same browser is a stored preference,
+  //    not a fresh decision.
+  check('the recorded match stops routing on later arrivals',
+    LR.init() === 'stored-preference' && navigatedTo === null,
+    LR.init());
+
+  // 6. A stored Language Preference always wins over the system language.
   reset(['zh-CN']);
   LP.setLanguage('en');
   check('a visitor who already chose a language is never re-routed',
     LR.init() === 'stored-preference' && navigatedTo === null,
     LR.init());
 
-  // 5. Someone mid-assessment is never moved.
+  // 7. Someone mid-assessment is never moved — even when the system language
+  //    points at the alternate page.
   reset(['zh-CN']);
   SS.save({ questions: [{ id: 'q1', options: [{ score: 0 }] }], phases: [] }, [0]);
   check('a Participant with an in-progress Session is never re-routed',
     LR.init() === 'session-in-progress' && navigatedTo === null,
     LR.init());
 
-  // 6. A language we do not publish is ignored and records no choice — the
-  //    visitor is still a first-time visitor.
+  // 8. A language we do not publish is ignored and records nothing — the
+  //    visitor keeps the page they linked to and stays a first-time visitor.
   reset(['fr-FR']);
   check('a browser language the app does not have is ignored',
     LR.init() === 'browser-language-not-offered' && navigatedTo === null,
@@ -191,27 +184,35 @@ exports.run = function() {
   check('an ignored browser language does not record a choice',
     LP.get().language === null, String(LP.get().language));
 
-  // 7. A single-language page has nothing to route to.
+  // 9. A single-language page has nothing to route to — and records nothing.
   reset(['zh-CN']);
   setPage({ 'data-lang-alt': null, 'data-lang-alt-locale': null });
   check('a page offering no other language does not route',
     LR.init() === 'no-other-language' && navigatedTo === null,
     LR.init());
+  check('a single-language page records no choice',
+    LP.get().language === null, String(LP.get().language));
 
-  // 8. A browser reporting nothing usable is left alone rather than guessed at.
+  // 10. A browser reporting nothing usable is left alone rather than guessed
+  //     at, and nothing is recorded.
   reset([]);
   check('an unknown browser language is left alone',
     LR.init() === 'unknown-browser-language' && navigatedTo === null,
     LR.init());
+  check('an unknown browser language does not record a choice',
+    LP.get().language === null, String(LP.get().language));
 
-  // 9. Tag variants on either side still pair up, on the mirror-image page.
+  // 11. Tag variants on either side still pair up, on the mirror-image page,
+  //     and the record lands there too.
   reset(['en-GB', 'en']);
   setPage({ lang: 'zh-Hans', 'data-lang-alt': '../', 'data-lang-alt-locale': 'en' });
   check('a Simplified Chinese page routes an English-primary visitor to the root',
     LR.init() === 'redirected' && navigatedTo === '../',
     'navigatedTo=' + navigatedTo);
+  check('the mirror-image redirect records the language choice',
+    LP.get().language === 'en', String(LP.get().language));
 
-  // 10. A failure in the guard degrades to doing nothing, never to throwing on
+  // 12. A failure in the guard degrades to doing nothing, never to throwing on
   //     a path that runs before the page renders.
   reset(['zh-CN']);
   var realGet = LP.get;
@@ -221,107 +222,45 @@ exports.run = function() {
   check('a failure during routing degrades silently instead of throwing',
     degraded === 'unavailable' && navigatedTo === null, degraded);
 
-  // ── shouldOffer(): the dismissible offer ───────────────────────────────
+  // ── The offer machinery is gone (ticket #54) ────────────────────────────
 
-  // 11. A first-time visitor whose browser language is neither page nor
-  //     alternate may still read the other language; the offer covers them.
-  reset(['fr-FR']);
-  check('a visitor whose browser language is neither offered page gets the offer',
-    LR.shouldOffer() === true);
+  // 13. No offer entry point survives on either module.
+  check('LangRouting exposes no offer entry point',
+    LR.offerInto === undefined && LR.shouldOffer === undefined &&
+    LR.PROMPT === undefined);
+  check('LangPref exposes no dismissal state',
+    LP.dismiss === undefined && LP.isDismissed === undefined);
 
-  // 12. Never offered to someone already reading the page.
-  reset(['en-US']);
-  check('a visitor already reading the page is not offered anything',
-    LR.shouldOffer() === false);
+  // 14. No offer code path remains in the shipped sources.
+  var routingSrc = read('js/lang-routing.js');
+  check('lang-routing.js carries no offer code path',
+    routingSrc.indexOf('offerInto') === -1 &&
+    routingSrc.indexOf('shouldOffer') === -1 &&
+    routingSrc.indexOf('lang-offer') === -1 &&
+    routingSrc.indexOf('openSystemDialog') === -1 &&
+    routingSrc.indexOf('lang.offer') === -1);
+  var prefSrc = read('js/lang-pref.js');
+  check('lang-pref.js carries no dismissal bookkeeping',
+    prefSrc.indexOf('dismiss') === -1);
+  var quizSrc = read('js/quiz.js');
+  check('quiz.js carries no offer wiring',
+    quizSrc.indexOf('offerInto') === -1 && quizSrc.indexOf('shouldOffer') === -1);
 
-  // 13. Never offered once a choice is recorded.
-  reset(['fr-FR']);
-  LP.setLanguage('en');
-  check('a recorded language choice suppresses the offer',
-    LR.shouldOffer() === false);
-
-  // 14. Never offered twice after a dismissal.
-  reset(['fr-FR']);
-  check('the offer is due before any dismissal', LR.shouldOffer() === true);
-  LP.dismiss(LR.PROMPT);
-  check('the offer is never due again after a dismissal',
-    LR.shouldOffer() === false);
-
-  // 15. Never offered on a page with no alternative.
-  reset(['fr-FR']);
-  setPage({ 'data-lang-alt': null, 'data-lang-alt-locale': null });
-  check('a page offering no other language never shows the offer',
-    LR.shouldOffer() === false);
-
-  // 16. offerInto is inert — and says so — when nothing is due.
-  reset(['en-US']);
-  var inserted = 0;
-  var inertHost = { firstChild: null, insertBefore: function() { inserted++; } };
-  check('offerInto does not touch the page when no offer is due',
-    LR.offerInto(inertHost) === false && inserted === 0,
-    'inserted=' + inserted);
-  check('offerInto tolerates a missing container',
-    LR.offerInto(null) === false);
-
-  // 17. When an offer IS due it opens a system dialog: an info dialog that
-  //     is not dangerous, carrying the existing offer Chrome Strings, whose
-  //     affirmative navigates the declared alternate and records the choice
-  //     (ticket #44: banner → dialog, ADR 0018 semantics unchanged).
-  reset(['fr-FR']);
-  var host = fakeEl();
-  check('offerInto opens the offer dialog when one is due',
-    LR.offerInto(host) === true && !!offered.ctl);
-
-  var opts = offered.opts;
-  check('the offer dialog carries the offer Chrome Strings',
-    opts.messageId === 'lang.offerQuestion' &&
-    opts.titleId === 'lang.offerTitle' &&
-    opts.okId === 'lang.offerAccept' &&
-    opts.cancelId === 'lang.offerDismiss',
-    JSON.stringify(opts.messageId));
-  check('the offer is a safe info dialog (Enter is affirmative)',
-    opts.dangerous === false && opts.icon === 'info');
-  check('the offer names the other language and offers to continue',
-    I18n.t(opts.messageId, opts.messageParams) === 'Read this in 中文?' &&
-    I18n.t(opts.okId) === 'Continue',
-    I18n.t(opts.messageId, opts.messageParams) + ' / ' + I18n.t(opts.okId));
-  check('the offer links to the declared alternate',
-    opts.messageParams.language === '中文' && !window.location.href,
-    String(window.location.href));
-
-  offered.ctl.close('ok');
-  check('accepting the offer records the language choice',
-    LP.get().language === 'zh', String(LP.get().language));
-  check('accepting the offer navigates the declared alternate',
-    window.location.href === 'zh/', String(window.location.href));
-
-  // 18. Dismissing the dialog is remembered for good — and the dialog is
-  //     gone, so the offer never comes back on this visit or the next.
-  reset(['fr-FR']);
-  LR.offerInto(fakeEl());
-  offered.ctl.close('cancel');
-  check('dismissing the offer closes the dialog',
-    globalThis.App.Windows.isDialogOpen() === false);
-  check('a dismissal is remembered for good',
-    LP.isDismissed(LR.PROMPT) === true && LR.shouldOffer() === false);
-  check('a dismissed offer does not reopen',
-    LR.offerInto(fakeEl()) === false);
-
-  // 19. One dialog at a time (double-open guard): the dialog layer owns
-  //     the modal, so a second offer while one is up does not open another.
-  reset(['fr-FR']);
-  var first = LR.offerInto(fakeEl());
-  var second = LR.offerInto(fakeEl());
-  check('the offer dialog opens once per eligible visit',
-    first === true && second === false,
-    'first=' + first + ' second=' + second);
-  check('the open offer dialog still switches and records on accept',
-    offered.ctl.close('ok') === true && LP.get().language === 'zh',
-    String(LP.get().language));
+  // 15. The offer dialog copy ids are gone from both dictionaries, while the
+  //     labels the language tray still resolves remain declared.
+  var enDict = read('i18n/en.js');
+  var zhDict = read('i18n/zh.js');
+  var goneIds = ['lang.offerQuestion', 'lang.offerAccept', 'lang.offerDismiss'];
+  var stillThere = goneIds.filter(function(id) {
+    var needle = "'" + id + "'";
+    return enDict.indexOf(needle) !== -1 || zhDict.indexOf(needle) !== -1;
+  });
+  check('the offer dialog copy ids are gone from both dictionaries',
+    stillThere.length === 0, stillThere.join(','));
+  check('the language tray labels remain declared',
+    I18n.has('lang.offerTitle') && I18n.has('lang.otherName'));
 
   reset();
-  if (savedWindows === undefined) delete globalThis.App.Windows;
-  else globalThis.App.Windows = savedWindows;
   delete globalThis.document;
   delete globalThis.window;
   return results;

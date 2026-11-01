@@ -22,9 +22,6 @@
     'lang.name': '简体中文',
     'lang.otherName': 'English',
     'lang.switchLabel': '切换到英文',
-    'lang.offerQuestion': '要用{language}阅读吗？',
-    'lang.offerAccept': '继续',
-    'lang.offerDismiss': '暂不',
     'lang.offerTitle': '语言',
     'lang.selfName': '中文',
 
