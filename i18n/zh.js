@@ -76,6 +76,12 @@
     'results.reviewTitle': '回顾你的作答',
     'results.reviewBack': '← 返回结果',
 
+    /* ── 测验窗口菜单（#65） ──
+       菜单里放着下载、分享、回顾、重测这些命令，窗口正文只留总分、
+       风险雷达图与盲区排行。命令文案复用上面 results.* 字符串，
+       这里只新增菜单名称。 */
+    'results.menuBar': '测验窗口菜单',
+
     /* ── 回顾 ── */
     'review.feedbackLabel': '反馈：',
     'review.bestPracticeLabel': '最佳实践：',

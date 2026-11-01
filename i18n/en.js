@@ -75,6 +75,14 @@
     'results.reviewTitle': 'Review Your Answers',
     'results.reviewBack': '← Back to results',
 
+    /* ── Quiz window menu bar (ticket #65) ──
+       The bar owns the four commands above (Download PNG, Share, Review
+       answers, Retake) at the head of the Quiz window's body, so the body
+       itself carries only the score header, the Risk Radar and the
+       Blind-Spot Bars. This is the bar's accessible name; the command
+       labels are the results.* strings they always were. */
+    'results.menuBar': 'Quiz window menu',
+
     /* ── Review ── */
     'review.feedbackLabel': 'Feedback: ',
     'review.bestPracticeLabel': 'Best Practice: ',
