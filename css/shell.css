@@ -163,49 +163,48 @@ body {
   text-align: left;
 }
 
-/* Clock: sunken tray field on the right. */
+/* ── Tray language toggle (ticket #50) ───────────────────────────────
 
-.os-clock {
+   A two-segment sunken tray field naming both languages: the page's own
+   pressed (white field, 1px inset), the declared alternate flat. Both
+   segments run one action (js/shell.js switchLanguage): record the
+   Language Preference, then navigate the declared alternate. Replaces
+   the taskbar clock. */
+
+.os-lang-toggle {
   flex: none;
   display: inline-flex;
   align-items: center;
+  box-sizing: border-box;   /* height is the outer field: siblings' −8px */
+  gap: 1px;
   height: calc(var(--os-taskbar-height) - 8px);
+  padding: 2px;
+  box-shadow: var(--bevel-sunken);
+}
+
+.os-lang-seg {
+  height: 100%;
+  min-width: 34px;
   padding: 0 var(--space-2);
   font-family: var(--font-heading);
   font-size: 14px;
-  background: var(--color-face);
-  box-shadow: var(--bevel-sunken);
+  background: transparent;
+  box-shadow: none;
 }
 
-/* ── Tray language indicator (ticket #44) ──────────────────────────────
-
-   A compact sunken chip naming the page's own language, next to the
-   clock. Clicking it switches to the declared alternate (js/shell.js
-   switchLanguage). */
-
-.os-tray-lang {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  height: calc(var(--os-taskbar-height) - 8px);
-  padding: 0 var(--space-2);
-  font-family: var(--font-heading);
-  font-size: 14px;
-  background: var(--color-face);
-  box-shadow: var(--bevel-sunken);
+.os-lang-seg[aria-pressed='true'] {
+  background: var(--color-surface);
+  box-shadow: inset 1px 1px var(--color-secondary),
+              inset -1px -1px var(--color-surface);
 }
 
-.os-tray-lang:hover {
-  box-shadow: var(--bevel-raised);
+.os-lang-seg[aria-pressed='false'] {
+  color: var(--color-text);
 }
 
-.os-tray-lang:active {
-  box-shadow: var(--bevel-sunken);
-}
-
-.os-tray-lang:focus-visible {
+.os-lang-seg:focus-visible {
   outline: 1px dotted var(--color-text);
-  outline-offset: -4px;
+  outline-offset: -3px;
 }
 
 /* ── Start menu popup ──────────────────────────────────────────────────
@@ -520,15 +519,12 @@ body {
   /* Taskbar controls fill the bar edge to edge: 44px tall hit targets. */
   .os-start-btn,
   .os-program-btn,
-  .os-clock,
-  .os-tray-lang {
+  .os-lang-toggle {
     height: 100%;
   }
 
-  /* Tray compaction: the two tray fields sit at chrome-small on phones;
-     the clock stays 'HH:MM', the language chip keeps its label. */
-  .os-clock,
-  .os-tray-lang {
+  /* Tray compaction: the language segments sit at chrome-small on phones. */
+  .os-lang-seg {
     font-size: 13px;
   }
 

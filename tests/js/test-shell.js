@@ -86,42 +86,20 @@ exports.run = function() {
     return { doc: doc, appEl: appEl, ctl: ctl };
   }
 
-  // ── Clock: format + 1-minute cadence decision ─────────────────────────
+  // ── Taskbar: the clock is gone (ticket #50) ───────────────────────────
 
-  check('clock pads single digits (07:05)',
-    Shell.formatClock(new Date(2026, 0, 1, 7, 5)) === '07:05',
-    Shell.formatClock(new Date(2026, 0, 1, 7, 5)));
-
-  check('clock is 24h at 23:59 and rolls to 00:00',
-    Shell.formatClock(new Date(2026, 0, 1, 23, 59)) === '23:59' &&
-    Shell.formatClock(new Date(2026, 0, 1, 0, 0)) === '00:00',
-    Shell.formatClock(new Date(2026, 0, 1, 23, 59)) + '/' +
-    Shell.formatClock(new Date(2026, 0, 1, 0, 0)));
-
-  // The same format in both locales: HH:MM is locale-independent by design.
+  // No clock element, no clock surface on the controller, no interval:
+  // the tray slot belongs to the language toggle (asserted below).
   var en = mount('en');
   var zh = mount('zh');
-  var d = new Date(2026, 0, 1, 9, 7);
-  check('clock label renders the same HH:MM in en and zh',
-    en.ctl.refreshClock(d) === '09:07' && zh.ctl.refreshClock(d) === '09:07',
-    en.ctl.clockText() + '/' + zh.ctl.clockText());
-
-  // 1-min cadence: the delay targets the next minute boundary, re-derived
-  // every tick (no real waiting).
-  check('tick cadence waits until the next minute boundary',
-    Shell.nextTickDelay(60500) === 59500 &&
-    Shell.nextTickDelay(0) === 60000 &&
-    Shell.nextTickDelay(59999) === 1 &&
-    Shell.nextTickDelay(123456789012) === (60000 - 123456789012 % 60000),
-    String(Shell.nextTickDelay(60500)));
-
-  // Minute rollover: paint again at the boundary → label advances.
-  var before = new Date(2026, 0, 1, 9, 59, 59);
-  var after = new Date(2026, 0, 1, 10, 0, 0);
-  check('label updates when the minute rolls',
-    en.ctl.refreshClock(before) === '09:59' &&
-    en.ctl.refreshClock(after) === '10:00',
-    en.ctl.clockText());
+  check('the taskbar carries no clock element and no clock surface',
+    !en.ctl.clockEl && !zh.ctl.clockEl &&
+    typeof en.ctl.refreshClock === 'undefined' &&
+    typeof en.ctl.clockText === 'undefined' &&
+    en.ctl.taskbar.children.every(function(child) {
+      return String(child.className).indexOf('os-clock') !== 0;
+    }),
+    en.ctl.taskbar.children.map(function(c) { return c.className; }).join(','));
 
   // ── Structure: window frame, taskbar, disabled title-bar buttons ─────
 
@@ -263,10 +241,11 @@ exports.run = function() {
   try { Shell.resolveStrings(I18n, ['shell.nope']); } catch (e) { threw = true; }
   check('a missing shell.* id fails loudly', threw);
 
-  // ── Language surfaces (ticket #44): tray chip + Start-menu entry ─────
+  // ── Tray language toggle (ticket #50): replaces the taskbar clock ─────
 
-  // A page declaring a data-lang-alt gets both surfaces, wired to the SAME
-  // action — the inline Quiz Chrome switcher's job moved here.
+  // A page declaring a data-lang-alt gets the two-segment tray control,
+  // both segments wired to the SAME action — the inline Quiz Chrome
+  // switcher's job moved here. The Start menu carries no language entry.
   var switchCalls = 0;
   function fakeSwitch() { switchCalls++; }
 
@@ -281,12 +260,12 @@ exports.run = function() {
       appEl: appEl,
       strings: Shell.resolveStrings(I18n, Shell.STRING_IDS),
       trayLang: {
-        label: I18n.t('lang.selfName'),
-        title: I18n.t('lang.switchLabel'),
-        onClick: fakeSwitch
-      },
-      langMenuItem: {
-        label: I18n.t('lang.menuItem', { language: I18n.t('lang.otherName') }),
+        title: I18n.t('lang.offerTitle'),
+        self: { label: I18n.t('lang.selfName') },
+        other: {
+          label: I18n.t('lang.otherName'),
+          title: I18n.t('lang.switchLabel')
+        },
         onClick: fakeSwitch
       }
     });
@@ -295,31 +274,67 @@ exports.run = function() {
 
   var langEn = buildWithLang('en');
   var langZh = buildWithLang('zh');
-  check('the tray chip names the page language (EN on en, 中文 on zh)',
-    langEn.trayLang.textContent === 'EN' &&
-    langEn.trayLang.getAttribute('aria-label') === 'Switch to Chinese' &&
-    langZh.trayLang.textContent === '中文' &&
-    langZh.trayLang.getAttribute('aria-label') === '切换到英文',
-    langEn.trayLang.textContent + '/' + langZh.trayLang.textContent);
-  check('the Start menu carries a localized Language entry',
-    langEn.langItem.textContent === 'Language: switch to 中文' &&
-    langZh.langItem.textContent === '语言：切换到English',
-    langEn.langItem.textContent + '/' + langZh.langItem.textContent);
+
+  check('the tray control is a labelled group ("Language"/语言)',
+    langEn.langToggle.getAttribute('role') === 'group' &&
+    langEn.langToggle.getAttribute('aria-label') === 'Language' &&
+    langZh.langToggle.getAttribute('aria-label') === '语言',
+    langEn.langToggle.getAttribute('aria-label'));
+
+  check('both language names show: EN + 中文 on en, 中文 + English on zh',
+    langEn.langSegments.self.textContent === 'EN' &&
+    langEn.langSegments.other.textContent === '中文' &&
+    langZh.langSegments.self.textContent === '中文' &&
+    langZh.langSegments.other.textContent === 'English',
+    langEn.langSegments.self.textContent + '+' +
+    langEn.langSegments.other.textContent + '/' +
+    langZh.langSegments.self.textContent + '+' +
+    langZh.langSegments.other.textContent);
+
+  check('the page language is pressed, the alternate flat (aria-pressed)',
+    langEn.langSegments.self.getAttribute('aria-pressed') === 'true' &&
+    langEn.langSegments.other.getAttribute('aria-pressed') === 'false' &&
+    langZh.langSegments.self.getAttribute('aria-pressed') === 'true' &&
+    langZh.langSegments.other.getAttribute('aria-pressed') === 'false',
+    langEn.langSegments.self.getAttribute('aria-pressed') + '/' +
+    langEn.langSegments.other.getAttribute('aria-pressed'));
+
+  check('the alternate segment carries the switch tooltip',
+    langEn.langSegments.other.getAttribute('title') === 'Switch to Chinese' &&
+    langZh.langSegments.other.getAttribute('title') === '切换到英文',
+    langEn.langSegments.other.getAttribute('title'));
+
+  check('both segments are native buttons in one field (keyboard reachable)',
+    langEn.langToggle.children.length === 2 &&
+    langEn.langToggle.children.every(function(seg) {
+      return seg.tagName === 'BUTTON' && seg.type === 'button';
+    }));
+
+  check('the Start menu carries no language entry',
+    langEn.langItem === undefined &&
+    langEn.menu.children.every(function(child) {
+      return child.getAttribute('data-os-menu') !== 'language';
+    }) &&
+    langEn.menu.children.length === 1,
+    'items=' + langEn.menu.children.length);
 
   I18n.use('en');
-  langEn.trayLang.click();
-  check('clicking the tray chip runs the switch action', switchCalls === 1);
-  langEn.openMenu();
-  langEn.langItem.click();
-  check('the Start-menu Language entry closes the menu and runs the same action',
-    switchCalls === 2 && !langEn.isMenuOpen(),
-    'calls=' + switchCalls);
+  langEn.langSegments.other.click();
+  check('clicking the alternate segment runs the switch action',
+    switchCalls === 1, 'calls=' + switchCalls);
+  langEn.langSegments.self.click();
+  check('clicking the pressed segment runs the same switch action',
+    switchCalls === 2, 'calls=' + switchCalls);
+  langZh.langSegments.other.click();
+  check('the zh toggle routes through the same action',
+    switchCalls === 3, 'calls=' + switchCalls);
 
   // A build without language deps (a page with no declared alternate)
-  // renders neither surface.
+  // renders no toggle at all.
   var noLang = mount('en');
-  check('a page without a declared alternate shows no language surfaces',
-    noLang.ctl.trayLang === null && noLang.ctl.langItem === null);
+  check('a page without a declared alternate shows no language toggle',
+    noLang.ctl.langToggle === null && noLang.ctl.langSegments === null &&
+    noLang.ctl.langItem === undefined);
 
   // The switch action itself: records the Language Preference, then
   // navigates the declared alternate — the exact LangPref path the inline
