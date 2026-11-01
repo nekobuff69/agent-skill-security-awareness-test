@@ -209,7 +209,8 @@ The interface is a Windows 95 desktop, delivered as a pure CSS override skin (`c
 | ------ | ---- | ---- |
 | Boot | `js/boot.js` | Boot-splash gate — the load animation, distinct from the **Welcome Splash**, which is the landing view itself: a sessionStorage flag (`quiz-os-booted`) decides whether a tab sees the boot splash (1350ms, then a 200ms fade) or an instant load; reduced motion or a prior visit answers "already booted". The overlay masks but never gates data fetching — only rendering waits. |
 | Shell | `js/shell.js` + `css/shell.css` | Wraps `#app` in the `.os-window` frame — a navy title bar whose [—][□][×] controls draw real glyphs (#49), over a window of fixed height so only the client area scrolls and the quiz's status bar stays pinned inside the window (#52) — and mounts the taskbar: Start button, program button, and the two-segment EN/中文 **Language Toggle** that replaced the tray clock (#50). Owned window controls (minimize/restore/zoom, ticket #43) live here. |
-| Windows | `js/windows.js` | The dialog primitive: `App.Windows.openSystemDialog` renders a Win95 system dialog — red warn / navy info circles, beveled command buttons, closes only via its buttons or Escape. One dialog at a time; the backdrop dims the desktop. The shell controller and the state machine are pure modules, testable headlessly. |
+| Windows | `js/windows.js` | The dialog primitive: `App.Windows.openSystemDialog` renders a Win95 system dialog — red warn / navy info circles, beveled command buttons, closes only via its buttons or Escape. One dialog at a time; the backdrop dims the desktop. The window controller renders control enablement and trace state out of the desktop core and owns no window state itself. |
+| Desktop core | `js/desktop-core.js` | The DOM-free state model behind the window (ticket #59): the Window Record — mode, geometry, last geometry, last mode, stacking order — the mode transitions with their refused impossible moves, the landing-view and End Program gates, and the mode-derived consequences (visible, taskbar membership, focus participation) the controller renders from. No DOM, no timers, no storage; tested headlessly through the module seam. |
 | Sound | `js/sound.js` | Period system sounds (e.g. the click that marks an Option). Purely additive — every interaction works silently. |
 | WizardNav | `js/wizard-nav.js` | The pure decision core behind the quiz's wizard row (`tapOption`, `canFinish`, `next`, `prev`, the one-fire commit gate behind [Finish], ADR 0020). |
 | Language | `js/lang-pref.js` + `js/lang-routing.js` + `js/lang-switch.js` | The locale pair of modules plus its switch: first-visit routing decides once from the system language and records the **Language Preference** (`quiz-lang`, ADR 0018); after that the taskbar **Language Toggle** performs the **Locale Swap** — alternate dictionary + Bank Variant prefetched while idle, applied in place, the live view rebuilt through the issue #48 `App.activateBank` seam, URL and history kept in sync, failure degraded to a notice (ADR 0019). |
@@ -285,7 +286,8 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 │   ├── lang-switch.js    # the Locale Swap — idle prefetch, in-place dictionary + Bank Variant swap, view re-render, pushState/popstate sync, failure notice (ADR-0019)
 │   ├── boot.js           # splash gate — sessionStorage flag, masked fetches, one-trace handoff (tickets #39/#42)
 │   ├── shell.js          # os-window wrap, taskbar, Start menu + About window (tickets #38/#43)
-│   ├── windows.js        # window controls state machine + system dialog primitive (ticket #43)
+│   ├── windows.js        # window controller (renders the desktop core) + system dialog primitive (ticket #43)
+│   ├── desktop-core.js   # DOM-free desktop state core: Window Record, mode transitions, derived consequences, landing + End Program gates (ticket #59)
 │   ├── sound.js          # period system sounds, Start-menu mute toggle (ticket #41)
 │   ├── wizard-nav.js     # pure wizard decisions + Finish commit gate (ADR-0020, ticket #40)
 │   ├── prompt-builder.js # Deep-Dive Prompt assembly
@@ -294,7 +296,7 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 │   ├── validator.js      # LLM response validation (fence-tolerant)
 │   ├── llm-client.js     # Worker call + response validation
 │   ├── action-plan.js    # path decision, retry policy, LLM prompt assembly
-│   └── results.js        # Title Card, radar + bars, Deep-Dive, Review (pure view)
+│   └── results.js        # Title Card, radar + bars, Deep-Dive, Review (pure view); Action Plan and Deep-Dive Prompt section mount points (#59)
 ├── tests/
 │   ├── mock_llm_output.json
 │   └── js/
@@ -316,7 +318,8 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 │       ├── test-rerender.js        # the issue #48 seam — bank swap re-renders the live view from current state, one rebuild per activation
 │       ├── test-wizard-nav.js      # tapOption/canFinish/prev/next decisions + the one-fire Finish commit gate (ADR-0020)
 │       ├── test-shell.js           # taskbar Language Toggle build, title-bar glyph delegation, program button, Start menu via DOM stubs
-│       ├── test-windows.js         # window state machine (minimize/restore/zoom/close confirm), dialog primitive, trace classes
+│       ├── test-windows.js         # window controller rendering (delegating to the desktop core), dialog primitive, trace classes
+│       ├── test-desktop-core.js    # DOM-free desktop core: Window Record transitions, mode-derived consequences, End Program gate, section mount points (ticket #59)
 │       ├── test-sound.js           # audible() matrix, voice table, mute persistence
 │       ├── test-results-retro.js   # retro results: Title Card window frame, radar SVG + dither, review disclosures
 │       ├── test-cjk-font-subset.js # the committed Fusion Pixel subset covers every Han codepoint the Chinese dictionary and Bank Variant render (fonts/PROVENANCE.md)

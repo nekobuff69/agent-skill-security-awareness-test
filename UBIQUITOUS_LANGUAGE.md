@@ -71,6 +71,17 @@ Domain vocabulary for the Agent Skills Security Self-assessment — extracted fr
 | **Blind-Spot Bars**   | The horizontal AST Scores sorted weakest-first, full AST names + percentage                       | Gap bars, risk profile bars   |
 | **Review**            | The post-Completion screen (reached from the results page) revealing each Question's chosen Option, Feedback, Best Practice, and OWASP link — no scores | Review panel, review page, results review |
 
+## Desktop shell
+
+| Term                  | Definition                                                                                       | Aliases to avoid              |
+| --------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------- |
+| **Desktop Core**      | The DOM-free state module (`js/desktop-core.js`, ticket #59) that owns every Window Record, the transitions between them, and the desktop gates; the codebase's only window state model — the Window Manager renders what it says | Window manager (that is the controller), state machine (bare), desktop state |
+| **Window Record**     | One program's window state: Mode, Geometry, Last Geometry, Last Mode and stacking order (z) | Window object, window model, window snapshot (bare) |
+| **Window Mode**       | `normal`, `maximized`, `minimized` or `hidden`. The mode is the contract: whether the window is visible on the desktop, whether it belongs in the taskbar, and whether it participates in focus are all DERIVED from it, never stored | Window flags, open/closed, minimized-boolean |
+| **Geometry**          | A Window Record's `{x, y, w, h}` in desktop coordinates (the taskbar is excluded). **Last Geometry** is the arrangement a restore returns to | Position, rect, bounds |
+| **End Program Gate**  | The desktop-wide condition set by `requestClose` and cleared by `confirmClose`/`cancelClose`: while the End Program dialog owns the desktop, every other transition is refused | Modal lock, busy flag |
+| **Section Mount Point** | The named host a results section renders into — `action-plan` and `deep-dive` today, resolved live through `App.resultsMount(name)` — so a later ticket can move that section into its own window without reshaping the results presenter | Slot, container, placeholder |
+
 ## Recommendation & grounding
 
 | Term                        | Definition                                                                                      | Aliases to avoid             |
@@ -124,6 +135,7 @@ The ten names are a fixed terminology set per language, not text assembled per f
 - The **Deep-Dive Prompt** is deterministic and identical on the **LLM Path** and the **Deterministic Fallback** — the **Narrative** (collapsed in the **Narrative Expander**) and the **Actions** differ between paths.
 - A **Source Note** bounds what the LLM may claim; **Authoring-Time Validation** enforces it, **Runtime Validation** checks structure only. The shipped **Grounding Corpus** itself is gate-tested (all 10 AST Risks must extract cleanly).
 - **Review** is its own screen, reached from the results page; it never shows scores or percentages.
+- The **Desktop Core** owns exactly one **Window Record** per program; the **Window Mode** alone decides whether that window is visible, in the taskbar and eligible for focus, and the Window Manager renders from those derived answers instead of keeping a copy. Every movable results section sits on its own **Section Mount Point** so the same content can be rendered in place or inside a window (ticket #59).
 
 ## Example dialogue
 

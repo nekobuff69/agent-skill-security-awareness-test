@@ -5,9 +5,14 @@
   global.App = app;
 
   /**
-   * Window manager (ticket #43): a pure state machine for the title-bar
-   * controls plus the reusable system-dialog primitive that tickets #44
-   * (language offer) and #47 (404) will adopt.
+   * Window manager (ticket #43): the controller and rendering for the
+   * title-bar controls plus the reusable system-dialog primitive that
+   * tickets #44 (language offer) and #47 (404) will adopt.
+   *
+   * Ticket #59 moved the state machine it used to own into js/desktop-core.js,
+   * the DOM-free desktop core (spec #58). This module renders; the core
+   * decides. The rules below are the core's rules restated where the
+   * rendering depends on them.
    *
    * Landing-state rule — era: an application that cannot close itself.
    *   close and maximize are DISABLED while the landing view shows: no
@@ -28,7 +33,7 @@
    * Mobile rule (ticket #46): at viewport widths ≤ 768px the stylesheet
    * (css/shell.css media block) presents the window maximized by DEFAULT —
    * full-bleed above the taskbar. Because that maximization is pure CSS,
-   * the pure state machine stays viewport-blind: it never models a mode the
+   * the desktop core stays viewport-blind: it never models a mode the
    * viewport can silently override. The controller layer carries the
    * consequences instead, behind the same 768px media query:
    *   - [□] NEVER toggles and always renders disabled (mobileMaximized());
@@ -40,10 +45,11 @@
    * Crossing the 768px boundary re-renders the controls via a matchMedia
    * change listener, so [□] re-enables at desktop widths.
    *
-   * Layering: createMachine() is the pure transition table (no DOM, fully
-   * headless-testable). create() wraps it with the DOM rendering (button
-   * disabled states, trace classes, program-button bevel) behind a deps
-   * object so tests drive it with fakeEl stubs. openSystemDialog() builds
+   * Layering: js/desktop-core.js is the pure transition table (no DOM, no
+   * timers, fully headless-testable). create() wraps it with the DOM
+   * rendering (button disabled states, trace classes, program-button bevel)
+   * behind a deps object so tests drive it with fakeEl stubs, reading the
+   * state and the derived flags out of the core. openSystemDialog() builds
    * the system dialog on a document passed in (or the live one).
    */
 
@@ -52,97 +58,77 @@
   /** Trace duration; the wireframe view-trace idiom in the skin uses 200ms. */
   var TRACE_MS = 200;
 
-  // ── Pure state machine ────────────────────────────────────────────────
+  // ── The state model lives in the desktop core ─────────────────────────
 
   /**
-   * The transition table. State:
-   *   mode        'normal' | 'minimized' | 'maximized'
-   *   confirmOpen true while the End Program dialog (or any system dialog
-   *               driving confirmClose) owns the desktop — every other
-   *               transition is blocked while it is true
-   *   view        the visible view id; landing gates close/maximize
+   * Ticket #59: the transition table moved OUT of this module into
+   * js/desktop-core.js, the DOM-free desktop core (parent spec #58).
+   * The codebase keeps exactly ONE state model — this module is a
+   * controller: it renders what the core says and never keeps a copy of
+   * window state.
+   *
+   * The core owns the window Record (mode, geometry, lastGeometry,
+   * lastMode, z) and derives the consequences (visible, taskbar
+   * membership, focus participation) from the mode. The desktop-level
+   * gates it also owns: the landing view (close/maximize disabled — the
+   * era's application that cannot close itself; minimize stays live) and
+   * the confirmOpen gate (the End Program dialog owns the desktop and
+   * blocks every other transition). The mobile rule (ticket #46) stays
+   * here and in the stylesheet: [□] renders disabled at ≤768px, a
+   * controller/stylesheet consequence the viewport-blind core never
+   * models.
+   */
+  function coreModule() {
+    if (!app.Desktop && typeof require === 'function') {
+      require('./desktop-core.js');   // Node seam; the page loads it by tag
+    }
+    return app.Desktop || null;
+  }
+
+  /**
+   * The single Quiz window's state, straight from the core. Exposed under
+   * its old name so the controller and the existing tests keep driving
+   * exactly one model: every method delegates — there is no local state.
    */
   function createMachine() {
-    var state = { mode: 'normal', confirmOpen: false, view: VIEW_LANDING };
-    var prevMode = 'normal';   // what minimize will restore to
-
-    function canMinimize() {
-      return !state.confirmOpen && state.mode !== 'minimized';
+    var Desktop = coreModule();
+    if (!Desktop || typeof Desktop.createCore !== 'function') {
+      throw new Error('js/windows.js needs the desktop core: load js/desktop-core.js first');
     }
-    function canMaximize() {
-      return !state.confirmOpen && state.view !== VIEW_LANDING;
-    }
-    function canClose() {
-      return !state.confirmOpen && state.view !== VIEW_LANDING;
-    }
-
-    function minimize() {
-      if (!canMinimize()) return false;
-      prevMode = state.mode === 'maximized' ? 'maximized' : 'normal';
-      state.mode = 'minimized';
-      return true;
-    }
-
-    /** Restore lands on the pre-minimize mode (Win95 restores to maximized
-     *  when the window was maximized before it shrank). */
-    function restore() {
-      if (state.mode !== 'minimized') return false;
-      state.mode = prevMode;
-      return true;
-    }
-
-    function toggleMaximize() {
-      if (!canMaximize() || state.mode === 'minimized') return false;
-      state.mode = state.mode === 'maximized' ? 'normal' : 'maximized';
-      return true;
-    }
-
-    function requestClose() {
-      if (!canClose()) return false;
-      state.confirmOpen = true;
-      return true;
-    }
-
-    /** Yes in the End Program dialog: back to landing, window un-maximized.
-     *  Session data is deliberately not touched (see header). */
-    function confirmClose() {
-      if (!state.confirmOpen) return false;
-      state.confirmOpen = false;
-      state.view = VIEW_LANDING;
-      state.mode = 'normal';
-      prevMode = 'normal';
-      return true;
-    }
-
-    /** No/Escape: the dialog goes away, everything else is exactly as it
-     *  was — view, mode and Session all preserved. */
-    function cancelClose() {
-      if (!state.confirmOpen) return false;
-      state.confirmOpen = false;
-      return true;
-    }
-
-    function setView(view) {
-      if (typeof view === 'string' && view !== '') state.view = view;
-      return state.view;
-    }
+    var core = Desktop.createCore({ id: Desktop.QUIZ_ID });
 
     function getState() {
-      return { mode: state.mode, confirmOpen: state.confirmOpen, view: state.view };
+      var snap = core.snapshot();
+      return {
+        mode: snap.windows[core.soleId].mode,
+        confirmOpen: snap.confirmOpen,
+        view: snap.view
+      };
     }
 
     return {
+      /** The core itself — the controller reads state and derived flags
+       *  through it and renders. */
+      core: core,
       getState: getState,
-      canMinimize: canMinimize,
-      canMaximize: canMaximize,
-      canClose: canClose,
-      minimize: minimize,
-      restore: restore,
-      toggleMaximize: toggleMaximize,
-      requestClose: requestClose,
-      confirmClose: confirmClose,
-      cancelClose: cancelClose,
-      setView: setView
+      isVisible: core.isVisible,
+      inTaskbar: core.inTaskbar,
+      canFocus: core.canFocus,
+      canMinimize: core.canMinimize,
+      canMaximize: core.canMaximize,
+      canClose: core.canClose,
+      minimize: core.minimize,
+      restore: core.restore,
+      toggleMaximize: core.toggleMaximize,
+      hide: core.hide,
+      requestClose: core.requestClose,
+      confirmClose: core.confirmClose,
+      cancelClose: core.cancelClose,
+      applyGeometry: core.applyGeometry,
+      setView: core.setView,
+      setActive: core.setActive,
+      raise: core.raise,
+      snapshot: core.snapshot
     };
   }
 
@@ -191,7 +177,7 @@
     }
   }
 
-  // ── Controller: machine + rendering ──────────────────────────────────
+  // ── Controller: core + rendering ─────────────────────────────────────
 
   /**
    * deps:
@@ -240,12 +226,15 @@
           dom.buttons.close.disabled = !machine.canClose();
         }
         if (dom.windowEl) {
+          // The drawn form comes from the core's mode, never a local copy.
           if (state.mode === 'maximized') dom.windowEl.classList.add('is-maximized');
           else dom.windowEl.classList.remove('is-maximized');
         }
         if (dom.programBtn) {
+          // Pressed = the window is on the desktop; the core derives that
+          // from the mode (minimized/hidden are the not-visible modes).
           dom.programBtn.setAttribute('aria-pressed',
-            state.mode === 'minimized' ? 'false' : 'true');
+            machine.isVisible() ? 'true' : 'false');
         }
       }
       return state;
@@ -288,7 +277,7 @@
     function toggleMaximize() {
       // Mobile rule (ticket #46): at ≤768px there is nothing to toggle —
       // the CSS media query maximizes by default and un-maximizing is
-      // meaningless on this viewport. The machine stays viewport-blind.
+      // meaningless on this viewport. The core stays viewport-blind.
       if (mobileMaximized()) return false;
       if (!machine.toggleMaximize()) return false;
       render();
@@ -318,6 +307,11 @@
       canMinimize: machine.canMinimize,
       canMaximize: machine.canMaximize,
       canClose: machine.canClose,
+      // The mode consequences the shell renders from — derived by the core.
+      isVisible: machine.isVisible,
+      inTaskbar: machine.inTaskbar,
+      canFocus: machine.canFocus,
+      snapshot: machine.snapshot,
       minimize: minimize,
       restore: restore,
       toggleMaximize: toggleMaximize,
@@ -337,8 +331,10 @@
         if (dom && dom.programBtn) {
           // Clicking the program button restores a minimized window (the
           // era's restore path); otherwise it just refocuses this window.
+          // "In the taskbar but not on the desktop" is the core's derived
+          // reading of minimized — no mode string compared here.
           on(dom.programBtn, 'click', function() {
-            if (machine.getState().mode === 'minimized') controller.restore();
+            if (machine.inTaskbar() && !machine.isVisible()) controller.restore();
           });
         }
         // View changes (App.showView flips section[hidden]) re-render the

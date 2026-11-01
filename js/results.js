@@ -822,6 +822,37 @@
     return btn;
   }
 
+  /* ── Section mount points (ticket #59) ──────────────────────────────── */
+
+  /**
+   * Stable hosts for the two sections the desktop tickets (#58/#61/#62)
+   * render into their own windows: the Action Plan and the Deep-Dive
+   * Prompt. The id rides on the section wrapper itself, so a later ticket
+   * moves the section — heading and content together — into a window body
+   * without reshaping this presenter, and the presenter keeps building the
+   * identical markup here while it is mounted in place.
+   *
+   * renderResults() rebuilds the results view from scratch on every render
+   * — including the in-place language-switch re-render of issue #56 — so
+   * the ids are re-established by that same render and nothing about a
+   * mount point is cached: resultsMount() resolves the LIVE element on
+   * every call.
+   */
+  var MOUNT_IDS = {
+    'action-plan': 'results-mount-action-plan',
+    'deep-dive': 'results-mount-deep-dive'
+  };
+
+  /** The current host element for a section mount point, or null when the
+   *  results view has not been rendered (or no document is available). */
+  function resultsMount(name) {
+    var id = MOUNT_IDS[name];
+    if (!id) return null;
+    if (typeof document === 'undefined' || !document ||
+        typeof document.getElementById !== 'function') return null;
+    return document.getElementById(id);
+  }
+
   function renderResults(bank, report) {
     var view = document.getElementById('results-view');
     if (!view) return;
@@ -866,16 +897,20 @@
     barsSection.appendChild(buildBars(report));
     view.appendChild(barsSection);
 
-    // Action Plan
+    // Action Plan — mounted on its stable section host (#59). The id rides
+    // the wrapper, so a later ticket can move the whole section into the
+    // Action Plan window without reshaping this presenter.
     var actionSection = el('div', { className: 'results-section' });
+    actionSection.id = MOUNT_IDS['action-plan'];
     actionSection.appendChild(el('h2', { className: 'results-section-title', textContent: t('results.actionPlanTitle') }));
     // The raw report is the slot identity; the localized prose and the
     // scoring Variant travel with it for the plan's prompt (#56).
     actionSection.appendChild(buildActionPlan(report, bank, scoringBank));
     view.appendChild(actionSection);
 
-    // Deep-Dive Prompt
+    // Deep-Dive Prompt — mounted on its stable section host (#59)
     var ddSection = el('div', { className: 'results-section' });
+    ddSection.id = MOUNT_IDS['deep-dive'];
     ddSection.appendChild(el('h2', { className: 'results-section-title', textContent: t('results.deepDiveTitle') }));
     ddSection.appendChild(buildDeepDive(shown));
     view.appendChild(ddSection);
@@ -944,6 +979,8 @@
   app.rerenderResults  = rerenderResults;
   app.rerenderReview   = rerenderReview;
   app.resultsState     = resultsState;
+  app.resultsMount     = resultsMount;
+  app.resultsMountIds  = MOUNT_IDS;
 
   /* Test seam (tests/js/test-results-retro.js, fakeEl pattern): the pure
      DOM builders plus the two palette helpers. Not used by the page. */
