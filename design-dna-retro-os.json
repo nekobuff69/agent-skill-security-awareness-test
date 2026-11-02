@@ -1,0 +1,244 @@
+{
+  "meta": {
+    "name": "Agent Skills Security Self-assessment (Retro-OS Skin)",
+    "description": "Windows 95 system skin for a two-language security self-assessment: the app reads as one program window (os-window + taskbar + system dialogs) standing on the teal desktop, drawn from the classic bevel triad and the classic 16-colour system palette.",
+    "source_references": [
+      "css/theme-retro-os.css",
+      "css/shell.css",
+      "css/boot.css",
+      "css/quiz.css",
+      "css/results.css",
+      "js/shell.js",
+      "js/windows.js",
+      "js/boot.js",
+      "AGENTS.md"
+    ],
+    "created_at": "2026-10-31"
+  },
+  "design_system": {
+    "color": {
+      "palette_type": "system (classic Win95 triad on a teal desktop; white document fields)",
+      "primary": {
+        "hex": "#000080",
+        "role": "Title bars, selection highlight, primary accent, info state"
+      },
+      "secondary": {
+        "hex": "#808080",
+        "role": "Medium shadow grey — borders, tracks, disabled title-bar glyphs"
+      },
+      "accent": {
+        "hex": "#000080",
+        "role": "Alters nothing: navy replaces the removed editorial orange; chrome text text-status uses the same navy as selection"
+      },
+      "neutral": {
+        "scale": ["#FFFFFF", "#DFDFDF", "#C0C0C0", "#808080", "#404040", "#000000"],
+        "usage": "The classic bevel triad: highlight #FFFFFF, face #C0C0C0, light shadow #DFDFDF, dark shadow #808080, outer border #000000; #404040 micro-labels (7.5:1 on the chrome face)"
+      },
+      "semantic": {
+        "success": "#008000",
+        "warning": "#808000",
+        "error": "#800000",
+        "info": "#000080",
+        "role_split": "One meaning, two roles: headline TEXT uses --color-score-green/amber/red, bar/graphic FILL uses --color-success/warning/error — both sets are the same dark classic hexes. Worst-case black-on-white floors documented in the token layer: #008000 4.75:1, #808000 3.55:1 (large text / fill only), #800000 7.5:1"
+      },
+      "graphics_only": {
+        "hexes": ["#00FF00", "#FFFF00", "#FF0000"],
+        "usage": "Bright system tints declared graphics-only (1–2:1 on white; never carry text). #FF0000 is also the flat red of the warn dialog circle"
+      },
+      "surface": {
+        "background": "#008080",
+        "card": "#C0C0C0",
+        "elevated": "#FFFFFF"
+      },
+      "contrast_strategy": "Dark members of the classic 16-colour set for all text on white/face fields; every ratio measured and documented in css/theme-retro-os.css token comments"
+    },
+    "typography": {
+      "type_scale": {
+        "title_bar": { "size": "14px", "weight": "400", "font": "W95FA", "line_height": "1", "tracking": "normal" },
+        "chrome_label": { "size": "14px", "weight": "400", "font": "W95FA", "usage": "counters, chips, buttons, Start/language-toggle segments" },
+        "headline": { "size": "64px / 44px / 32px by breakpoint", "weight": "400", "font": "W95FA via --font-heading, except the Welcome Splash catchphrase which runs Silkscreen 32px (uppercase, 36px on the Chinese page)", "line_height": "1.1", "letter_spacing": "normal (pixel faces carry their own rhythm)" },
+        "subtitle": { "size": "24px / 20px / 18px", "weight": "400", "font": "body stack" },
+        "body": { "size": "16px", "weight": "400", "line_height": "1.6", "font": "system sans" },
+        "meta": { "size": "13px", "weight": "400", "font": "ui-monospace stack", "tracking": "0.05em uppercase" },
+        "micro_label": { "size": "small", "color": "#404040", "usage": "field micro-labels" }
+      },
+      "font_families": {
+        "heading": "W95FA (Latin chrome) / Fusion Pixel 12 SC subset (Han chrome on the Chinese page, leading --font-heading under html[lang^=\"zh\"]), fallback Segoe UI/SimSun",
+        "display": "Silkscreen — the Welcome Splash catchphrase only, Latin-pinned",
+        "body": "system sans stack",
+        "mono": "ui-monospace / Cascadia Mono / Consolas"
+      },
+      "font_style_notes": "All three faces are self-hosted under fonts/ with their OFL 1.1 texts and fonts/PROVENANCE.md — W95FA (Alina Sava, pixel re-creation of MS Sans Serif), Silkscreen (Jason Kottke, bitmap display face), Fusion Pixel 12px proportional SC (TakWolf) as an offline repo-side subset of the pinned release. Each is pinned by unicode-range so Latin and Han runs never land on the other's face; no third-party network dependency (ADR 0001, ADR 0021 amended by #51). UI chrome only; prose stays on the readable body stack."
+    },
+    "spacing": {
+      "base_unit": "8px",
+      "scale": [4, 8, 16, 24, 32, 48, 64, 96, 128],
+      "content_density": "the window frame owns the whitespace: #app padding varies per breakpoint (64/48/24 top)",
+      "section_rhythm": "consistent rhythm off --space-2..--space-5 inside dialog bodies (8/16/32px)"
+    },
+    "layout": {
+      "grid_system": "single column; the application container reads as ONE program window standing on the desktop (.os-window wraps #app: the frame's opaque chrome face reserves the bevel as its edge, the client area sits inside it)",
+      "max_content_width": "720px",
+      "columns": 1,
+      "gutter": "24px",
+      "chrome_dimensions": {
+        "title_bar": "30px min-height",
+        "taskbar": "36px fixed at viewport bottom, height reserved on body"
+      },
+      "breakpoints": {
+        "tablet": "max-width 768px (dialled padding)",
+        "mobile": "max-width 480px (dialog anatomy stacks, Start menu spans)",
+        "small_mobile": "max-width 400px (headline 32px, quiz card header full-bleed)"
+      },
+      "alignment_tendency": "left-aligned content on centered windows; dialog buttons right-aligned"
+    },
+    "shape": {
+      "border_radius": {
+        "small": "0",
+        "medium": "0",
+        "large": "0",
+        "exception": "32px circle only for the drawn dialog icons"
+      },
+      "border_usage": "none — depth is drawn with box-shadow bevels, not borders",
+      "divider_style": "1px solid #000000 rule under an open expander's title-bar row"
+    },
+    "elevation": {
+      "shadow_style": "no drop shadows — the bevel triad IS the elevation",
+      "levels": {
+        "low": "--bevel-sunken: inset -1px -1px #FFFFFF, inset 1px 1px #000000, inset -2px -2px #DFDFDF, inset 2px 2px #808080 (fields, tracks, pressed buttons)",
+        "medium": "--bevel-raised: inset -1px -1px #000000, inset 1px 1px #FFFFFF, inset -2px -2px #808080, inset 2px 2px #DFDFDF (buttons, window frames, dialog faces)",
+        "high": "desktop z-ladder: .os-shortcuts 100 (the icon column on the desktop's BASE surface — icons are surface, not chrome) < .os-window 200 (the Window stack's rung: every Window paints WINDOW_Z_BASE + its stack number, so a Window always covers the column) < taskbar 1000 < start menu 1100 < About backdrop 1200 (dim rgba(0,0,0,0.35)) < system dialog 1300 (dim rgba(0,0,0,0.25))"
+      },
+      "depth_cues": "flat layering: background never eases; pressed state flips raised → sunken; taskbar state flips program button sunken/raised"
+    },
+    "iconography": {
+      "style": "flat circles and system flag marks, all CSS-drawn — no icon font, no image assets",
+      "stroke_weight": "solid fills (4px cross bars, 2px wireframe ink)",
+      "size_scale": "32px dialog icons, 16×14 title-bar buttons, 16×14 start flag",
+      "preferred_set": "hand-drawn era set: red circle + white cross (warn), navy circle (info), [—][□][×] title marks, [+] / [-] Explorer toggles, etched radio dial glyph, four-colour flag gradient"
+    },
+    "motion": {
+      "easing": "none — Win95 has no easing; every token transition is 0s and all value animations use steps()",
+      "duration_scale": {
+        "micro": "0s (feedback instant)",
+        "normal": "200ms stepped",
+        "macro": "1350ms boot splash (12 steps)"
+      },
+      "mechanical_traces": "os-wireframe-trace 200ms: a navy rectangle sweeps from the title bar downward in four steps(4) across the first 160ms, content pops in behind it in one step at the 100ms midpoint (os-view-pop), and the ink lifts off in a fifth step over the final 40ms — restarts every time a view re-enters rendering via App.showView",
+      "entrance_pattern": "card wipe (client-area) on question change; view pop behind the trace",
+      "boot": "sessionStorage-gated splash (flag 'quiz-os-booted'); masked overlay + segmented stepped fill synced to SPLASH_MS 1350 in js/boot.js, 200ms linear fade handoff; the gate shows exactly ONE trace, never splash+fade double",
+      "reduced_motion_contract": "prefers-reduced-motion: no trace draws, no gated content — full content present immediately; blocks gate disjoint selectors in css/theme-retro-os.css and css/quiz.css (card wipes, Progress Fill, Blind-Spot Bar width easing); boot.js decides to skip the splash outright"
+    },
+    "components": [
+      "os-window (raised frame on the teal desktop: the frame paints an opaque chrome face and its padding reserves the bevel, #app fills the client area inside that edge — tickets #60/#71; on the results and review views it is positioned by the window's Geometry and carries a corner size grip)",
+      "title bar (navy→#1084D0 gradient, 14px W95FA label, [—][□][×] controls drawn as inline-SVG era glyphs — 6×2 bar, 9×9 square, 8×7 cross in currentColor, black live / gray disabled, #49; the ONE window chrome — the results header no longer fakes a window of its own)",
+      "taskbar (start button + program button + the two-segment EN/中文 Language Toggle that replaced the clock tray, #50; pressed-state flip on minimize)",
+      "start menu popup and about/system dialog primitive (js/windows.js App.Windows.openSystemDialog: backdrop dims desktop 25%, one dialog at a time, closes only by button/Escape)",
+      "boot splash (sunken groove, segmented navy stepped fill, status line)",
+      "welcome splash (the compact landing wizard card, #53: 64px inline eye glyph, two-line uppercase catchphrase on the Silkscreen display face — 32px, the Fusion Pixel subset carrying it on the Chinese page at 36px — the Bank's title as subtitle, a hairline rule, one body line + time estimate, a single default [Start] — the language affordance is the taskbar toggle, never a dialog)",
+      "locale-swap failure notice (`.quiz-notice` inside the current view: raised bevel strip, localized copy naming the other language, a beveled dismiss button, auto-dismissed; the language never changes unless the swap succeeds, #55/#56)",
+      "quiz status bar (pinned inside the fixed-height window, quiz view only, 32px: segmented navy Progress Fill on a 150×14 track + question counter + phase name; segmented = repeating gradient trick; only .quiz-body scrolls)",
+      "question card / wizard (a flat grouping element since #52 — the raised card frame is gone; the sunken scenario field and the radiogroup rows with etched dial glyphs carry the depth; pinned footer [< Back] [Next >] / [Finish])",
+      "title card (results window: navy bar + sunken white client field, percentage in --color-score-*)",
+      "risk radar (sunken white field, black-on-white vector chart)",
+      "blind-spot bars (sunken dithered track — 1px repeating-conic dither, graphics-only; square dark fills)",
+      "action plan + expanders (action plan = ONE ranked list: the Actions are rows in a single sunken white field — sunken priority badge, title, AST chip, description, hairline separators, no navy head row and no raised card frame, #72; the Narrative Expander and the Review accordion share the Explorer disclosure idiom — a silver row led by the square [+]/[-] glyph, black on the face, never navy; the Deep-Dive Prompt keeps no expander at all, #74 — its window body is the one-line guidance above a sunken scrolling prompt field, and its single Copy Prompt command sits in the window's flat bar, the same strip surface as the Quiz menu bar with no menu in it)",
+      "system dialog warn/info icons (flat 32px circles)",
+      "command buttons on every surface (raised bevel, dotted focus rectangle, sunken press)"
+    ]
+  },
+  "design_style": {
+    "aesthetic": {
+      "mood": "nostalgic, playful, mechanical",
+      "visual_metaphor": "an operating system desktop from 1995 — the assessment is a program, participants are system users",
+      "era_influence": "Windows 95 (classic bevel triad, 16-colour system palette, MS Sans Serif chrome)",
+      "genre": "productivity software parody carrying a serious assessment",
+      "personality_traits": ["mechanical", "honest", "structured", "nostalgic", "serious under the chrome"],
+      "adjectives": ["flat", "square", "beveled", "brutal-literal", "instant"]
+    },
+    "visual_language": {
+      "complexity": "medium (high chrome density, plain fields)",
+      "ornamentation": "none that is not structural: dithering only on graphics-only fills, bevels only where a control sits",
+      "whitespace_usage": "measured — the window frame defines space; dialog interiors are tight (8/16px)",
+      "visual_weight_distribution": "chrome-dense frames around quiet white content fields",
+      "focal_strategy": "title bars and stepped navy fills carry all visual weight",
+      "contrast_level": "high (black on white inside windows; navy-on-white chrome)",
+      "texture_usage": "1px checkerboard dither token, graphics-only"
+    },
+    "composition": {
+      "hierarchy_method": "window nesting: dialog → panel → field; inside windows the largest text is the percentage headline",
+      "balance_type": "symmetrical, window-centered",
+      "flow_direction": "top-down inside one window (wizard); the taskbar anchors the bottom",
+      "grouping_strategy": "sunken panels group; expanded tree children indent",
+      "negative_space_role": "teal desktop margin frames the program"
+    },
+    "imagery": {
+      "photo_treatment": "none",
+      "illustration_style": "flat vector only (radar)",
+      "graphic_elements": "CSS-drawn era icons and logo marks",
+      "pattern_usage": "dither fills only",
+      "image_shape": "square-cut everywhere"
+    },
+    "interaction_feel": {
+      "feedback_style": "instant facet-flips: raised→sunken, selection → navy block with white text",
+      "hover_behavior": "same raised state; focus dot rectangle only",
+      "transition_personality": "discrete — steps(), steps(), steps()",
+      "loading_style": "segmented stepped fill (boot groove, progress)",
+      "microinteraction_density": "low — flips, no easing, no ripples"
+    },
+    "brand_voice_in_ui": {
+      "tone": "period-system voice: terse status lines ('Not a test — a mirror.'),",
+      "formality": "system-informal",
+      "cta_style": "command buttons: [Start →], [Finish]",
+      "empty_state_approach": "sunken field with a one-line status",
+      "error_tone": "era error dialog: red circle, frank statement, one action"
+    }
+  },
+  "visual_effects": {
+    "overview": {
+      "effect_intensity": "low",
+      "performance_tier": "high (no images, no easing libraries, self-hosted fonts)",
+      "fallback_strategy": "box-shadow bevels degrade to flat bounds; motion is fully optional under prefers-reduced-motion",
+      "primary_technology": "pure CSS (gradients, clip-path, steps()); zero animation JS"
+    },
+    "background_effects": {
+      "type": "solid fill",
+      "description": "#008080 desktop at body level; window faces flat",
+      "technology": "CSS",
+      "params": {}
+    },
+    "particle_systems": {
+      "enabled": false,
+      "type": "none"
+    },
+    "3d_elements": {
+      "enabled": false,
+      "type": "none"
+    },
+    "shader_effects": {
+      "enabled": false,
+      "type": "none"
+    },
+    "scroll_effects": {
+      "parallax": { "enabled": false, "layers": [], "depth_range": 0, "speed_curve": "instant" },
+      "scroll_triggered_animations": {
+        "enabled": true,
+        "trigger_points": ["view enters the window (App.showView un-hides a section)", "client-area card swap in the wizard"],
+        "animation_type": "stepped wireframe trace + one-step content pop / card wipe",
+        "scrub_behavior": false
+      },
+      "scroll_morphing": { "enabled": false }
+    },
+    "text_effects": {
+      "type": "none",
+      "description": "pixel face carries its own rendering; text-shadow only on disabled chrome glyphs"
+    },
+    "cursor_effects": { "enabled": false },
+    "image_effects": { "type": "none" },
+    "glassmorphism_neumorphism": {
+      "enabled": false,
+      "style": "the opposite of glass: opaque bevels"
+    },
+    "composite_notes": "Everything is drawn with box-shadow bevels, gradient steps and a two-circle pseudo-element icon system. Motion budget is spent once per view entry (the 200ms trace) and inside the wizard (wipes); everywhere else answers are instant, and the reduced-motion contract removes even those."
+  }
+}

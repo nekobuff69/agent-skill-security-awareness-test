@@ -2,7 +2,7 @@
   "meta": {
     "title": "智能体安全意识测评",
     "subtitle": "基于 OWASP Agentic Skills Top 10",
-    "source": "https://owasp.org/www-project-agentic-skills-top-10/top10",
+    "source": "https://owasp.github.io/www-project-agentic-skills-top-10/top10",
     "license": "Quiz questions are original; factual claims sourced from OWASP Agentic Skills Top 10 (CC-BY-SA-4.0).",
     "design_philosophy": "A self-assessment rather than a knowledge test. Every option reflects a real behavioral choice, and scoring reveals blind spots rather than trivia gaps.",
     "total_questions": 20,
@@ -125,7 +125,7 @@
         }
       ],
       "best_practice": "不管下载量和评价如何，都要通过独立信源核实发布者身份，并在用真实数据之前先在一次性环境中测试技能。",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast01.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast01.html",
       "test": {
         "canonical_answer_index": 3,
         "max_score": 3,
@@ -165,7 +165,7 @@
         }
       ],
       "best_practice": "不管技能名里带什么品牌或商标声明，都用同一套标准衡量：权限、发布者验证、代码审查。",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast04.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast04.html",
       "test": {
         "canonical_answer_index": 3,
         "max_score": 3,
@@ -205,7 +205,7 @@
         }
       ],
       "best_practice": "安装前检查整棵依赖树有没有仿冒包，并把每个包名和正牌仓库核对一遍。",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast02.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast02.html",
       "test": {
         "canonical_answer_index": 3,
         "max_score": 3,
@@ -245,7 +245,7 @@
         }
       ],
       "best_practice": "把 SKILL.md 文件过一遍能检查隐藏字符、零宽 Unicode 和 base64 编码载荷的安全扫描工具。别只信眼睛。",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast04.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast04.html",
       "test": {
         "canonical_answer_index": 3,
         "max_score": 3,
@@ -285,7 +285,7 @@
         }
       ],
       "best_practice": "用多层扫描（代码模式分析、自然语言审阅、行为测试），因为没有任何单一扫描工具能覆盖所有攻击类型。",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast08.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast08.html",
       "test": {
         "canonical_answer_index": 3,
         "max_score": 3,
@@ -325,7 +325,7 @@
         }
       ],
       "best_practice": "把平台内扫描工具的徽章和自动化扫描结果当作参考，另外用外部工具独立核实。",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast08.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast08.html",
       "test": {
         "canonical_answer_index": 3,
         "max_score": 3,
@@ -366,7 +366,7 @@
         }
       ],
       "best_practice": "装之前一定要查有没有针对这类技能的已知攻击活动，并在沙箱环境里测试新技能，之后再让它接触真实数据。",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast01.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast01.html",
       "test": {
         "canonical_answer_index": 3,
         "max_score": 3,
@@ -406,7 +406,7 @@
         }
       ],
       "best_practice": "逐条把权限申请和技能声称的功能对照一遍，拒绝任何对该任务不必要的访问。",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast03.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast03.html",
       "test": {
         "canonical_answer_index": null,
         "max_score": 3,
@@ -447,7 +447,7 @@
         }
       ],
       "best_practice": "把智能体的权限限制到每项任务所需的最低限度；只读的任务就只给读取权限。",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast03.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast03.html",
       "test": {
         "canonical_answer_index": 1,
         "max_score": 3,
@@ -487,7 +487,7 @@
         }
       ],
       "best_practice": "把每一个技能都当作不可信代码来看待——它继承你完整的用户权限，并且要开启沙箱或容器隔离来限制爆炸半径。",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast06.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast06.html",
       "test": {
         "canonical_answer_index": 2,
         "max_score": 3,
@@ -527,7 +527,7 @@
         }
       ],
       "best_practice": "把每个技能的权限限制在它的具体功能上，让一个技能里的漏洞无法触及你其他的技能或个人数据。",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast03.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast03.html",
       "test": {
         "canonical_answer_index": 2,
         "max_score": 3,
@@ -567,7 +567,7 @@
         }
       ],
       "best_practice": "把技能声明的风险等级与实际权限范围之间的任何矛盾，都当作刻意的危险信号，而不是文档错误。",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast04.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast04.html",
       "test": {
         "canonical_answer_index": 2,
         "max_score": 3,
@@ -607,7 +607,7 @@
         }
       ],
       "best_practice": "避开那些在运行时从外部 URL 拉取指令的技能；尽量把内容内联进去，或者锁定到内容哈希上，防止被篡改。",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast05.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast05.html",
       "test": {
         "canonical_answer_index": 2,
         "max_score": 3,
@@ -647,7 +647,7 @@
         }
       ],
       "best_practice": "记住，技能引用的外部内容是被当作可执行指令消费的：既要审运行时取到的内容，也要审拉取它的代码。",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast05.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast05.html",
       "test": {
         "canonical_answer_index": 1,
         "max_score": 3,
@@ -687,7 +687,7 @@
         }
       ],
       "best_practice": "接受任何技能更新之前，先验证发布方身份、检查加密签名、审阅更新差异。没有验证就绝不自动更新。",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast07.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast07.html",
       "test": {
         "canonical_answer_index": 3,
         "max_score": 3,
@@ -727,7 +727,7 @@
         }
       ],
       "best_practice": "按风险等级设定固定节奏，定期审阅已安装的技能，并订阅这些技能的安全公告。",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast07.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast07.html",
       "test": {
         "canonical_answer_index": null,
         "max_score": 3,
@@ -767,7 +767,7 @@
         }
       ],
       "best_practice": "维护一份完整集中的清单，记录所有已安装的技能及其权限、安装人和审阅状态。",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast09.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast09.html",
       "test": {
         "canonical_answer_index": 2,
         "max_score": 3,
@@ -807,7 +807,7 @@
         }
       ],
       "best_practice": "把技能回收和员工离职流程绑定：有人一走就吊销凭据、盘点已安装的技能。",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast09.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast09.html",
       "test": {
         "canonical_answer_index": 2,
         "max_score": 3,
@@ -847,7 +847,7 @@
         }
       ],
       "best_practice": "在不同智能体平台之间移植技能时，验证安全属性（权限、风险等级、隔离）是否完整保留。",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast10.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast10.html",
       "test": {
         "canonical_answer_index": 3,
         "max_score": 3,
@@ -887,7 +887,7 @@
         }
       ],
       "best_practice": "开启运行时活动日志并定期审阅：检查的不只是输出，还有每个技能实际访问了什么、发起过哪些网络请求、有没有超出声明用途。",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast09.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast09.html",
       "test": {
         "canonical_answer_index": 3,
         "max_score": 3,

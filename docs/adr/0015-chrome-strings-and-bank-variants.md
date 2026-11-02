@@ -33,7 +33,7 @@ The dictionary also owns the AST Risk display names (`ast.AST01`…`ast.AST10`),
 ## Consequences
 
 - Bank edits must be propagated by hand to each Variant; the gate catches structural divergence, not stale prose.
-- Adding a language means adding one bank file, one dictionary file, one page, and a stylesheet — no code changes, no build step.
+- Adding a language means adding one bank file, one dictionary file, one page, and a stylesheet — no code changes, no build step. *(Amended by #51, recorded by #57: the per-language stylesheet is gone — a new language's typography is a rule set inside the shared `css/theme-retro-os.css`, gated on its `html[lang]` prefix, because the runtime Locale Swap rewrites `<html lang>` without loading a different sheet — see [0019](0019-in-page-locale-switching.md).)*
 - The AST Risk display-name duplication that ADR 0013 resolved for identity is now resolved for names too, and the registry's contract is narrower: ids and severities only.
 - A missing Chrome String id is a hard failure at load, which is the intended trade: a loud break in dev beats a silently English button in production.
 - ADR 0002's file stays on disk. Its reasoning about content duplication still governs assessment content; its blanket "no secondary source exists" is what this decision replaces.

@@ -11,7 +11,9 @@ How the engineering skills should consume this repo's domain documentation when 
 
 If a file doesn't exist, **proceed silently**. Don't flag its absence.
 
-## File structure
+## Documentation surface
+
+This tree names the documentation surface only; the shipped code and both Bank Variants (`questions.json`, `questions.zh.json`) live at the repo root beside it.
 
 ```
 /

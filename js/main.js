@@ -51,47 +51,182 @@
   var BANK_URL = document.documentElement.getAttribute('data-bank') || 'questions.json';
   var CORPUS_URL = document.documentElement.getAttribute('data-corpus') || 'docs/owasp-ast-full.md';
 
-  // Fetch and initialize bank
-  function loadBank() {
-    var landing = document.getElementById('landing-view');
-    if (landing) {
-      // Build via textContent so the dictionary value is never parsed as HTML.
-      landing.innerHTML = '';
-      var loadingP = document.createElement('p');
-      loadingP.textContent = t('loading.bank');
-      landing.appendChild(loadingP);
-      landing.hidden = false;
-    }
+  // ── Active view ───────────────────────────────────────────────────
 
-    fetch(BANK_URL)
+  // The id of the one visible section (`hidden` is the single source of
+  // truth — showView toggles it), or null when nothing is visible. Used by
+  // the re-render seam to decide what to rebuild.
+  app.currentView = function() {
+    var sections = document.querySelectorAll('#app > section');
+    for (var i = 0; i < sections.length; i++) {
+      if (!sections[i].hidden) return sections[i].id || null;
+    }
+    return null;
+  };
+
+  // ── Bank fetch seam (issue #48) ────────────────────────────────────
+
+  // Fetch and parse a Question Bank from any URL. Deliberately state-free:
+  // it never touches the active bank or any view — the caller decides
+  // what the data is for (initial load, refresh, Bank Variant swap).
+  app.fetchBank = function(url, onReady, onError) {
+    return fetch(url)
       .then(function(resp) {
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         return resp.json();
       })
       .then(function(data) {
-        global.Bank = data;
-        app.Bank = data;
-
-        // Fetch Grounding Corpus for LLM path
-        fetch(CORPUS_URL)
-          .then(function(resp) {
-            if (!resp.ok) throw new Error('HTTP ' + resp.status);
-            return resp.text();
-          })
-          .then(function(text) {
-            global.Corpus = text;
-          })
-          .catch(function() {
-            global.Corpus = null;
-          });
-
-        if (typeof app.renderLanding === 'function') {
-          app.renderLanding(data);
-        }
+        if (typeof onReady === 'function') onReady(data);
       })
       .catch(function(err) {
-        showError(t('error.loadBank', { message: err.message }));
+        if (typeof onError === 'function') onError(err);
+        else showError(t('error.loadBank', { message: err.message }));
       });
+  };
+
+  // ── Bank swap + re-render seam (issue #48) ─────────────────────────
+
+  // Make `data` the active Question Bank and rebuild whichever view is
+  // currently visible from current state — without a page load.
+  //
+  //   answering  → re-rendered in place at the same Question with every
+  //                recorded answer intact when the new bank is structurally
+  //                identical (the Bank Variant boundary, ADR 0017); a
+  //                structural change cannot re-attribute stored answers, so
+  //                it falls back to the Session-aware fresh render.
+  //   results / review → rebuilt from the same score report, so the same
+  //                report can be shown against another Bank Variant.
+  //   landing / none → rebuilt from the new bank's meta.
+  //
+  // Returns the view id that was re-rendered.
+  app.activateBank = function(data) {
+    global.Bank = data;
+    app.Bank = data;
+
+    var view = app.currentView();
+
+    if (view === 'quiz-view' && typeof app.quizState === 'function') {
+      var state = app.quizState();
+      if (state) {
+        var identical = app.SessionStore &&
+          app.SessionStore.hashBank(state.bank) === app.SessionStore.hashBank(data);
+        if (identical && typeof app.rerenderQuiz === 'function') {
+          app.rerenderQuiz(data, state.currentIdx, state.answers);
+        } else {
+          app.renderQuiz(data);
+        }
+        return 'quiz-view';
+      }
+    }
+
+    if ((view === 'results-view' || view === 'review-view') &&
+        typeof app.resultsState === 'function') {
+      var rs = app.resultsState();
+      if (rs && rs.report) {
+        if (view === 'results-view') {
+          app.renderResults(data, rs.report);
+        } else if (typeof app.renderReview === 'function') {
+          app.renderReview(data, rs.report);
+        }
+        return view;
+      }
+    }
+
+    app.renderLanding(data);
+    return 'landing-view';
+  };
+
+  // One-call refresh seam: fetch a Question Bank from a caller-supplied
+  // URL, make it active, and re-render the active view in place.
+  // onDone receives (bank, viewId).
+  app.loadBankFrom = function(url, onDone, onError) {
+    return app.fetchBank(url, function(data) {
+      var view = app.activateBank(data);
+      if (typeof onDone === 'function') onDone(data, view);
+    }, onError);
+  };
+
+  // Fetch and initialize bank
+  function loadBank() {
+    var landing = document.getElementById('landing-view');
+
+    // Ticket #63: a committed desktop Record predicts that the entry view
+    // is the desktop, so the landing must not be painted "Loading bank…" —
+    // it would flash above the restored desktop. Presence only: the Record
+    // is validated against the bank the moment it lands.
+    var desktopPending = false;
+    try {
+      desktopPending = !!(app.DesktopStore &&
+        typeof app.DesktopStore.exists === 'function' &&
+        app.DesktopStore.exists());
+    } catch (err) {
+      desktopPending = false;
+    }
+
+    if (landing) {
+      if (desktopPending) {
+        // Nothing shows while the bank is in flight except the desktop
+        // shell itself; the restore (or the quiet fall-back to landing
+        // below) fills it in.
+        landing.hidden = true;
+      } else {
+        // Build via textContent so the dictionary value is never parsed as HTML.
+        landing.innerHTML = '';
+        var loadingP = document.createElement('p');
+        loadingP.textContent = t('loading.bank');
+        landing.appendChild(loadingP);
+        landing.hidden = false;
+      }
+    }
+
+    app.fetchBank(BANK_URL, function(data) {
+      // Fetch Grounding Corpus for LLM path
+      fetch(CORPUS_URL)
+        .then(function(resp) {
+          if (!resp.ok) throw new Error('HTTP ' + resp.status);
+          return resp.text();
+        })
+        .then(function(text) {
+          global.Corpus = text;
+        })
+        .catch(function() {
+          global.Corpus = null;
+        });
+
+      // The committed desktop comes first, before any view renders — an
+      // invalid Record is discarded quietly by the store and this load
+      // proceeds exactly as it would without one.
+      var restored = false;
+      if (desktopPending && app.DesktopStore &&
+          typeof app.DesktopStore.restore === 'function') {
+        try {
+          global.Bank = data;
+          app.Bank = data;
+          restored = !!app.DesktopStore.restore(data);
+        } catch (err) {
+          restored = false;
+        }
+        if (!restored && landing) {
+          // Quiet invalidation: the landing is the entry view after all.
+          landing.hidden = false;
+        }
+      }
+
+      if (!restored) {
+        app.activateBank(data);
+      }
+      // The first Bank Variant has landed: the language toggle may swap.
+      if (app.LangSwitch && typeof app.LangSwitch.ready === 'function') {
+        app.LangSwitch.ready();
+      }
+    }, function(err) {
+      showError(t('error.loadBank', { message: err.message }));
+      // A failed first load still leaves a working page to switch away
+      // from — the toggle must not stay disabled behind it.
+      if (app.LangSwitch && typeof app.LangSwitch.ready === 'function') {
+        app.LangSwitch.ready();
+      }
+    });
   }
 
   document.addEventListener('DOMContentLoaded', function() {
@@ -104,6 +239,12 @@
     // assessment content and should not wait on it.
     if (app.LangRouting && typeof app.LangRouting.init === 'function') {
       app.LangRouting.init();
+    }
+    // Instant language switch (#55): capture the page locale, wire
+    // Back/Forward, and prefetch the alternate dictionary and Bank Variant
+    // while the browser is idle.
+    if (app.LangSwitch && typeof app.LangSwitch.start === 'function') {
+      app.LangSwitch.start();
     }
     loadBank();
   });

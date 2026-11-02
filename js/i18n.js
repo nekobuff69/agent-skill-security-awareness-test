@@ -34,6 +34,32 @@
   }
 
   /**
+   * Merge extra Chrome Strings into a locale's dictionary. The seam for
+   * module-level contributions that land outside register() (tests, late
+   * modules): merges into whatever
+   * register() already placed, and creates the dictionary when absent —
+   * the page's locale is still verified loudly by use(), and missing ids
+   * still throw in t(), so this can never mask an absent base dictionary.
+   * @param {string} locale - 'en', 'zh'
+   * @param {object} additions - string-id → string (or number for budgets)
+   */
+  function extend(locale, additions) {
+    if (typeof locale !== 'string' || locale === '') {
+      throw new Error('i18n.extend requires a locale string');
+    }
+    if (!additions || typeof additions !== 'object' || Array.isArray(additions)) {
+      throw new Error('i18n.extend requires an additions object for locale ' + locale);
+    }
+    var key = locale.toLowerCase();
+    var dict = dictionaries[key] || (dictionaries[key] = {});
+    for (var id in additions) {
+      if (Object.prototype.hasOwnProperty.call(additions, id)) {
+        dict[id] = additions[id];
+      }
+    }
+  }
+
+  /**
    * Normalize a document language tag to its dictionary key.
    * 'zh-Hans' and 'zh' both resolve to 'zh'.
    */
@@ -93,6 +119,7 @@
 
   app.I18n = {
     register: register,
+    extend: extend,
     use: use,
     t: t,
     format: format,

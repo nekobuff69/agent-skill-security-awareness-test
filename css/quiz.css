@@ -1,79 +1,131 @@
-/* ── Quiz view ──────────────────────────────────────────────────────── */
+/* ── Quiz view ────────────────────────────────────────────────────────
+   Fixed-height column inside the window client area (ticket #52): the
+   body scrolls, the footer and status bar are pinned panes. */
 
 #quiz-view {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
-  padding-bottom: var(--space-8);
-}
-
-/* ── Sticky chrome bar ──────────────────────────────────────────────── */
-
-.quiz-chrome {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-1);
-  background: var(--color-bg);
-  border-bottom: 1px solid var(--color-border);
-}
-
-/* Progress track + fill ──────────────────────────────────────────────── */
-
-.quiz-chrome-track {
-  flex: 1 1 auto;
-  height: 4px;
-  background: var(--color-border);
-  border-radius: 2px;
+  gap: 0;
   overflow: hidden;
 }
 
-.quiz-chrome-fill {
+/* ── Scrollable body ────────────────────────────────────────────────
+   The only part of the quiz view that scrolls; long Scenario/Option
+   content moves this pane, never the page (css/shell.css). */
+
+.quiz-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+}
+
+/* ── Window footer: [< Back] [Next >] / [Finish] (ADR 0020) ──────────
+   Pinned to the bottom of the window with a 1px separator (ticket #52).
+   Buttons are built once per run and only their state changes per card
+   (js/quiz.js). */
+
+.quiz-footer {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--color-border);
+  /* Era sunken separator line above the raised bar face. */
+  box-shadow: inset 0 1px #FFFFFF;
+}
+
+/* ── Status bar (answering screen only, ticket #52) ──────────────────
+   Left field = phase name (Phase Chip text, swapped in place); right
+   field = segmented Progress Fill (answered/total) + Question Counter
+   (position being viewed). Built with the quiz view, hidden with it. */
+
+.quiz-statusbar {
+  flex: none;
+  display: flex;
+  gap: 2px;
+  height: 32px;
+  padding: 2px;
+  background: var(--color-face);
+  box-shadow: inset 0 1px var(--color-border);
+}
+
+.quiz-status-field {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 0 var(--space-2);
+  font-family: var(--font-heading);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--color-text);
+  /* Sunken chrome field, Win95 idiom (skin tokens; base fallback). */
+  box-shadow: var(--bevel-sunken,
+                   inset -1px -1px #FFFFFF, inset 1px 1px #808080,
+                   inset -2px -2px #DFDFDF, inset 2px 2px #000000);
+}
+
+/* Phase name: one line, ellipsis when the window is narrow. */
+.quiz-status-phase {
+  flex: 1 1 auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Right pane: Progress Fill + Question Counter, never wraps. */
+.quiz-status-progress {
+  flex: none;
+  gap: var(--space-2);
+}
+
+/* Progress track + segmented fill: answered / total (never position). */
+.quiz-status-track {
+  flex: none;
+  width: 150px;
+  height: 14px;
+  padding: 2px;
+  background: var(--color-surface);
+  border-radius: 0;
+  overflow: hidden;
+  /* Light sunken field: a full bevel would swallow a 14px track. */
+  box-shadow: inset 1px 1px var(--color-secondary), inset -1px -1px #FFFFFF;
+}
+
+.quiz-status-fill {
   height: 100%;
   width: 0;
   background: var(--color-accent);
-  border-radius: 2px;
+  border-radius: 0;
   transition: width 0.35s ease;
 }
 
-/* Counter: "1 / 20" ──────────────────────────────────────────────────── */
-
-.quiz-chrome-counter {
-  flex: 0 0 auto;
+/* Question Counter: "N / 20", the position being viewed. */
+.quiz-status-counter {
+  flex: none;
+  font-family: var(--font-heading);
   font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--color-text-muted);
   white-space: nowrap;
+  color: var(--color-text);
   letter-spacing: 0.02em;
-}
-
-/* Phase chip ─────────────────────────────────────────────────────────── */
-
-.quiz-chrome-chip {
-  flex: 0 0 auto;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--color-accent);
-  background: #FFF5F0;
-  border-radius: 100px;
-  padding: 0.2rem 0.65rem;
-  white-space: nowrap;
 }
 
 /* ── Scenario card ──────────────────────────────────────────────────── */
 
 .quiz-card {
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
-  padding: var(--space-5) var(--space-4);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-2);
 }
 
 .quiz-scenario {
@@ -81,7 +133,7 @@
   color: var(--color-text-muted);
   line-height: 1.55;
   border-left: 3px solid var(--color-border);
-  padding-left: var(--space-3);
+  padding-left: var(--space-2);
 }
 
 .quiz-question {
@@ -91,7 +143,7 @@
   line-height: 1.4;
 }
 
-/* ── Option buttons ─────────────────────────────────────────────────── */
+/* ── Radio option rows (ADR 0020) ───────────────────────────────────── */
 
 .quiz-options {
   display: flex;
@@ -99,37 +151,84 @@
   gap: var(--space-2);
 }
 
-.quiz-option-btn {
+.quiz-radio-row {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   width: 100%;
   text-align: left;
+  font-family: var(--font-body);   /* Option prose stays readable        */
   font-size: 0.9375rem;
   line-height: 1.45;
-  padding: var(--space-3) var(--space-4);
-  min-height: 44px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
-  background: var(--color-bg);
+  padding: var(--space-2) var(--space-3);
+  /* Tightened for the fixed window (ticket #52): the touch minimum of
+     44px returns in the ≤400px block below, where thumbs are the target. */
+  min-height: 34px;
+  border: 0;
+  border-radius: 0;
+  background: var(--color-surface);
   color: var(--color-text);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: none;
+  /* Sunken white field, Win95 idiom. The bevel token belongs to
+     css/theme-retro-os.css; the fallback keeps the base skin recognisable
+     when the override is absent. */
+  box-shadow: var(--bevel-sunken,
+                   inset -1px -1px #FFFFFF, inset 1px 1px #808080,
+                   inset -2px -2px #DFDFDF, inset 2px 2px #000000);
 }
 
-.quiz-option-btn:hover {
-  border-color: var(--color-primary);
-  background: #F9F9F9;
+/* Pointer feedback is a 1px inner ring only — no soft shadows, no radii. */
+.quiz-radio-row:hover {
+  cursor: pointer;
+  box-shadow: var(--bevel-sunken,
+                   inset -1px -1px #FFFFFF, inset 1px 1px #808080,
+                   inset -2px -2px #DFDFDF, inset 2px 2px #000000),
+              inset 0 0 0 1px var(--color-secondary);
 }
 
-.quiz-option-btn:active {
-  background: #FFF5F0;
+/* Dotted focus rectangle, drawn inside the row — Win95 keyboard idiom. */
+.quiz-radio-row:focus-visible {
+  outline: 1px dotted #000000;
+  outline-offset: -4px;
 }
 
-.quiz-option-btn.selected {
-  border-color: var(--color-accent);
-  background: #FFF5F0;
-  font-weight: 500;
+/* Selection: the Win95 navy inversion (the skin's selected-list idiom). */
+.quiz-radio-row[aria-checked='true'] {
+  background: var(--color-primary);
+  color: #FFFFFF;
+}
+
+/* ── Radio dial glyph ──────────────────────────────────────────────── */
+
+.quiz-radio-mark {
+  position: relative;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  /* The dial is the one circle this skin draws — an etched white face;
+     selection fills its black dot. */
+  border-radius: 50%;
+  background: var(--color-surface, #FFFFFF);
+  box-shadow: inset 1px 1px 0 var(--color-secondary, #808080),
+              inset -1px -1px 0 #FFFFFF,
+              0 0 0 1px #000000;
+}
+
+.quiz-radio-mark::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: transparent;
+}
+
+.quiz-radio-row[aria-checked='true'] .quiz-radio-mark::after {
+  background: #000000;
 }
 
 /* ── Notice banner ──────────────────────────────────────────────────── */
@@ -153,19 +252,17 @@
 /* ── Mobile (≤ 400 px) ─────────────────────────────────────────────── */
 
 @media (max-width: 400px) {
-  #quiz-view {
-    gap: var(--space-4);
-    padding-bottom: var(--space-5);
+  .quiz-body {
+    gap: var(--space-1);
+    padding: var(--space-2);
   }
 
-  .quiz-chrome {
-    gap: var(--space-2);
-    padding: var(--space-2) var(--space-1);
+  .quiz-footer {
+    padding: var(--space-2);
   }
 
-  .quiz-chrome-chip {
-    font-size: 0.6875rem;
-    padding: 0.15rem 0.5rem;
+  .quiz-status-phase {
+    font-size: 0.75rem;
   }
 
   .quiz-card {
@@ -173,7 +270,8 @@
     border-radius: 8px;
   }
 
-  .quiz-option-btn {
+  /* Touch minimum returns at thumb widths (44px, the ADR 0021 floor). */
+  .quiz-radio-row {
     font-size: 0.875rem;
     padding: var(--space-3);
     min-height: 44px;
@@ -184,29 +282,6 @@
     height: 1.5rem;
     font-size: 0.6875rem;
   }
-}
-
-/* ── Card header: question-number chip ──────────────────────────────── */
-
-.quiz-card-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-1);
-}
-
-.quiz-number-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--color-accent);
-  background: #FFF5F0;
-  border-radius: 100px;
-  padding: 0.2rem 0.6rem;
-  min-width: 2rem;
-  letter-spacing: 0.03em;
 }
 
 /* ── Micro-labels: Scenario / Question ──────────────────────────────── */
@@ -241,59 +316,111 @@
   flex: 1;
 }
 
-/* ── Back button ───────────────────────────────────────────────────── */
+/* ── Footer buttons: [< Back] [Next >] / [Finish] (ADR 0020) ─────────
+   Rendered once into the pinned .quiz-footer (js/quiz.js). */
 
-.quiz-back-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
+.quiz-wizard-btn {
+  font-family: var(--font-heading);  /* Chrome Strings on the pixel face */
   font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--color-text-muted);
-  background: none;
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-2) var(--space-4);
   min-height: 44px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 0;
+  border-radius: 0;
   cursor: pointer;
-  transition: all var(--transition-fast);
-  align-self: flex-start;
+  transition: none;
+  /* Raised Win95 push button: the bevel token lives in
+     css/theme-retro-os.css. */
+  box-shadow: var(--bevel-raised,
+                   inset 1px 1px #FFFFFF, inset -1px -1px #000000,
+                   inset 2px 2px #DFDFDF, inset -2px -2px #808080);
 }
 
-.quiz-back-btn:hover {
-  background: var(--color-border);
-  border-color: #bbb;
+.quiz-wizard-btn:hover {
+  box-shadow: var(--bevel-raised,
+                   inset 1px 1px #FFFFFF, inset -1px -1px #000000,
+                   inset 2px 2px #DFDFDF, inset -2px -2px #808080),
+              inset 0 0 0 1px var(--color-secondary);
 }
 
-.quiz-back-btn:active {
-  background: #eee;
+.quiz-wizard-btn:active {
+  /* Pressed: the bevel inverts, Win95 idiom. */
+  box-shadow: var(--bevel-sunken,
+                   inset 1px 1px #808080, inset -1px -1px #FFFFFF,
+                   inset 2px 2px #000000, inset -2px -2px #DFDFDF);
 }
 
-/* ── Card transitions ──────────────────────────────────────────────── */
-
-.quiz-card.card-enter {
-  opacity: 0;
-  transform: translateY(12px);
-  transition: opacity 0.2s ease, transform 0.2s ease;
+.quiz-wizard-btn:focus-visible {
+  outline: 1px dotted #000000;
+  outline-offset: -4px;
 }
 
-.quiz-card.card-exit {
-  opacity: 0;
-  transform: translateY(-8px);
-  transition: opacity 0.2s ease, transform 0.2s ease;
+.quiz-wizard-btn:disabled {
+  color: var(--color-text-light, #808080);
+  text-shadow: 1px 1px 0 #FFFFFF;
+  cursor: default;
 }
 
-/* ── Reduced motion: disable card transitions ──────────────────────── */
+/* [Finish] is the default (emphasized) button: navy inversion, so the
+   single path to Completion reads as one — never auto-fired (ADR 0020). */
+.quiz-finish-btn {
+  color: #FFFFFF;
+  background: var(--color-primary);
+  box-shadow: var(--bevel-raised,
+                   inset 1px 1px #FFFFFF, inset -1px -1px #000000,
+                   inset 2px 2px #3F3FB0, inset -2px -2px #101050);
+}
+
+.quiz-finish-btn:active {
+  box-shadow: var(--bevel-sunken,
+                   inset 1px 1px #101050, inset -1px -1px #FFFFFF,
+                   inset 2px 2px #000000, inset -2px -2px #3F3FB0);
+}
+
+.quiz-finish-btn:disabled {
+  color: var(--color-text-light, #808080);
+  background: var(--color-surface);
+  text-shadow: 1px 1px 0 #FFFFFF;
+}
+
+/* ── Client-area card wipe (ADR 0020) ───────────────────────────────── */
+/* The wipe runs inside the 200ms advance beat (js/quiz.js WIPE_MS);
+   the outgoing card collapses toward its left edge, the incoming one
+   expands back out — a horizontal curtain, no vertical motion. */
+
+.quiz-card.card-wipe-out {
+  animation: quiz-card-wipe-out 160ms linear forwards;
+}
+
+.quiz-card.card-wipe-in {
+  animation: quiz-card-wipe-in 160ms linear;
+}
+
+@keyframes quiz-card-wipe-out {
+  to { clip-path: inset(0 0 0 100%); }
+}
+
+@keyframes quiz-card-wipe-in {
+  from { clip-path: inset(0 0 0 100%); }
+}
+
+/* ── Reduced motion: every animation above is instant ───────────────── */
+/* js/quiz.js gates beats and scroll at call time against this same
+   media query; the wipe classes are simply never added when it matches.
+   The remaining animations (notice, fill) collapse to step changes. */
 
 @media (prefers-reduced-motion: reduce) {
-  .quiz-card.card-enter,
-  .quiz-card.card-exit {
-    transition: none !important;
+  .quiz-card.card-wipe-out,
+  .quiz-card.card-wipe-in,
+  .quiz-notice {
+    animation: none !important;
+    clip-path: none;
     opacity: 1;
     transform: none;
   }
 
-  .quiz-option-btn {
+  .quiz-status-fill {
     transition: none !important;
   }
 }

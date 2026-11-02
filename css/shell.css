@@ -1,0 +1,923 @@
+/* ── Desktop shell (ticket #38) ──────────────────────────────────────────
+
+   Window frame, taskbar, Start menu, language tray chip and About window
+   for the retro OS desktop. Linked after css/theme-retro-os.css — the last
+   base stylesheet on every page. All colours, bevels and the chrome
+   typeface come from the skin's tokens — no new palette here.
+
+   Layering (z-index ladder, ticket #75):
+     .os-shortcuts (100, the icon column on the DESKTOP'S BASE LAYER:
+         every Window paints above it, so a window covers the column and
+         minimizing or moving reveals it again)
+       <  .os-window (200 + the core's stack number — the window base is
+         the floor js/windows.js paints, never a bare stack number)
+       <  .os-taskbar (1000)  <  .os-start-menu (1100)
+       <  .os-about-backdrop (1200)
+       <  .os-dialog-backdrop (1300)
+   ─────────────────────────────────────────────────────────────────── */
+
+:root {
+  --os-taskbar-height: 36px;
+  --os-titlebar-height: 30px;
+}
+
+/* ── Taskbar height reservation ────────────────────────────────────────
+
+   The taskbar is position:fixed, so the document reserves its height at the
+   bottom; nothing — Retake button included — hides behind it. */
+
+body {
+  padding-bottom: var(--os-taskbar-height);
+  /* The window owns all scrolling (ticket #52): long views scroll inside
+     the client area, never the page. */
+  overflow: hidden;
+}
+
+/* ── Window frame ──────────────────────────────────────────────────────
+
+   Wraps #app at runtime (js/shell.js). The frame itself paints the era
+   window's edge: an opaque chrome face with the raised bevel reserved by
+   padding, exactly like 98.css's `background: silver; padding: 3px`
+   idiom (ticket #71) — programs and the app host can no longer paint
+   over the edge, so stacked windows keep a visible seam. The window is
+   FIXED HEIGHT on every
+   view (ticket #52): it fills the desktop above the taskbar, the title bar
+   and the client area flex inside it, and overflow stays clipped so only
+   the view bodies scroll. */
+
+.os-window {
+  display: flex;
+  flex-direction: column;
+  max-width: var(--max-width);
+  height: calc(100vh - var(--os-taskbar-height));
+  margin: 0 auto;
+  /* Ticket #71: the face and the bevel are the frame's own paint. The
+     padding reserves the bevel's thickness (98.css: face + 3px edge) and
+     border-box keeps it inside the existing width/height — the outer
+     geometry, the flow layout and the inline drag Geometry the desktop
+     regime writes are all unchanged. */
+  box-sizing: border-box;
+  padding: 3px;
+  background: var(--color-face);
+  box-shadow: var(--bevel-raised);
+  border-radius: 0;
+  overflow: hidden;
+  z-index: 200;        /* the Window stack's base: above the shortcut
+                          column's rung (100); js/windows.js paints
+                          200 + the core's stack number inline */
+}
+
+/* The title bar is the window's fixed chrome: flex:none keeps it from
+   being squeezed by the client area below it. */
+.os-titlebar {
+  flex: none;
+}
+
+/* #app no longer draws its own window bevel — the shell frame does. It
+   now fills the window below the title bar (flex, min-height 0) instead of
+   carrying a min-height of its own; the views inside own their padding and
+   their scrolling (ticket #52). */
+.os-window #app {
+  box-shadow: none;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  margin: 0;
+  max-width: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* View frame: every visible view fills the client area. */
+.os-window #app > section:not([hidden]) {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* All views except the quiz scroll as a whole, with a modest edge inset
+   (the old #app padding, tightened per ticket #52). The quiz pins its
+   footer and status bar and scrolls only .quiz-body — css/quiz.css. */
+.os-window #app > section:not([hidden]):not(#quiz-view) {
+  overflow-y: auto;
+  padding-left: var(--space-4);
+  padding-right: var(--space-4);
+}
+
+/* ── Welcome splash window (ticket #53) ──────────────────────────────
+
+   While the Landing view is the visible view, the window drops the
+   fixed-height desktop frame and becomes a content-sized ~560px panel
+   centred on the teal desktop above the taskbar. Every other view keeps
+   the ticket #52 frame unchanged. The state is derived from the DOM the
+   shell already maintains — App.showView flips section[hidden] — so no
+   view controller is told about window sizing. */
+
+body:has(#app > #landing-view:not([hidden])) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  /* The taskbar is fixed at the bottom edge; body's normal reserved
+     padding would push the centred window up by its own height, so the
+     splash reserves nothing and the window centres in the viewport strip
+     above the bar. */
+  height: calc(100vh - var(--os-taskbar-height));
+  padding-bottom: 0;
+}
+
+body:has(#app > #landing-view:not([hidden])) .os-window {
+  position: static;   /* the ≤768px maximized rule must not pin this box */
+  width: min(560px, calc(100vw - 2 * var(--space-4)));
+  height: auto;       /* content-sized: title bar + welcome card */
+  max-height: 100%;   /* taller content scrolls inside the view body */
+  margin: 0;
+}
+
+/* ── Desktop regime (ticket #60) ──────────────────────────────────────
+
+   On the results and review views the frame becomes a positioned window:
+   the controller (js/windows.js) adds .is-windowed and paints the core's
+   Geometry inline (left/top/width/height). Landing and quiz keep the
+   layout-flow frame above — the desktop does not exist before the Finish
+   Commit. The z ladder is untouched: the fixed taskbar (1000) still paints
+   over the window, exactly like the era's always-on-top bar. */
+
+.os-window.is-windowed {
+  position: fixed;   /* desktop coordinates, taskbar excluded by the clamp */
+  margin: 0;
+  max-width: none;
+  height: auto;      /* the inline Geometry IS the height */
+}
+
+/* The title bar is the drag handle while the window is a window: no text
+   selection under the pointer, and no browser scroll gesture stealing it
+   on touch. The buttons keep their own cursor. */
+.os-window.is-windowed .os-titlebar {
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+}
+
+/* Bottom-right corner grip (js/shell.js builds it; the controller resizes
+   through it). Shown only in the regime — on the flow views and on the
+   mobile layout there is nothing to grab. The dithered diagonal is the
+   era's sizing box, drawn with gradients, no image asset (ADR 0001). */
+.os-resize-grip {
+  display: none;
+}
+
+.os-window.is-windowed .os-resize-grip {
+  display: block;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  touch-action: none;
+  user-select: none;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--color-secondary) 0 1px,
+    var(--color-face) 1px 2px,
+    var(--color-surface) 2px 3px,
+    var(--color-face) 3px 4px
+  );
+}
+
+/* Live gesture: the bevel reads pressed while the Participant drags or
+   sizes (no text is selectable under the pointer either way). */
+.os-window.is-dragging .os-titlebar,
+.os-window.is-resizing .os-resize-grip {
+  filter: brightness(0.96);
+}
+
+/* A closed window is off the desktop (core hide(), ticket #60) AND off the
+   taskbar (ticket #62, every program): no frame, no client area, no button
+   — the bare teal desktop with the shortcut column stays, and the put-away
+   window's shortcut is the way back (its arrangement waits in the Record). */
+.os-window.is-hidden {
+  display: none;
+}
+
+/* ── Program windows (ticket #61) ─────────────────────────────────────
+
+   The Action Plan and the Deep-Dive Prompt frames: the same chrome as the
+   Quiz frame, and a client area that IS the section's mount host. They are
+   painted only while their window has a Record on the desktop stage; on
+   the flow stages the frame is .is-hidden (no Record) and on the ≤768px
+   layout the media block below takes them full-screen like every other
+   frame. The body scrolls on its own — the frame keeps its fixed height,
+   the section content does not. */
+.os-window-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-4);
+  background: var(--color-face);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);   /* the same column rhythm #results-view draws */
+}
+
+/* The active window is unmistakable: the era drew the active title bar in
+   navy and every inactive one in flat gray with black type (9.9:1 on the
+   darkest step of the ramp). The Quiz frame is the active window whenever
+   the desktop is not the stage, so the flow layout never loses its navy
+   bar, and the landing splash is untouched. */
+.os-window:not(.is-active) .os-titlebar {
+  background: linear-gradient(90deg, #B0B0B0 0%, #E4E4E4 100%);
+  color: var(--color-text);
+}
+
+/* The program frames are fixed-height windows on the desktop, sized by
+   their Geometry — the same rule the Quiz frame rides (.is-windowed). */
+.os-window.is-windowed .os-window-body {
+  max-width: none;
+}
+
+/* ── Desktop shortcuts (ticket #62, re-layered by #75) ───────────────────
+
+   The top-left icon column: one shortcut per program, glyph over label,
+   ALWAYS present on the desktop-width layout — running or not, arrived or
+   not. The column belongs to the DESKTOP SURFACE, so it sits on the
+   desktop's base rung (100): every Window paints above it (the window base
+   in js/windows.js is 200 + the core's stack number), a window covers the
+   icons, and minimizing or moving a Window reveals the column again. The
+   rung stays below the taskbar (1000), the Start menu (1100) and the
+   dialog rungs, which own the desktop.
+   Double-click, Enter or Space launch; a single click only selects, as on
+   a real desktop. The ≤768px layout removes the column entirely (media
+   block at the bottom): there the taskbar's PERMANENT program switches
+   (ticket #68) are the only route between the programs. */
+.os-shortcuts {
+  position: fixed;
+  top: var(--space-2);
+  left: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 96px;
+  z-index: 100;            /* the desktop's base layer, under every Window */
+}
+
+/* The desktop does not exist before the Finish Commit (spec #58): the
+   landing and answering stages are the stages where a Window IS the whole
+   screen, so the column is drawn only on the stages behind Completion —
+   #75's layering already puts a Window over it, but on these two stages
+   there is no desktop to stand the icons on at all, and the maximized flow
+   frame would simply hide them. */
+body:has(#landing-view:not([hidden])) .os-shortcuts,
+body:has(#quiz-view:not([hidden])) .os-shortcuts {
+  display: none;
+}
+
+.os-shortcut {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  /* An era icon is not a push button: no face, no bevel, no field. */
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--color-text);
+  font-family: var(--font-heading);
+  font-weight: 400;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  text-align: center;
+  cursor: default;         /* one click selects; two launch */
+}
+
+.os-shortcut-glyph {
+  display: block;
+  line-height: 0;          /* the drawn icon hugs its box */
+}
+
+.os-shortcut-label {
+  display: block;
+}
+
+/* ── Title bar ─────────────────────────────────────────────────────────
+
+   Navy → lighter blue gradient, exactly like the Quiz Card header drawn in
+   css/theme-retro-os.css. */
+
+.os-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--os-titlebar-height);
+  padding: 0 var(--space-1) 0 var(--space-2);
+  background: linear-gradient(90deg, #000080 0%, #1084D0 100%);
+  color: #FFFFFF;
+  font-family: var(--font-heading);
+}
+
+.os-titlebar-title {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.os-titlebar-buttons {
+  display: flex;
+  gap: 2px;
+  flex: none;
+}
+
+/* Title-bar buttons: 16×14 with a drawn era glyph inside (98.css geometry:
+   6×2 minimize bar, 9×9 outlined maximize square, 8×7 close cross — the
+   SVG markup lives in js/shell.js's TITLE_BAR_GLYPHS). Era-correct for a
+   landing-state application that cannot close itself: the controller (#43)
+   flips these between live and disabled, and only the glyph's color and
+   shadow follow the state — bevel, press offset and focus rectangle stay
+   exactly as every other command button draws them. */
+
+.os-titlebar-btn {
+  width: 16px;
+  height: 14px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  color: var(--color-text);
+}
+
+/* currentColor paints the glyph: black live, gray disabled. */
+.os-titlebar-btn .tb-glyph {
+  display: block;
+}
+
+.os-titlebar-btn:disabled {
+  /* The skin's generic disabled rule: flat, gray text, dotted border. The
+     title-bar button keeps a 1px raised bevel so it still reads as a
+     drawn button, not a hole. */
+  background: var(--color-face);
+  color: var(--color-secondary);
+  border: 0;
+  box-shadow: var(--bevel-raised);
+}
+
+/* Disabled glyphs get the classic 1px white drop shadow (text-shadow
+   cannot reach SVG content, so the shadow rides the glyph itself). */
+.os-titlebar-btn:disabled .tb-glyph {
+  filter: drop-shadow(1px 1px 0 #FFFFFF);
+}
+
+/* ── Taskbar ─────────────────────────────────────────────────────────── */
+
+.os-taskbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--os-taskbar-height);
+  padding: 2px var(--space-2);
+  background: var(--color-face);
+  box-shadow: inset 0 1px #FFFFFF, inset 0 -1px #000000;
+  font-family: var(--font-heading);
+}
+
+.os-start-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: calc(var(--os-taskbar-height) - 8px);
+  padding: 0 var(--space-2);
+  font-family: var(--font-heading);
+}
+
+/* The 4-color flag mark, drawn with a gradient — no image asset needed. */
+.os-start-icon {
+  width: 16px;
+  height: 14px;
+  flex: none;
+  background:
+    linear-gradient(135deg, #FF0000 0 25%, #00FF00 25% 50%,
+                    #0000FF 50% 75%, #FFFF00 75% 100%);
+}
+
+.os-start-label {
+  font-size: 14px;
+}
+
+/* Program button: pressed state — this window is the running program. */
+
+/* The running-windows list (ticket #61): the Quiz button, then one button
+   per program window in the stable program order. The Windows controller
+   removes a button with its window's mode (an unarrived program and a
+   hidden window are both absent), so this row IS "exactly the running
+   windows" — the markup is built once, the list is painted per render. */
+.os-taskbar-programs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-right: auto;      /* the era packs its program buttons left */
+}
+
+.os-program-btn {
+  flex: 0 1 auto;
+  min-width: 0;
+  height: calc(var(--os-taskbar-height) - 8px);
+  padding: 0 var(--space-2);
+  margin-right: 0;         /* the free space belongs after the bar (above) */
+  font-family: var(--font-heading);
+  background: var(--color-face);
+  color: var(--color-text);
+  box-shadow: var(--bevel-sunken);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+/* ── Tray language toggle (tickets #50, #55) ──────────────────────────
+
+   A two-segment sunken tray field naming both languages: the active
+   language pressed (white field, 1px inset), the other flat. Both
+   segments run one action (js/shell.js switchLanguage → js/lang-switch.js):
+   swap the dictionary and Bank Variant in place on the splash and
+   answering screens (#55), recording the Language Preference; other views
+   record it and navigate the declared alternate. Replaces the taskbar
+   clock. */
+
+.os-lang-toggle {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;   /* height is the outer field: siblings' −8px */
+  gap: 1px;
+  height: calc(var(--os-taskbar-height) - 8px);
+  padding: 2px;
+  box-shadow: var(--bevel-sunken);
+}
+
+.os-lang-seg {
+  height: 100%;
+  min-width: 34px;
+  padding: 0 var(--space-2);
+  font-family: var(--font-heading);
+  font-size: 14px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.os-lang-seg[aria-pressed='true'] {
+  background: var(--color-surface);
+  box-shadow: inset 1px 1px var(--color-secondary),
+              inset -1px -1px var(--color-surface);
+}
+
+.os-lang-seg[aria-pressed='false'] {
+  color: var(--color-text);
+}
+
+.os-lang-seg:focus-visible {
+  outline: 1px dotted var(--color-text);
+  outline-offset: -3px;
+}
+
+/* ── Start menu popup ──────────────────────────────────────────────────
+
+   Anchored above the Start button; beveled vertical list, navy selection
+   bar on hover/focus. */
+
+.os-start-menu {
+  display: none;
+  position: fixed;
+  bottom: var(--os-taskbar-height);
+  left: var(--space-2);
+  z-index: 1100;
+  min-width: 180px;
+  padding: var(--space-1);
+  background: var(--color-face);
+  box-shadow: var(--bevel-raised);
+  font-family: var(--font-heading);
+}
+
+.os-start-menu.open {
+  display: block;
+}
+
+.os-start-menu-item {
+  display: block;
+  width: 100%;
+  padding: var(--space-1) var(--space-3);
+  font-family: var(--font-heading);
+  font-size: 14px;
+  text-align: left;
+  background: transparent;
+  box-shadow: none;
+}
+
+.os-start-menu-item:hover,
+.os-start-menu-item:focus-visible {
+  background: var(--color-primary);
+  color: #FFFFFF;
+  outline: none;
+}
+
+/* ── About window ──────────────────────────────────────────────────────
+
+   Mini-window centered over a dimmed backdrop. */
+
+.os-about-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.os-about-backdrop.open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.os-about-window {
+  width: min(420px, calc(100vw - 2 * var(--space-3)));
+  background: var(--color-face);
+  box-shadow: var(--bevel-raised);
+  font-family: var(--font-body);
+}
+
+.os-about-window .os-titlebar {
+  padding-left: var(--space-2);
+}
+
+.os-about-body {
+  padding: var(--space-3);
+}
+
+.os-about-body p {
+  margin: 0 0 var(--space-2);
+  line-height: 1.5;
+}
+
+.os-about-app {
+  font-family: var(--font-heading);
+}
+
+.os-about-link {
+  color: var(--color-primary);
+}
+
+.os-about-credits {
+  font-size: 13px;
+  color: var(--color-text-light);
+}
+
+.os-about-ok {
+  display: block;
+  min-width: 75px;
+  margin: 0 var(--space-3) var(--space-3) auto;
+  padding: var(--space-1) var(--space-3);
+  font-family: var(--font-heading);
+}
+
+/* ── Window controls (ticket #43) ───────────────────────────────────────
+
+   Minimize/restore reuse the wireframe trace idiom (css/theme-retro-os.css,
+   200ms, discrete steps): the frame collapses toward the taskbar and
+   re-opens from it. The controller (js/windows.js) swaps .is-minimizing
+   for .is-minimized on a timer; under prefers-reduced-motion the delay is
+   0ms in JS and the animations below are off, so the state lands instantly. */
+
+@keyframes os-minimize-trace {
+  from { clip-path: inset(0 0 0 0); }
+  to   { clip-path: inset(100% 0 0 0); }
+}
+
+@keyframes os-restore-trace {
+  from { clip-path: inset(100% 0 0 0); }
+  to   { clip-path: inset(0 0 0 0); }
+}
+
+.os-window.is-minimizing {
+  animation: os-minimize-trace 200ms steps(4, end) forwards;
+}
+
+.os-window.is-restoring {
+  animation: os-restore-trace 200ms steps(4, end);
+}
+
+.os-window.is-minimized {
+  display: none;
+}
+
+/* Maximized: full-viewport above the taskbar, its own scroll (ticket #46
+   tunes the mobile variant). The bevel stays (ticket #71): the frame
+   keeps its reserved edge and the client area sits inside it, exactly
+   like every other Program window on the desktop. */
+.os-window.is-maximized {
+  position: fixed;
+  inset: 0 0 var(--os-taskbar-height) 0;
+  max-width: none;
+  margin: 0;
+  overflow: hidden;
+}
+
+.os-window.is-maximized #app {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* Program button: sunken (pressed) while the window is shown, raised
+   (unpressed) while it is minimized — the era's taskbar state flip. */
+.os-program-btn[aria-pressed='true'] {
+  box-shadow: var(--bevel-sunken);
+}
+
+.os-program-btn[aria-pressed='false'] {
+  box-shadow: var(--bevel-raised);
+  font-weight: bold;
+}
+
+/* ── System dialog (ticket #43) ────────────────────────────────────────
+
+   Reusable primitive (App.Windows.openSystemDialog): navy title bar from
+   the shared .os-titlebar classes, sunken icon field, beveled command
+   buttons. The backdrop dims the desktop but is inert — a real modal only
+   closes via its buttons or Escape. */
+
+.os-dialog-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1300;              /* above .os-about-backdrop (1200) */
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.os-dialog-backdrop.open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.os-dialog {
+  width: min(440px, calc(100vw - 2 * var(--space-3)));
+  background: var(--color-face);
+  box-shadow: var(--bevel-raised);
+  font-family: var(--font-body);
+}
+
+.os-dialog-body {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3);
+}
+
+/* Era icon: flat circle, drawn glyph. warn = red circle + white cross
+   (the "this ends the program" mark); info = navy circle + white glyph. */
+.os-dialog-icon {
+  flex: none;
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.os-dialog-icon[data-icon='warn'] {
+  background: #FF0000;
+}
+
+.os-dialog-icon[data-icon='info'] {
+  background: #000080;
+}
+
+/* The white cross: two 16x4 bars, rotated ±45°. */
+.os-dialog-icon::before,
+.os-dialog-icon::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  height: 4px;
+  margin: -2px 0 0 -8px;
+  background: #FFFFFF;
+}
+
+.os-dialog-icon::before { transform: rotate(45deg); }
+.os-dialog-icon::after  { transform: rotate(-45deg); }
+
+.os-dialog-message {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.os-dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: 0 var(--space-3) var(--space-3);
+}
+
+.os-dialog-btn {
+  min-width: 75px;
+  padding: var(--space-1) var(--space-3);
+  font-family: var(--font-heading);
+}
+
+/* Focus ring: era dotted rectangle (matches the skin's button focus). */
+.os-dialog-btn:focus-visible,
+.os-titlebar-btn:focus-visible,
+.os-program-btn:focus-visible,
+.os-start-btn:focus-visible {
+  outline: 1px dotted var(--color-text);
+  outline-offset: -4px;
+}
+
+/* The keyboard floor (#67): a window frame is focusable through its own
+   grouping (restore() lands focus there, so the Participant knows WHICH
+   program Tab will walk next). Every other window's CONTROLS wear the
+   inert attribute the controller paints — client area, title-bar buttons
+   and any region mounted into the frame — while the title bar and the
+   corner grip stay live, so the pointer keeps raising, dragging and
+   resizing exactly as before.
+   A desktop icon takes the same dotted ring (ticket #62): the outline sits
+   INSIDE the icon box so it never grows the column. */
+.os-window:focus-visible,
+.os-shortcut:focus-visible {
+  outline: 1px dotted var(--color-text);
+  outline-offset: -3px;
+}
+
+/* ── Reduced motion (ticket #43 extension of the #42 contract) ─────────
+   Traces never draw; the state classes land instantly (JS delay is 0ms).
+   The dialog has no animation of its own, so it appears instantly by
+   construction. */
+@media (prefers-reduced-motion: reduce) {
+  .os-window.is-minimizing,
+  .os-window.is-restoring {
+    animation: none;
+  }
+}
+
+/* ── Responsive: single-program layout — full-screen frame, slim switcher
+   taskbar (tickets #46, #68) ────────────────────────────────────────────
+
+   At ≤768px the desktop is SINGLE-PROGRAM: one frame fills the screen
+   above the slim taskbar, its client area scrolls on its own, and the
+   taskbar is the only switcher between the three programs. Implemented
+   as pure presentation — the media query decides, not .is-maximized — so
+   the state machine in js/windows.js stays viewport-blind; the
+   controller carries the behavioral consequences behind the same query
+   (the mobile rule in its header: [—]/[□] dead, geometry refused, the
+   taskbar painted as three permanent switch entries). Crossing 768px is
+   an instant class-free state switch, never an animation: nothing
+   resizes, nothing moves twice, and no Record, mode or Geometry is lost
+   in either direction. */
+@media (max-width: 768px) {
+  :root {
+    /* Slim taskbar: 44px IS the slim form — the slimmest bar whose
+       interactive controls (Start, program button, tray chip) still meet
+       the 44px touch minimum edge to edge. A shorter bar would need
+       invisible hit-area extensions, which lie about the visible chrome.
+       Every derived measurement (body padding-bottom, Start-menu anchor,
+       window insets) follows this one var. */
+    --os-taskbar-height: 44px;
+  }
+
+  .os-window {
+    position: fixed;
+    inset: 0 0 var(--os-taskbar-height) 0;
+    max-width: none;
+    margin: 0;
+    box-shadow: none;
+    overflow: hidden;
+  }
+
+  /* The desktop regime (ticket #60) is a desktop-width presentation: the
+     controller never paints Geometry here, and the corner grip stays hidden
+     with it. Restated at mobile specificity so a class that outlives a
+     viewport crossing can never leave a half-positioned frame. */
+  .os-window.is-windowed {
+    inset: 0 0 var(--os-taskbar-height) 0;
+    max-width: none;
+  }
+
+  .os-window.is-windowed .os-resize-grip {
+    display: none;
+  }
+
+  /* Single-program layout (ticket #68): the chrome reduces to close.
+     There is no dragging, resizing or maximizing on this viewport — the
+     controller refuses every geometry write and both toggles behind the
+     same media query (js/windows.js) — so [—] and [□] would be controls
+     that lie about a gesture that cannot happen, exactly the way [□]
+     already did for #46. They leave the chrome; [×] stays, and it puts
+     the window away with the permanent taskbar switch as the way back. */
+  .os-window .os-titlebar-btn[data-os-button="minimize"],
+  .os-window .os-titlebar-btn[data-os-button="maximize"] {
+    display: none;
+  }
+
+  /* The title bar is not a handle on this layout. Restated at mobile
+     specificity so a regime class that outlives a viewport crossing can
+     never leave a frame asking for, or stealing, a drag gesture. */
+  .os-window.is-windowed .os-titlebar {
+    cursor: default;
+    touch-action: auto;
+    user-select: text;
+  }
+
+  /* The taskbar is the only switcher (the shortcut column above it does
+     not fit): its three program entries are PERMANENT — running, put away
+     or not arrived — and js/windows.js paints them so. The row shares the
+     room the Start button and the tray leave: the app's own button is one
+     slot and the programs bar is the two slots beside it, so the three
+     switches read equal, and each label flexes down with its ellipsis
+     rather than wrapping or pushing the tray off the bar. The bar only
+     claims its two slots when it actually lists a switch — on the flow
+     stages the Quiz entry takes the row for itself. */
+  .os-taskbar .os-program-btn {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .os-taskbar-programs {
+    flex: 0 1 auto;
+    min-width: 0;
+    margin-right: 0;   /* auto margins eat the switcher's slots */
+  }
+
+  .os-taskbar-programs:has(.os-program-btn:not([hidden])) {
+    flex: 2 1 0;
+  }
+
+  .os-window #app {
+    height: 100%;
+    min-height: 0;
+    max-width: none;   /* the skin's 720px cap would leave a teal gutter */
+    overflow: auto;
+    /* The skin's ≤768 #app margins would inset the full-bleed client
+       area; this file is the last base sheet, so margin: 0 wins the
+       cascade without touching css/theme-retro-os.css. */
+    margin: 0;
+  }
+
+  /* Vertical padding would shrink the controls below the 44px bar. */
+  .os-taskbar {
+    padding: 0 var(--space-2);
+  }
+
+  /* Taskbar controls fill the bar edge to edge: 44px tall hit targets. */
+  .os-start-btn,
+  .os-program-btn,
+  .os-lang-toggle {
+    height: 100%;
+  }
+
+  /* Tray compaction: the language segments sit at chrome-small on phones. */
+  .os-lang-seg {
+    font-size: 13px;
+  }
+
+  /* Start menu entries: the pixel face needs the touch minimum too
+     (padding alone lands at ~29px). */
+  .os-start-menu-item {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  /* System dialog command buttons (End Program / Language offer). */
+  .os-dialog-btn {
+    min-height: 44px;
+  }
+
+  /* Desktop shortcuts (ticket #62) do not exist on this layout: there is
+     no teal desktop to stand icons on — every frame is full-screen and the
+     taskbar's permanent switches (#68) are the only way between the
+     programs. */
+  .os-shortcuts {
+    display: none;
+  }
+}
+
+/* ≤480: menu spans the width; nothing wraps — the program button keeps
+   flexing down with its ellipsis, the tray fields stay flex:none. */
+@media (max-width: 480px) {
+  .os-start-menu {
+    left: var(--space-1);
+    right: var(--space-1);
+    min-width: 0;
+  }
+}

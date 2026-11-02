@@ -3,52 +3,67 @@
 #results-view {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
-  padding-bottom: var(--space-8);
+  gap: var(--space-2);
+  /* Vertical inset inside the fixed window (ticket #52); the horizontal
+     edge inset comes from css/shell.css's view rule. Tight on purpose:
+     the header, the Risk Radar and the Blind-Spot Bars must fit one
+     desktop window at 1024×768 without internal scrolling. */
+  padding-top: var(--space-2);
+  padding-bottom: var(--space-2);
 }
 
-/* ── Title Card ── */
+/* ── Results header panel (ticket #60: the window's first body panel) ──
+
+   The fake Title Card window of #45 is retired: the shell frame IS the
+   window now, so the Progression Title (emoji + name) and the Overall
+   Percentage render in one sunken white client field, and no second title
+   bar exists. Its raised frame and navy title-bar rules left with it; the
+   skin's .results-title-name rule (css/theme-retro-os.css) still owns the
+   tier name's face, and the tier data path is untouched. */
+
 .results-title-card {
-  text-align: center;
-  padding: var(--space-8) var(--space-4) var(--space-6);
-  background: linear-gradient(135deg, var(--color-primary) 0%, #333 100%);
-  border-radius: 12px;
-  color: #fff;
+  text-align: left;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: 0;
+  box-shadow: var(--bevel-sunken);
 }
 
-.results-title-emoji {
-  font-size: 3rem;
-  line-height: 1;
-  margin-bottom: var(--space-2);
+/* The Progression Title row: .results-title-name (the skin's face and
+   colour) + this size, as the window's first body row (ticket #60). */
+.results-title-caption {
+  font-size: 1.125rem;
+  margin-bottom: var(--space-1);
 }
 
-.results-title-name {
+.results-overall-caption {
   font-family: var(--font-heading);
-  font-size: 2rem;
-  font-weight: 400;
-  letter-spacing: -0.02em;
+  font-size: 1.125rem;
+  color: var(--color-text);
   margin-bottom: var(--space-1);
 }
 
 .results-title-pct {
   font-family: var(--font-heading);
-  font-size: 4rem;
-  font-weight: 800;
+  font-size: 2.5rem;
+  font-weight: 400;        /* W95FA has one weight; no faux bold */
   color: var(--color-accent);
   opacity: 1;
-  margin-top: var(--space-2);
+  margin-top: 0;
 }
 
 /* The score's meaning, on the headline itself.
 
-   js/results.js buildTitleCard appends results-green/amber/red alongside
+   js/results.js buildResultsHeader appends results-green/amber/red alongside
    results-title-pct. These rules override the accent colour above, so the
    largest, most eye-catching element on the page finally says something:
-   a 100% does not render in the same orange as every risk indicator.
+   a 100% does not render in the same navy as every neutral control.
 
-   The --color-score-* set, not the bar-fill tokens below: this sits on the
-   dark card, where the fill values would not clear 3:1. See the Score colours
-   block in css/theme-surya.css for the measurements behind both sets. */
+   The --color-score-* set, not the bar-fill tokens below, for the headline
+   role; see the Score colours block in css/theme-retro-os.css for the
+   measurements behind both sets (the client field is white either way). */
 .results-title-pct.results-green { color: var(--color-score-green); }
 .results-title-pct.results-amber { color: var(--color-score-amber); }
 .results-title-pct.results-red   { color: var(--color-score-red); }
@@ -57,24 +72,68 @@
 .results-section {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .results-section-title {
   font-family: var(--font-heading);
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 400;
   color: var(--color-text);
   margin: 0;
 }
 
-/* ── Risk Radar ── */
+/* Id-scoped so these win over the later-loaded skin rules (#58 fit): the
+   header, radar and bars must share one 1024×768 window body. */
+#results-view .results-title-card {
+  padding: var(--space-2) var(--space-3);
+  margin: 0;
+}
+
+#results-view .results-radar-wrap {
+  max-width: 240px;
+  padding: var(--space-1);
+}
+
+#results-view .results-section {
+  gap: var(--space-1);
+}
+
+#results-view .results-section-title {
+  font-size: 1.125rem;
+}
+
+/* Ten bars become five rows of two on a desktop window, so the section
+   fits beside the radar instead of tripling the window's scroll. */
+@media (min-width: 769px) {
+  #results-view .results-bars {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-1) var(--space-3);
+  }
+}
+
+/* A section mounted into its own program window already has the program
+   name on the window's title bar: the in-body heading would repeat it. */
+.os-window-body .results-section > .results-section-title {
+  display: none;
+}
+
+/* ── Risk Radar ──
+
+   Sunken white field (skin tokens) hosting the black-on-white vector chart
+   drawn in js/results.js — no shadow, no radius; the field itself is the
+   Win95 inset. */
 .results-radar-wrap {
   display: flex;
   justify-content: center;
-  max-width: 400px;
+  max-width: 320px;
   margin: 0 auto;
   width: 100%;
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border-radius: 0;
+  box-shadow: var(--bevel-sunken);
 }
 
 .results-radar-svg {
@@ -82,21 +141,38 @@
   height: auto;
 }
 
-/* ── Buttons row (download / share) ── */
-.results-btn-row {
+/* ── Window menu bar (ticket #65) ──
+
+   The Quiz window's commands live here, in one strip at the head of the
+   body: Download PNG, Share, Review answers, Retake. The items are the
+   command buttons themselves (their .results-*-btn classes keep the skin's
+   raised-bevel button rules in css/theme-retro-os.css), so the bar is just
+   the era's menu strip: a sunken gutter of bevelled buttons. It wraps
+   rather than clipping at narrow widths — the desktop window can be
+   dragged down to its 360px floor, where four commands stack. */
+.results-menu-bar {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-2);
-  justify-content: center;
+  padding: var(--space-2) var(--space-3);
+  margin: 0;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  box-shadow: var(--bevel-raised);
+}
+
+.results-menu-bar .results-menu-item {
+  font-size: 0.875rem;
+  padding: var(--space-2) var(--space-4);
+  cursor: pointer;
 }
 
 .results-download-btn,
 .results-share-btn {
-  font-size: 0.875rem;
-  padding: var(--space-2) var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--border-radius);
   background: var(--color-bg);
-  cursor: pointer;
   transition: all var(--transition-fast);
 }
 
@@ -135,14 +211,21 @@
   grid-area: track;
   height: 12px;
   background: var(--color-border);
-  border-radius: 6px;
+  border-radius: 0;      /* Win95 squares; the skin adds the dither + inset */
   overflow: hidden;
 }
 
 .results-bar-fill {
   height: 100%;
-  border-radius: 6px;
+  border-radius: 0;
   transition: width 0.6s ease;
+  /* Segmented blocks (ticket #45): same 6px-on/2px-off rhythm the skin
+     paints the Progress Fill with — the band colour below shows through
+     the transparent cells, var(--color-surface) draws the gaps. The width
+     behaviour driven by js/results.js is untouched; the reduced-motion
+     block at the foot of this file collapses the transition. */
+  background-image: repeating-linear-gradient(
+    90deg, transparent 0 6px, var(--color-surface) 6px 8px);
 }
 
 .results-bar-pct {
@@ -164,24 +247,30 @@
    The two selector forms are both kept: js/results.js puts the class on the
    fill itself (.results-bar-fill.results-red), while these rules also support
    an ancestor carrying it. The compound selector is what wins over the
-   single-class .results-bar-fill rule in css/theme-surya.css, which is why the
-   bars are not all orange. */
+   single-class .results-bar-fill rule in css/theme-retro-os.css, which is
+   why each bar keeps its own score colour. */
+/* background-color (not the background shorthand): the shorthand resets the
+   background-image the .results-bar-fill rule above sets, which would drop
+   the segmented-block pattern. */
 .results-red .results-bar-fill,
 .results-bar-fill.results-red {
-  background: var(--color-error);
+  background-color: var(--color-error);
 }
 
 .results-amber .results-bar-fill,
 .results-bar-fill.results-amber {
-  background: var(--color-warning);
+  background-color: var(--color-warning);
 }
 
 .results-green .results-bar-fill,
 .results-bar-fill.results-green {
-  background: var(--color-success);
+  background-color: var(--color-success);
 }
 
-/* ── Action Plan ── */
+/* ── Action Plan ──
+   One ranked list (ticket #72): the Actions are rows inside a single
+   sunken panel — no per-row navy header, no per-row raised card frame.
+   Priority is carried by the sunken white badge on each row. */
 .results-action-plan {
   display: flex;
   flex-direction: column;
@@ -194,17 +283,24 @@
   line-height: 1.6;
 }
 
+/* The ranked panel: a sunken white field, exactly one in the window. */
 .results-action-list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  background: var(--color-surface);
+  box-shadow: var(--bevel-sunken);
 }
 
+/* A row of the list: plain content on the sunken body, read order led by
+   the badge. Rows keep the DOM class, but the chrome is list-row chrome. */
 .results-action-item {
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
-  padding: var(--space-3) var(--space-4);
-  background: #FAFAFA;
+  border: 0;
+  border-radius: 0;
+  padding: var(--space-3);
+}
+
+.results-action-item + .results-action-item {
+  border-top: 1px solid var(--color-border);
 }
 
 .results-action-head {
@@ -212,25 +308,29 @@
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
-  margin-bottom: var(--space-2);
+  margin: 0 0 var(--space-2);
 }
 
+/* Priority badge: a sunken white field with the navy digit, Win95 square. */
 .results-action-priority {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 1.5rem;
   height: 1.5rem;
-  border-radius: 50%;
-  background: var(--color-primary);
-  color: #fff;
+  font-family: var(--font-heading);
   font-size: 0.75rem;
   font-weight: 700;
   flex-shrink: 0;
+  background: var(--color-surface);
+  color: var(--color-primary);
+  border-radius: 0;
+  box-shadow: var(--bevel-sunken);
 }
 
 .results-action-title {
-  font-weight: 600;
+  font-family: var(--font-heading);
+  font-weight: 400;          /* W95FA carries no bold */
   font-size: 0.9375rem;
   color: var(--color-text);
 }
@@ -239,9 +339,11 @@
   font-size: 0.6875rem;
   font-weight: 500;
   padding: 0.15em 0.5em;
-  border-radius: 3px;
-  background: #FFF5F0;
-  color: var(--color-accent);
+  border-radius: 0;
+  background: var(--color-surface);
+  color: var(--color-primary);
+  box-shadow: inset 1px 1px var(--color-secondary),
+              inset -1px -1px #FFFFFF;
   white-space: nowrap;
 }
 
@@ -252,44 +354,74 @@
   margin: 0;
 }
 
-/* ── Narrative Expander ── */
+/* ── Narrative Expander ──
+
+   The disclosure idiom the Review screen already uses (ticket #72): a list
+   row on the silver panel, led by the square [+]/[-] Explorer glyph — no
+   navy gradient anywhere in window content — and the Narrative prose on
+   the panel body when the row is opened. */
+
 .results-narrative-details {
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
+  border: 0;
+  border-radius: 0;
   overflow: hidden;
+  background: var(--color-face);
+  box-shadow: var(--bevel-raised);
 }
 
 .results-narrative-summary {
   cursor: pointer;
-  padding: var(--space-3) var(--space-4);
+  padding: 4px var(--space-3);
+  font-family: var(--font-heading);
   font-size: 0.9375rem;
-  font-weight: 500;
-  color: var(--color-accent);
-  background: #FFF5F0;
+  font-weight: 400;
+  color: var(--color-text);
   user-select: none;
+  list-style: none;
 }
 
-.results-narrative-summary:hover {
-  background: #FFEBE0;
+.results-narrative-summary::-webkit-details-marker {
+  display: none;
 }
 
-.results-narrative-details[open] .results-narrative-summary {
-  border-bottom: 1px solid var(--color-border);
+/* Square Explorer toggle: [+]/[-] on the row, no easing. */
+.results-narrative-summary::before {
+  content: '[+] ';
+  color: var(--color-text);
+  font-weight: 400;
+  display: inline-block;
+  margin-right: var(--space-1);
 }
 
-/* ── Deep-Dive Prompt ── */
+.results-narrative-details[open] > .results-narrative-summary::before {
+  content: '[-] ';
+}
+
+.results-narrative-details[open] > .results-narrative-summary {
+  border-bottom: 1px solid #000000;
+}
+
+/* Prose on the silver body of the open panel. */
+.results-narrative-details .results-action-narrative {
+  margin: 0;
+  padding: var(--space-3) var(--space-3) 0;
+  color: var(--color-text);
+}
+
+.results-narrative-details .results-action-narrative:last-child {
+  padding-bottom: var(--space-3);
+}
+
+/* ── Deep-Dive Prompt (ticket #74) ──
+
+   The fold is gone: the window body is the one-line guidance above the
+   prompt's sunken scrollable field, and the window's one Copy Prompt
+   command sits in the bar above it (the .results-menu-bar surface the
+   Quiz window shares). The navy expander row went with the <details>. */
 .results-deep-dive {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-}
-
-.results-deep-dive-heading {
-  font-family: var(--font-heading);
-  font-size: 1.5rem;
-  font-weight: 400;
-  color: var(--color-text);
-  margin: 0;
 }
 
 .results-deep-dive-sub {
@@ -299,35 +431,17 @@
   margin: 0;
 }
 
-.results-prompt-details {
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
-  overflow: hidden;
-}
-
-.results-prompt-summary {
-  cursor: pointer;
-  padding: var(--space-3) var(--space-4);
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--color-accent);
-  background: #FFF5F0;
-  user-select: none;
-}
-
-.results-prompt-summary:hover {
-  background: #FFEBE0;
-}
-
 .results-prompt-pre {
   max-height: 300px;
   overflow: auto;
   margin: 0;
-  padding: var(--space-4);
+  padding: var(--space-3);
   font-size: 0.8125rem;
   line-height: 1.5;
-  background: #FAFAFA;
-  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--bevel-sunken);
   white-space: pre-wrap;
   word-break: break-word;
   font-family: var(--font-mono);
@@ -341,8 +455,6 @@
   background: var(--color-bg);
   color: var(--color-accent);
   cursor: pointer;
-  margin: var(--space-2) var(--space-4) var(--space-3);
-  width: calc(100% - var(--space-8));
   transition: all var(--transition-fast);
 }
 
@@ -350,30 +462,35 @@
   background: #FFF5F0;
 }
 
-/* ── Review Accordion ── */
+/* ── Review Accordion (ticket #45: tree-style disclosure) ──
+
+   Each Question is a tree node in the Explorer idiom: a disclosure row on
+   the silver panel with a square [+]/[-] glyph toggle — ticket #72 took the
+   navy title bar off every in-window row, this one included — and an
+   indented sunken client panel of child rows. The review text stays
+   score-free (ADR 0005: no percentages in Review). */
+
 .results-review {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .results-review-item {
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
+  border: 0;
+  border-radius: 0;
   overflow: hidden;
-}
-
-.results-review-item[open] {
-  border-color: var(--color-primary);
+  background: var(--color-face);
+  box-shadow: var(--bevel-raised);
 }
 
 .results-review-summary {
   cursor: pointer;
-  padding: var(--space-3) var(--space-4);
+  padding: 4px var(--space-3);
+  font-family: var(--font-heading);
   font-size: 0.9375rem;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--color-text);
-  background: #FAFAFA;
   user-select: none;
   list-style: none;
 }
@@ -382,42 +499,55 @@
   display: none;
 }
 
+/* Square Explorer toggle: [+]/[-] on the row, no easing. */
 .results-review-summary::before {
-  content: '▸ ';
-  color: var(--color-accent);
-  font-weight: 700;
-  transition: transform 0.15s;
+  content: '[+] ';
+  color: var(--color-text);
+  font-weight: 400;
   display: inline-block;
   margin-right: var(--space-1);
 }
 
 .results-review-item[open] > .results-review-summary::before {
-  content: '▾ ';
+  content: '[-] ';
 }
 
-.results-review-summary:hover {
-  background: var(--color-border);
+.results-review-item[open] > .results-review-summary {
+  border-bottom: 1px solid #000000;
 }
 
+/* The Question chip rides the same silver row as its question. */
 .results-review-qnum {
-  font-weight: 700;
-  color: var(--color-accent);
+  font-family: var(--font-heading);
+  font-weight: 400;
+  color: var(--color-text);
   font-size: 0.8125rem;
 }
 
+/* The client field: sunken white panel, child rows indented under the
+   disclosure row like Explorer tree children. */
 .results-review-inner {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-4);
+  margin: var(--space-1);
+  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-5);
+  background: var(--color-surface);
+  border-radius: 0;
+  box-shadow: var(--bevel-sunken);
 }
 
-.results-review-phase {
+/* #results-view prefix so this beats the skin's same-specificity
+   .results-review-phase { color: #FFFFFF } — that rule targets the summary
+   context, but the phase label renders inside the white client field, where
+   white text would vanish. */
+#results-view .results-review-inner .results-review-phase {
+  font-family: var(--font-heading);
   font-size: 0.6875rem;
-  font-weight: 600;
+  font-weight: 400;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--color-accent);
+  color: var(--color-text-light);
 }
 
 .results-review-scenario {
@@ -434,23 +564,26 @@
   margin: 0;
 }
 
+/* Child rows indent under the disclosure row (Explorer tree). */
 .results-review-option {
   font-size: 0.875rem;
   color: var(--color-text-muted);
   line-height: 1.5;
   padding: var(--space-2) var(--space-3);
+  margin-left: var(--space-3);
   border-left: 3px solid transparent;
 }
 
+/* Selection = navy highlight, white text (Win95 selected list item). */
 .results-review-option-selected {
-  border-left-color: var(--color-accent);
-  background: #FFF5F0;
-  color: var(--color-text);
+  border-left-color: #FFFFFF;
+  background: var(--color-primary);
+  color: #FFFFFF;
   font-weight: 500;
 }
 
 .results-review-option-marker {
-  color: var(--color-accent);
+  color: var(--color-primary);
   font-weight: 700;
   flex-shrink: 0;
 }
@@ -460,12 +593,14 @@
   color: var(--color-text-muted);
   line-height: 1.5;
   padding: var(--space-3);
-  background: var(--color-border);
-  border-radius: 6px;
+  margin-left: var(--space-3);
+  background: var(--color-surface);
+  border-radius: 0;
+  box-shadow: var(--bevel-sunken);
 }
 
 .results-review-feedback strong {
-  color: var(--color-accent);
+  color: var(--color-primary);
 }
 
 .results-review-best {
@@ -473,8 +608,10 @@
   color: var(--color-text-muted);
   line-height: 1.5;
   padding: var(--space-3);
-  background: #E8F5E9;
-  border-radius: 6px;
+  margin-left: var(--space-3);
+  background: var(--color-surface);
+  border-radius: 0;
+  box-shadow: var(--bevel-sunken);
 }
 
 .results-review-best strong {
@@ -483,7 +620,8 @@
 
 .results-review-link {
   font-size: 0.8125rem;
-  color: var(--color-accent);
+  margin-left: var(--space-3);
+  color: var(--color-primary);
   text-decoration: none;
 }
 
@@ -514,13 +652,9 @@
   background: #FFF5F0;
 }
 
-/* ── Action Button Row (Review + Retake) ── */
-.results-action-btn-row {
-  display: flex;
-  gap: var(--space-3);
-  justify-content: center;
-  margin-top: var(--space-4);
-}
+/* Review and Retake are menu-bar commands now (ticket #65): the row that
+   used to carry them under the sections is gone, and the buttons keep the
+   classes above — the menu bar lays them out. */
 
 .results-review-btn {
   font-size: 0.875rem;
@@ -542,7 +676,9 @@
 #review-view {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  padding-bottom: var(--space-4);
 }
 
 .results-review-header {
@@ -567,13 +703,19 @@
   background: #F5F5F5;
 }
 
+/* ── Reduced motion: the Blind-Spot Bars are the only animation here ──
+   (the width fill driven by js/results.js; everything else on this view
+   paints instantly). Same gate the quiz CSS uses (css/quiz.css). */
+
+@media (prefers-reduced-motion: reduce) {
+  .results-bar-fill {
+    transition: none !important;
+  }
+}
+
 /* ── Mobile-first responsive ── */
 @media (max-width: 400px) {
   .results-title-pct {
     font-size: 3rem;
-  }
-  
-  .results-action-btn-row {
-    flex-direction: column;
   }
 }

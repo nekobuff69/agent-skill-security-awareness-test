@@ -47,6 +47,28 @@ exports.run = function() {
   check('t() does not return empty string for a missing id', returned !== '',
     JSON.stringify(returned));
 
+  // --- extend() merges add-on Chrome Strings without replacing the base ---
+
+  I18n.extend('en', { 'shell.test.merged': 'Merged value' });
+  check('extend() adds a new id to a registered locale',
+    I18n.t('shell.test.merged') === 'Merged value', I18n.t('shell.test.merged'));
+  check('extend() keeps base dictionary ids after merging',
+    I18n.t('quiz.labelScenario') === 'Scenario');
+  I18n.extend('en', { 'shell.test.merged': 'Overwritten' });
+  check('extend() lets a later duplicate id win (namespacing convention)',
+    I18n.t('shell.test.merged') === 'Overwritten');
+  I18n.extend('probe', { 'shell.test.merged': 'Probe only' });
+  I18n.use('probe');
+  check('extend() registers a locale that had no base dictionary (add-on before base load never blanks a page)',
+    I18n.t('shell.test.merged') === 'Probe only', I18n.t('shell.test.merged'));
+  var probeMissingThrew = false;
+  try { I18n.t('quiz.labelScenario'); } catch (e) { probeMissingThrew = true; }
+  check('an add-on-only dictionary still throws for base ids it never provided', probeMissingThrew);
+  I18n.use('en');
+  var extendThrew = false;
+  try { I18n.extend('en', null); } catch (e) { extendThrew = true; }
+  check('extend() rejects a non-object additions argument', extendThrew);
+
   var astThrew = false;
   try {
     I18n.astName('AST99');
@@ -64,7 +86,7 @@ exports.run = function() {
 
   check('placeholder substitution fills {count} and {time}',
     I18n.t('landing.meta', { count: 20, time: '8-12 minutes' }) ===
-      '20 questions 8-12 minutes',
+      '20 questions · 8-12 minutes',
     I18n.t('landing.meta', { count: 20, time: '8-12 minutes' }));
 
   check('placeholder substitution fills {risk} in a fallback string',
@@ -132,17 +154,10 @@ exports.run = function() {
   var total = 0;
   var empties = [];
 
-  // 'landing.subtitleFallback' is deliberately empty: the landing Subtitle
-  // comes from the Bank Variant, and an absent subtitle must render as an
-  // empty element rather than placeholder text.
-  var ALLOWED_EMPTY = { 'landing.subtitleFallback': true };
-
   while ((m = re.exec(src)) !== null) {
     total++;
-    var id = m[1];
-    var raw = m[2];
     // An escaped-quote-free empty string is the only empty case.
-    if (raw === '' && !ALLOWED_EMPTY[id]) empties.push(id);
+    if (m[2] === '') empties.push(m[1]);
   }
 
   check('dictionary declares a non-trivial number of ids', total > 80, String(total));
@@ -154,15 +169,16 @@ exports.run = function() {
   // Spot-check the id set the UI modules depend on, so a rename in the
   // dictionary surfaces here rather than as a runtime throw.
   var requiredIds = [
-    'doc.title', 'lang.name',
+    'doc.title', 'lang.name', 'lang.switchUnavailable',
     'loading.bank', 'error.loadBank', 'error.retry',
-    'landing.titleFallback', 'landing.subtitleFallback', 'landing.meta',
+    'landing.headline1', 'landing.headline2', 'landing.titleFallback',
+    'landing.body', 'landing.meta',
     'landing.metaCountFallback', 'landing.timeFallback', 'landing.start',
     'quiz.phaseChip', 'quiz.questionChip', 'quiz.labelScenario',
     'quiz.labelQuestion', 'quiz.previous', 'quiz.bankChanged',
     'results.radarTitle', 'results.barsTitle', 'results.actionPlanTitle',
     'results.deepDiveTitle', 'results.planLoading', 'results.narrativeSummary',
-    'results.deepDiveHeading', 'results.deepDiveSub', 'results.showPrompt',
+    'results.deepDiveSub',
     'results.copy', 'results.copied', 'results.copyFailed', 'results.downloadPng',
     'results.share', 'results.shareTitle', 'results.shareText', 'results.retake',
     'results.reviewBtn', 'results.reviewTitle', 'results.reviewBack',
@@ -212,6 +228,26 @@ exports.run = function() {
   check('both languages enforce the same budgets',
     zhLlmBudget === I18n.t('llm.budget') && zhPromptBudget === I18n.t('prompt.budget'),
     zhLlmBudget + '/' + zhPromptBudget);
+
+  // --- the two dictionaries declare the same ids (no id drift) ---
+
+  function declaredIds(rel) {
+    var text = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+    var idRe = /^\s*'([^']+)':/gm;
+    var found = [];
+    var hit;
+    while ((hit = idRe.exec(text)) !== null) found.push(hit[1]);
+    return found.sort();
+  }
+
+  var enIds = declaredIds('i18n/en.js');
+  var zhIds = declaredIds('i18n/zh.js');
+  var zhOnly = zhIds.filter(function(id) { return enIds.indexOf(id) === -1; });
+  var enOnly = enIds.filter(function(id) { return zhIds.indexOf(id) === -1; });
+  check('the two dictionaries declare exactly the same ids (no id drift)',
+    enIds.length === zhIds.length && zhOnly.length === 0 && enOnly.length === 0,
+    'en=' + enIds.length + ' zh=' + zhIds.length +
+    ' zh-only=' + zhOnly.join(',') + ' en-only=' + enOnly.join(','));
 
   // --- format() leaves unknown placeholders intact ---
 

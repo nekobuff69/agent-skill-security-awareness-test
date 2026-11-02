@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-bank="questions.json" data-corpus="docs/owasp-ast-full.md" data-lang-alt="zh/" data-lang-alt-locale="zh">
+<html lang="en" data-bank="questions.json" data-corpus="docs/owasp-ast-full.md" data-lang-alt="zh/" data-lang-alt-locale="zh" data-lang-alt-lang="zh-Hans" data-lang-alt-dict="i18n/zh.js" data-lang-alt-bank="questions.zh.json">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -41,12 +41,13 @@
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="css/quiz.css">
   <link rel="stylesheet" href="css/results.css">
-  <link rel="stylesheet" href="css/theme-surya.css">
-  <link rel="stylesheet" href="css/lang-switch.css">
+  <link rel="stylesheet" href="css/theme-retro-os.css">
+  <link rel="stylesheet" href="css/boot.css">
+  <link rel="stylesheet" href="css/shell.css">
 </head>
 <body>
   <div id="app">
-    <section id="landing-view"></section>
+    <section id="landing-view" class="wizard"></section>
     <section id="quiz-view" hidden></section>
     <section id="results-view" hidden></section>
     <section id="review-view" hidden></section>
@@ -59,8 +60,10 @@
   <script src="js/ast.js"></script>
   <script src="js/scoring.js"></script>
   <script src="js/session-store.js"></script>
+  <script src="js/desktop-store.js"></script>
   <script src="js/lang-pref.js"></script>
   <script src="js/lang-routing.js"></script>
+  <script src="js/lang-switch.js"></script>
   <script src="js/prompt-builder.js"></script>
   <script src="js/fallback.js"></script>
   <script src="js/extractor.js"></script>
@@ -68,6 +71,11 @@
   <script src="js/llm-client.js"></script>
   <script src="js/action-plan.js"></script>
   <script src="js/main.js"></script>
+  <script src="js/wizard-nav.js"></script>
+  <script src="js/boot.js"></script>
+  <script src="js/desktop-core.js"></script>
+  <script src="js/windows.js"></script>
+  <script src="js/shell.js"></script>
   <script src="js/quiz.js"></script>
   <script src="js/results.js"></script>
 </body>

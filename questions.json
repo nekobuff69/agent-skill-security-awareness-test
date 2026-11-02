@@ -2,7 +2,7 @@
   "meta": {
     "title": "Agent Security Awareness Quiz",
     "subtitle": "Based on the OWASP Agentic Skills Top 10",
-    "source": "https://owasp.org/www-project-agentic-skills-top-10/top10",
+    "source": "https://owasp.github.io/www-project-agentic-skills-top-10/top10",
     "license": "Quiz questions are original; factual claims sourced from OWASP Agentic Skills Top 10 (CC-BY-SA-4.0).",
     "design_philosophy": "A self-assessment rather than a knowledge test. Every option reflects a real behavioral choice, and scoring reveals blind spots rather than trivia gaps.",
     "total_questions": 20,
@@ -125,7 +125,7 @@
         }
       ],
       "best_practice": "Always verify publisher identity through independent sources and test skills in a disposable environment before using them with real data, regardless of download count or reviews.",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast01.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast01.html",
       "test": {
         "canonical_answer_index": 3,
         "max_score": 3,
@@ -165,7 +165,7 @@
         }
       ],
       "best_practice": "Evaluate every skill on the same criteria: permissions, publisher verification, and code review, regardless of brand names or trademark claims in the skill name.",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast04.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast04.html",
       "test": {
         "canonical_answer_index": 3,
         "max_score": 3,
@@ -205,7 +205,7 @@
         }
       ],
       "best_practice": "Inspect the full dependency tree for typosquatting and verify each package name against the legitimate registry before installing.",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast02.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast02.html",
       "test": {
         "canonical_answer_index": 3,
         "max_score": 3,
@@ -245,7 +245,7 @@
         }
       ],
       "best_practice": "Run SKILL.md files through a security scanner that checks for hidden characters, zero-width Unicode, and base64-encoded payloads. Don't trust human eyes alone.",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast04.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast04.html",
       "test": {
         "canonical_answer_index": 3,
         "max_score": 3,
@@ -285,7 +285,7 @@
         }
       ],
       "best_practice": "Use multiple scanning layers (code pattern analysis, natural language review, behavioral testing) because no single scanner catches all attack types.",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast08.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast08.html",
       "test": {
         "canonical_answer_index": 3,
         "max_score": 3,
@@ -325,7 +325,7 @@
         }
       ],
       "best_practice": "Treat in-platform scanner badges and automated scan results as advisory, and verify independently with external tools.",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast08.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast08.html",
       "test": {
         "canonical_answer_index": 3,
         "max_score": 3,
@@ -366,7 +366,7 @@
         }
       ],
       "best_practice": "Always check for known attack campaigns targeting the skill category you're installing, and test new skills in a sandboxed environment before trusting them with real data.",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast01.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast01.html",
       "test": {
         "canonical_answer_index": 3,
         "max_score": 3,
@@ -406,7 +406,7 @@
         }
       ],
       "best_practice": "Review each permission request against the skill's stated function and deny any access that isn't necessary for the task.",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast03.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast03.html",
       "test": {
         "canonical_answer_index": null,
         "max_score": 3,
@@ -447,7 +447,7 @@
         }
       ],
       "best_practice": "Scope agent permissions to the minimum required for each task; a read-only task should have only read permissions.",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast03.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast03.html",
       "test": {
         "canonical_answer_index": 1,
         "max_score": 3,
@@ -487,7 +487,7 @@
         }
       ],
       "best_practice": "Treat every skill as untrusted code that inherits your full user permissions, and enable sandboxing or container isolation to limit blast radius.",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast06.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast06.html",
       "test": {
         "canonical_answer_index": 2,
         "max_score": 3,
@@ -527,7 +527,7 @@
         }
       ],
       "best_practice": "Scope each skill's permissions to its specific function so a vulnerability in one skill cannot reach your other skills or personal data.",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast03.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast03.html",
       "test": {
         "canonical_answer_index": 2,
         "max_score": 3,
@@ -567,7 +567,7 @@
         }
       ],
       "best_practice": "Treat any mismatch between a skill's declared risk tier and its actual permission scope as a deliberate red flag, not a documentation error.",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast04.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast04.html",
       "test": {
         "canonical_answer_index": 2,
         "max_score": 3,
@@ -607,7 +607,7 @@
         }
       ],
       "best_practice": "Avoid skills that fetch instructions from external URLs at runtime; inline content where possible or pin it to a content hash to prevent tampering.",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast05.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast05.html",
       "test": {
         "canonical_answer_index": 2,
         "max_score": 3,
@@ -647,7 +647,7 @@
         }
       ],
       "best_practice": "Remember that external content referenced by skills is consumed as executable instructions, and audit the runtime content as well as the code that fetches it.",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast05.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast05.html",
       "test": {
         "canonical_answer_index": 1,
         "max_score": 3,
@@ -687,7 +687,7 @@
         }
       ],
       "best_practice": "Verify publisher identity, check for cryptographic signatures, and review update diffs before accepting any skill update. Never auto-update without verification.",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast07.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast07.html",
       "test": {
         "canonical_answer_index": 3,
         "max_score": 3,
@@ -727,7 +727,7 @@
         }
       ],
       "best_practice": "Review installed skills periodically on a defined cadence based on risk tier, and subscribe to security advisories for installed skills.",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast07.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast07.html",
       "test": {
         "canonical_answer_index": null,
         "max_score": 3,
@@ -767,7 +767,7 @@
         }
       ],
       "best_practice": "Maintain a complete, centralized inventory of all installed skills with their permissions, installers, and review status.",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast09.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast09.html",
       "test": {
         "canonical_answer_index": 2,
         "max_score": 3,
@@ -807,7 +807,7 @@
         }
       ],
       "best_practice": "Tie skill deprovisioning to employee offboarding: revoke credentials and review installed skills as soon as someone leaves.",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast09.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast09.html",
       "test": {
         "canonical_answer_index": 2,
         "max_score": 3,
@@ -847,7 +847,7 @@
         }
       ],
       "best_practice": "Verify that security properties (permissions, risk tiers, isolation) are preserved when porting skills across different agent platforms.",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast10.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast10.html",
       "test": {
         "canonical_answer_index": 3,
         "max_score": 3,
@@ -887,7 +887,7 @@
         }
       ],
       "best_practice": "Enable and regularly review runtime activity logs: check not just outputs but what each skill actually accessed, what network calls it made, and whether anything fell outside its stated purpose.",
-      "ast_source_url": "https://owasp.org/www-project-agentic-skills-top-10/ast09.html",
+      "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast09.html",
       "test": {
         "canonical_answer_index": 3,
         "max_score": 3,

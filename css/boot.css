@@ -1,0 +1,106 @@
+/* ── Boot splash (issue #39) ──────────────────────────────────────────
+   Overlay + W95 splash, assembled only from theme-retro-os.css skin
+   tokens: face/navy greys, sunken bevel, W95FA chrome font, zero radii,
+   Win95-instant transitions. The overlay masks — it never gates — so
+   content fetches run underneath it untouched.
+
+   Issue #42 adds ONE exception to "never gates": the wireframe view
+   tracing. While the splash is up (the overlay exists without its
+   .boot-leaving class), the sections beneath are display:none — CSS
+   animations never run on un-rendered content, so no view fades or
+   traces under the mask. When js/boot.js adds .boot-leaving (the 0.2s
+   overlay fade at SPLASH_MS), the :not() stops matching, the views
+   re-enter rendering, and the trace in css/theme-retro-os.css fires
+   once — sweeping exactly as the splash clears. The overlay's removal
+   FADE_MS later therefore re-reveals already-traced views: the boot
+   handoff shows exactly ONE trace, never a splash+fade double
+   animation. Fetches below still run unblocked; only rendering waits. */
+
+/* Gate removed the instant .boot-leaving lands — the rule stops matching
+   and the views re-enter rendering (restart point for the trace). The
+   no-shell form (#app still a body child) is kept so the gate also works
+   before/without App.Shell's wrap. */
+.boot-overlay:not(.boot-leaving) ~ .os-window #app > section,
+.boot-overlay:not(.boot-leaving) ~ #app > section {
+  display: none;
+}
+
+.boot-overlay {
+  position: fixed;
+  inset: 0;
+  /* Above everything, including any window-shell chrome layered later. */
+  z-index: 2147483647;
+  background: #000000;              /* black full viewport, per spec */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-heading);
+}
+
+.boot-panel {
+  width: 260px;
+  text-align: center;
+}
+
+.boot-title {
+  margin: 0 0 16px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-face);        /* chrome grey text on black */
+}
+
+/* Sunken groove: Win95 recessed track, pale field inside. */
+.boot-groove {
+  padding: 4px;
+  background: var(--color-face);
+  box-shadow: var(--bevel-sunken);
+}
+
+/* Segmented navy fill: discrete blocks, stepped forward by steps() —
+   never a smooth ease (Win95 has no easing). 12 steps over 1.35s,
+   kept in sync with SPLASH_MS in js/boot.js. */
+.boot-fill {
+  height: 14px;
+  width: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--color-primary) 0 9px,    /* navy block      */
+    var(--color-face) 9px 12px     /* gap between     */
+  );
+  animation: boot-fill 1.35s steps(12, end) forwards;
+}
+
+@keyframes boot-fill {
+  from { width: 8%; }
+  to   { width: 100%; }
+}
+
+.boot-status {
+  margin: 14px 0 0;
+  font-size: 12px;
+  color: var(--color-face);
+}
+
+/* Fade-out handoff: the overlay is removed after this completes. */
+.boot-overlay.boot-leaving {
+  animation: boot-fade 0.2s linear forwards;
+}
+
+@keyframes boot-fade {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* prefers-reduced-motion: the decision in js/boot.js already returns
+   'instant' so this never renders; the rule is a CSS-side backstop that
+   parks the fill full instead of animating. */
+@media (prefers-reduced-motion: reduce) {
+  .boot-fill {
+    animation: none;
+    width: 100%;
+  }
+  .boot-overlay.boot-leaving {
+    animation: none;
+    opacity: 0;
+  }
+}

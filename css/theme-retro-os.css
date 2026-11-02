@@ -1,0 +1,949 @@
+/* ── Retro OS Theme (Windows 95) ──────────────────────────────────────────
+
+   Override skin, linked near the end of every HTML page (css/boot.css and
+   css/shell.css follow it; the Chinese typographic overrides live at the
+   end of this file, gated on html[lang^="zh"], so both pages share one
+   stylesheet list). The
+   base structure stylesheets (styles.css, css/quiz.css, css/results.css)
+   keep their semantic token aliases — --color-bg, --color-accent,
+   --color-score-*, --color-success/--color-warning/--color-error —
+   untouched; this file only re-points their values and restyles components
+   in the Win95 idiom.
+
+   ── Bevel geometry ────────────────────────────────────────────────────
+   Authentic Windows 95 outset/inset, drawn with box-shadow (no border
+   collapse surprises, radii are 0 anyway):
+
+     raised (command button, window face):
+       inset -1px -1px #000000   inset  1px  1px #FFFFFF
+       inset -2px -2px #808080   inset  2px  2px #DFDFDF
+     sunken (field, track):
+       inset -1px -1px #FFFFFF   inset  1px  1px #000000
+       inset -2px -2px #DFDFDF   inset  2px  2px #808080
+
+   The triad is the classic one: highlight #FFFFFF, face #C0C0C0, light
+   shadow #DFDFDF, dark shadow #808080, outer border #000000.
+
+   ── Colour roles ──────────────────────────────────────────────────────
+   Every status colour that renders as TEXT uses the dark member of the
+   classic 16-colour set (black-on-white contrast ratios, worst case
+   measured on the white --color-bg field):
+     #008000 dark green  4.75:1    #808000 olive  3.55:1 (large text only:
+                                    the Progression Title percentage, 3rem+)
+     #800000 dark maroon 7.5:1
+   The bright system tints (#00FF00 / #FFFF00 / #FF0000) are declared as
+   graphics-only tokens: they never carry text — at 1–2:1 on white they
+   would fail the same floor the old token file documented.
+   ─────────────────────────────────────────────────────────────────── */
+
+/* ── Chrome typeface ──────────────────────────────────────────────────
+
+   W95FA — a pixel design re-created after the original MS Sans Serif — by
+   Alina Sava, licensed SIL Open Font License 1.1: explicitly free for
+   personal AND commercial use, including web embedding. The face and its
+   license text are committed together under fonts/ (see
+   fonts/PROVENANCE.md for the retrieval record). Self-hosted: no third-party
+   network dependency (ADR 0001). Used for UI chrome only — labels,
+   counters, buttons, headings; prose stays on the readable body stack. */
+@font-face {
+  font-family: 'W95FA';
+  src: url('../fonts/w95fa.woff2') format('woff2'),
+       url('../fonts/w95fa.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  /* The face maps CJK codepoints to placeholder (tofu-lookalike) glyphs, so
+     font fallback would never hand Han text to the CJK faces further down the
+     stack. Pin the claimed coverage to Latin + typographic marks: any codepoint
+     outside this range skips W95FA entirely and falls through to the CJK faces
+     (the Fusion Pixel subset below on the zh page, the system CJK fallbacks in
+     --font-heading everywhere else). */
+  unicode-range: U+0020-007E, U+00A0-024F, U+2000-206F, U+2122, U+25A0-25FF;
+}
+
+/* ── Display face ─────────────────────────────────────────────────────
+
+   Silkscreen by Jason Kottke, SIL Open Font License 1.1 — a compact pixel
+   display face for headline/splash use. Served as the Google Fonts static
+   builds re-encoded to woff2 locally (see fonts/PROVENANCE.md); the OFL
+   text is committed beside it as fonts/Silkscreen-OFL.txt. Self-hosted
+   under fonts/: no third-party runtime request (ADR 0001).
+
+   Same Latin pin as W95FA — the face carries Latin (and Greek/Latin-1
+   extension) glyphs only, so pinning it to the same unicode-range keeps
+   every non-Latin codepoint falling through to the CJK faces below. */
+@font-face {
+  font-family: 'Silkscreen';
+  src: url('../fonts/Silkscreen-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0020-007E, U+00A0-024F, U+2000-206F, U+2122, U+25A0-25FF;
+}
+
+@font-face {
+  font-family: 'Silkscreen';
+  src: url('../fonts/Silkscreen-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0020-007E, U+00A0-024F, U+2000-206F, U+2122, U+25A0-25FF;
+}
+
+/* ── Simplified Chinese pixel face (subset) ───────────────────────────
+
+   Fusion Pixel 12px proportional (Simplified Chinese build) by TakWolf,
+   SIL Open Font License 1.1, subset to the exact CJK codepoints the zh
+   dictionary and Bank Variant render (see fonts/PROVENANCE.md and
+   scripts/subset-fusion-pixel.py for the regeneration procedure; the
+   committed inventory is
+   fonts/fusion-pixel-12px-proportional-sc-subset.codepoints.json, and
+   tests/js/test-cjk-font-subset.js fails when a required glyph is
+   missing).
+
+   The unicode-range deliberately EXCLUDES Latin and the typographic
+   punctuation U+2000–206F: those runs stay on W95FA (or the system
+   stacks) exactly as before, so the English page never fetches this face
+   and mixed zh/Latin chrome still resolves Latin to the W95FA pixel
+   face. */
+@font-face {
+  font-family: 'Fusion Pixel 12 SC';
+  src: url('../fonts/fusion-pixel-12px-proportional-sc-subset.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-303F, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF,
+                 U+FE30-FE4F, U+FF00-FFEF;
+}
+
+:root {
+  /* ── Win95 system palette ── */
+  --color-bg: #FFFFFF;          /* white document field                */
+  --color-surface: #FFFFFF;     /* white field inside sunken panels    */
+  --color-face: #C0C0C0;        /* chrome face (buttons, cards, bars)  */
+  --color-primary: #000080;     /* navy: title bars, selection, primary */
+  --color-secondary: #808080;   /* medium shadow grey                   */
+  --color-accent: #000080;      /* navy replaces the editorial orange   */
+  --color-border: #808080;      /* mid grey borders/tracks              */
+
+  --color-text: #000000;
+  --color-text-muted: #000000;  /* Win95 renders all chrome text black */
+  --color-text-light: #404040;  /* micro-labels; 7.5:1 on the C0C0C0 face */
+
+  /* ── Score colours (two roles, one meaning) ──
+
+     Headline role: the Progression Title percentage on the white sunken
+     field of .results-title-card (large text, 3:1 floor):
+       --color-score-green   #008000  4.75:1
+       --color-score-amber   #808000  3.55:1 — large-text floor only, and
+                            the headline is ≥3rem at every breakpoint
+       --color-score-red     #800000  7.50:1
+     Fill role: Blind-Spot Bar fills on the dithered white track (graphic,
+     3:1 floor):
+       --color-success       #008000  4.75:1
+       --color-warning       #808000  3.55:1
+       --color-error         #800000  7.50:1
+     Bright tints stay graphics-only; see below. */
+  --color-score-green: #008000;
+  --color-score-amber: #808000;
+  --color-score-red: #800000;
+
+  --color-success: #008000;
+  --color-warning: #808000;
+  --color-error: #800000;
+  --color-info: #000080;
+
+  /* Graphics-only: 1–2:1 against white, so these are declared for fills and
+     graphics, never for text. */
+  --color-bright-green: #00FF00;
+  --color-bright-yellow: #FFFF00;
+  --color-bright-red: #FF0000;
+
+  /* ── Typography ── */
+  --font-heading: 'W95FA', 'Segoe UI', Tahoma, 'SimSun', '宋体',
+                  'Microsoft YaHei', 'PingFang SC', 'Noto Sans CJK SC',
+                  sans-serif;   /* chrome face; CJK runs (e.g. the 中文
+                                   switch label on the en page) fall through
+                                   to an installed CJK face, never tofu */
+  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+               'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', Consolas, 'Courier New',
+               monospace;
+
+  /* ── Spacing (unchanged 8px base; consumed by the base files) ── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --space-5: 32px;
+  --space-6: 48px;
+  --space-8: 64px;
+  --space-10: 96px;
+  --space-12: 128px;
+
+  /* ── Layout ── */
+  --max-width: 720px;
+  --border-radius: 0;           /* Win95 squares                       */
+
+  /* Win95 has no easing; feedback is instant. Kept as tokens because the
+     base stylesheets consume them (styles.css, css/results.css). */
+  --transition-fast: 0s;
+  --transition-normal: 0s;
+  --transition-slow: 0s;
+
+  /* Shared bevels, so component rules stay one-liners. */
+  --bevel-raised: inset -1px -1px #000000, inset 1px 1px #FFFFFF,
+                  inset -2px -2px #808080, inset 2px 2px #DFDFDF;
+  --bevel-sunken: inset -1px -1px #FFFFFF, inset 1px 1px #000000,
+                  inset -2px -2px #DFDFDF, inset 2px 2px #808080;
+  /* 1px checkerboard dither — graphic fills ONLY, never under text. */
+  --dither: repeating-conic-gradient(#FFFFFF 0% 25%, #DFDFDF 0% 50%);
+  --dither-size: 2px 2px;
+}
+
+/* ── Global ─────────────────────────────────────────────────────────── */
+body {
+  background-color: #008080;    /* the teal desktop                     */
+  color: var(--color-text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: auto;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  font-weight: 400;
+  letter-spacing: normal;       /* pixel faces carry their own rhythm   */
+}
+
+/* The app container reads as one program window standing on the desktop. */
+#app {
+  background: var(--color-face);
+  border-radius: 0;
+  box-shadow: var(--bevel-raised);
+}
+
+/* ── Command buttons ─────────────────────────────────────────────────── */
+
+button {
+  font-family: var(--font-heading);
+  font-weight: 400;             /* W95FA has one weight; no faux bold    */
+  background: var(--color-face);
+  color: var(--color-text);
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--bevel-raised);
+  transition: none;
+}
+
+/* Win95 hover: the button stays raised; the keyboard focus is the dotted
+   rectangle drawn inside the face. */
+button:hover {
+  background: var(--color-face);
+  transform: none;
+}
+
+button:focus-visible {
+  outline: 1px dotted #000000;
+  outline-offset: -4px;
+}
+
+button:active:not(:disabled) {
+  transform: translate(1px, 1px);   /* the 1px press offset            */
+  box-shadow: var(--bevel-sunken);
+}
+
+button:disabled {
+  color: var(--color-secondary);
+  cursor: default;
+  box-shadow: none;
+  border: 1px dotted var(--color-secondary);  /* flat, dither-free: the
+    dither token is graphic-only and a disabled button carries text. */
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: #FFFFFF;
+}
+
+.btn-primary:hover {
+  background: var(--color-primary);
+  transform: none;
+  box-shadow: var(--bevel-raised);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translate(1px, 1px);
+  box-shadow: var(--bevel-sunken);
+}
+
+/* Buttons whose base rules in css/results.css / css/quiz.css pin border
+   colours and hover fills at higher specificity than the plain `button`
+   rule above. */
+.results-download-btn,
+.results-share-btn,
+.results-copy-btn,
+.results-retake-btn,
+.results-review-btn,
+.results-review-back-btn,
+.quiz-back-btn {
+  font-family: var(--font-heading);
+  background: var(--color-face);
+  color: var(--color-text);
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--bevel-raised);
+}
+
+.results-download-btn:hover,
+.results-share-btn:hover,
+.results-copy-btn:hover,
+.results-retake-btn:hover,
+.results-review-btn:hover,
+.results-review-back-btn:hover,
+.quiz-back-btn:hover {
+  background: var(--color-face);
+  color: var(--color-text);
+  transform: none;
+  box-shadow: var(--bevel-raised);
+}
+
+.results-download-btn:active,
+.results-share-btn:active,
+.results-copy-btn:active,
+.results-retake-btn:active,
+.results-review-btn:active,
+.results-review-back-btn:active,
+.quiz-back-btn:active {
+  transform: translate(1px, 1px);
+  box-shadow: var(--bevel-sunken);
+}
+
+/* ── Landing ────────────────────────────────────────────────────────── */
+
+#landing-view h1 {
+  letter-spacing: normal;
+}
+
+#landing-view .subtitle {
+  color: var(--color-text);
+}
+
+#landing-view .meta {
+  font-family: var(--font-heading);   /* Chrome String on the pixel face */
+  color: var(--color-text-light);
+}
+
+/* ── Quiz status bar (ticket #52) ────────────────────────────────────── */
+
+/* Progress track: sunken, white, no text. Progress Fill: segmented navy
+   blocks (CSS gradient trick) — the width behaviour driven by js/quiz.js is
+   untouched; only the paint changes. */
+.quiz-status-fill {
+  border-radius: 0;
+  background: repeating-linear-gradient(
+    90deg, var(--color-primary) 0 6px, var(--color-surface) 6px 8px);
+}
+
+.quiz-status-counter,
+.quiz-status-phase {
+  font-family: var(--font-heading);
+  color: var(--color-text);
+}
+
+/* ── Question Card ──────────────────────────────────────────────────────
+   The card is a grouping element only: the scenario and option rows carry
+   the sunken fields, so a second raised frame inside the window would read
+   as a nested title bar. */
+
+.quiz-label {
+  font-family: var(--font-heading);   /* Chrome String on the pixel face */
+  color: var(--color-text);
+}
+
+/* Scenario prose: sunken white field on the chrome face. Body sans, ≥14px. */
+.quiz-scenario {
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 0;
+  padding: var(--space-2) var(--space-3);
+  box-shadow: var(--bevel-sunken);
+  font-style: normal;             /* Win95 fields do not italicise       */
+}
+
+.quiz-question {
+  font-family: var(--font-body);  /* Question prose stays readable       */
+  letter-spacing: normal;
+}
+
+.quiz-option-btn {
+  font-family: var(--font-body);  /* Option prose stays readable         */
+  background: var(--color-face);
+  border: 0;
+  border-radius: 0;
+  color: var(--color-text);
+  box-shadow: var(--bevel-raised);
+}
+
+.quiz-option-btn:hover {
+  background: #DFDFDF;            /* Win95 light hover highlight         */
+  color: var(--color-text);
+  border-color: transparent;
+}
+
+.quiz-option-btn:active {
+  transform: translate(1px, 1px);
+  background: var(--color-face);
+  box-shadow: var(--bevel-sunken);
+}
+
+/* Selection = navy, white text — the Win95 selected-list-item look. */
+.quiz-option-btn.selected {
+  background: var(--color-primary);
+  color: #FFFFFF;
+  border-color: transparent;
+  box-shadow: var(--bevel-sunken);
+}
+
+.quiz-letter-badge {
+  font-family: var(--font-heading);
+  background: var(--color-face);
+  color: var(--color-text);
+  border-radius: 0;
+  box-shadow: var(--bevel-raised);
+}
+
+/* ── Notice + error ─────────────────────────────────────────────────── */
+
+.quiz-notice {
+  background: var(--color-surface);
+  border: 1px solid var(--color-error);
+  border-radius: 0;
+  color: var(--color-text);
+  box-shadow: var(--bevel-sunken);
+}
+
+.error {
+  background: var(--color-surface);
+  border: 1px solid var(--color-error);
+  border-radius: 0;
+  box-shadow: var(--bevel-sunken);
+}
+
+/* ── Results ────────────────────────────────────────────────────────── */
+
+.results-title-card {
+  text-align: left;
+  /* The editorial skin restored a dark gradient here because the base rule
+     painted white text over whatever background survived. This skin keeps
+     the text dark and puts it on a sunken white field instead: the score
+     colours are text, and the dark 16-colour variants only clear their
+     contrast floor on white (see the Score colours block above). */
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--bevel-sunken);
+  padding: var(--space-6) var(--space-5);
+}
+
+.results-title-pct {
+  font-family: var(--font-heading);   /* digits on the pixel face        */
+  color: var(--color-accent);
+  letter-spacing: normal;
+}
+
+.results-title-name {
+  font-family: var(--font-heading);
+  color: var(--color-text);
+  letter-spacing: normal;
+}
+
+.results-section-title {
+  font-family: var(--font-heading);
+  letter-spacing: normal;
+}
+
+/* Blind-Spot Bars: sunken track, dithered (graphic fill — no text sits on
+   it), square dark-variant fills. */
+.results-bar-track {
+  background: var(--dither);
+  background-size: var(--dither-size);
+  border-radius: 0;
+  box-shadow: var(--bevel-sunken);
+}
+
+.results-bar-fill {
+  border-radius: 0;
+}
+
+/* Ticket #72: the Action Plan is one ranked list. The rows carry no card
+   frame of their own — css/results.css paints the panel as the sunken
+   field and the rows as plain content on it — so the skin adds nothing
+   here beyond the Win95 square on the priority badge. */
+.results-action-priority {
+  border-radius: 0;             /* Win95 squares                        */
+}
+
+.results-ast-chip {
+  font-family: var(--font-heading);  /* AST IDs: Latin chrome            */
+  background: var(--color-surface);
+  color: var(--color-primary);
+  border-radius: 0;
+  box-shadow: inset 1px 1px var(--color-secondary),
+              inset -1px -1px #FFFFFF;
+}
+
+/* The two disclosures that remain — the Narrative Expander and the Review
+   accordion — are list rows (#72): their summary rows sit on the silver
+   face in black type, so the skin paints no navy title bar on them. The
+   Deep-Dive Prompt's navy expander row went with the fold itself (#74). */
+.results-narrative-details,
+.results-review-item {
+  background: var(--color-face);
+  border: 0;
+  border-radius: 0;
+  overflow: hidden;
+  box-shadow: var(--bevel-raised);
+}
+
+.results-narrative-summary,
+.results-review-summary {
+  font-family: var(--font-heading);
+  font-weight: 400;
+  color: var(--color-text);
+  padding: 4px var(--space-3);
+}
+
+.results-review-item[open] > .results-review-summary {
+  border-bottom: 1px solid #000000;
+}
+
+.results-review-qnum {
+  font-family: var(--font-heading);
+  color: var(--color-text);      /* on the silver disclosure row         */
+}
+
+/* The Phase heading sits in the white client field, where the skin's old
+   title-bar pairing put it on navy; that paint stays as it was. */
+.results-review-phase {
+  font-family: var(--font-heading);
+  color: #FFFFFF;
+}
+
+/* Review inner content. */
+.results-review-inner {
+  background: var(--color-surface);
+}
+
+.results-review-feedback,
+.results-review-best {
+  background: var(--color-surface);
+  border-radius: 0;
+  color: var(--color-text);
+  box-shadow: var(--bevel-sunken);
+}
+
+.results-review-feedback strong {
+  color: var(--color-primary);
+}
+
+.results-review-best strong {
+  color: var(--color-success);   /* dark green text                     */
+}
+
+/* Selection inside a Review: navy highlight, white text. */
+.results-review-option-selected {
+  background: var(--color-primary);
+  color: #FFFFFF;
+  border-left-color: #FFFFFF;
+}
+
+.results-review-option-marker {
+  color: var(--color-accent);
+}
+
+.results-review-option-selected .results-review-option-marker {
+  color: #FFFFFF;
+}
+
+.results-review-link {
+  color: var(--color-primary);
+}
+
+.results-prompt-pre {
+  font-family: var(--font-mono);
+  background: var(--color-surface);
+  border-radius: 0;
+  box-shadow: var(--bevel-sunken);
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  #app {
+    margin: var(--space-4) var(--space-2);
+  }
+}
+
+@media (max-width: 480px) {
+  #app {
+    margin: var(--space-2) var(--space-1);
+  }
+
+  .results-title-card {
+    padding: var(--space-5) var(--space-4);
+  }
+}
+
+@media (max-width: 400px) {
+  #app {
+    margin: var(--space-1) 0;
+  }
+
+  .quiz-card-header {
+    margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-3)) var(--space-3);
+  }
+}
+
+/* ── Wireframe view tracing (issue #42) ───────────────────────────────
+   Every time a view enters the window (App.showView flips the [hidden]
+   attribute; the section re-enters rendering and CSS animations restart
+   on it) the window content is traced open like period CAD software: a
+   navy wireframe rectangle sweeps from the title bar downward in four
+   mechanical steps across 160ms, the content pops in behind it as one
+   step, and the ink lifts off in a fifth. Pure CSS, no JS, no easing
+   library — nothing soft. The animation names succeed the removed soft
+   view fade, which no longer exists anywhere. */
+@keyframes os-wireframe-trace {
+  0% {
+    clip-path: inset(0 0 100% 0);
+    opacity: 1;
+    /* Four discrete steps between the untraced frame and the open one. */
+    animation-timing-function: steps(4, end);
+  }
+  80% {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+    /* One last step lifts the ink off the finished rectangle. */
+    animation-timing-function: steps(1, end);
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+    opacity: 0;
+  }
+}
+
+@keyframes os-view-pop {
+  /* Content pops in a single step at the trace midpoint (100ms of the
+     200ms trace): held at 0 through the first half by steps(1, end). */
+  0% {
+    opacity: 0;
+    animation-timing-function: steps(1, end);
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.os-window #app > section:not([hidden]) {
+  position: relative;
+  /* Content pop must end exactly when the trace does: same duration. */
+  animation: os-view-pop 200ms;
+}
+
+.os-window #app > section:not([hidden])::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border: 2px solid var(--color-primary);
+  /* Parked invisible until the animation starts: the from-frame covers
+     the rectangle, so no untraced ink can flash before the trace. */
+  clip-path: inset(0 0 100% 0);
+  animation: os-wireframe-trace 200ms forwards;
+}
+
+/* ── Reduced motion contract (issue #42) ──────────────────────────────
+   The wireframe trace never draws and the view content is fully present
+   immediately. css/quiz.css's block already collapses Quiz-Chrome wipes
+   and the Progress Fill; this adds the one historical gap it missed:
+   Blind-Spot Bars (.results-bar-fill) width easing in css/results.css.
+   The two blocks gate disjoint selectors, so no !important collision. */
+@media (prefers-reduced-motion: reduce) {
+  .os-window #app > section:not([hidden]),
+  .os-window #app > section:not([hidden])::after {
+    animation: none;
+  }
+
+  .os-window #app > section:not([hidden])::after {
+    content: none;
+  }
+
+  .results-bar-fill {
+    transition: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Chinese typography overrides (consolidated from css/cjk.css, #51)
+
+   css/cjk.css used to repair four treatments that are actively wrong
+   for Chinese when the shared skin re-points --font-heading to a pixel
+   face; it was a stylesheet that only the Chinese page linked, so a
+   page that switches language at runtime could leave the document on
+   the wrong sheet. The overrides now live here, gated on
+   html[lang^="zh"] (matches lang="zh" and lang="zh-Hans"/"zh-CN"), so
+   both pages share one stylesheet list and the gate is decided by the
+   document language itself.
+
+   SCOPE: every rule below is gated on html[lang^="zh"]. An
+   html[lang="en"] document matches none of these selectors, so the
+   English rendering is unchanged by construction.
+
+   FACES: --font-heading leads with the self-hosted Fusion Pixel 12 SC
+   subset (@font-face above): its unicode-range is pinned to CJK
+   codepoints, so Han chrome renders on the pixel face. Latin runs
+   (digits, AST IDs, A–D badges, English switch labels) skip the subset
+   and land on W95FA, the same Latin pixel face the English page uses.
+   --font-body stays the SimSun-first system stack: prose reads
+   period-accurate and legible instead of pixel-fuzzy at reading sizes.
+   Everything named below is either self-hosted under fonts/ or a
+   system install — nothing to download over the network.
+
+   The rule catalogue below is preserved from css/cjk.css, including
+   the origin-file comments for every override.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Font stacks ───────────────────────────────────────────────────
+
+   Heading stack: Fusion Pixel subset → W95FA → the era CJK chain
+   (SimSun first, then the real CJK installs per platform — Songti on
+   macOS, YaHei on Windows, Noto/Source Han on Android and Linux), so
+   the generic keyword is never reached while a proper CJK face is
+   installed and an out-of-subset glyph never renders as tofu.
+
+   Body stack: SimSun first, as the era face of the Win95 idiom; prose
+   keeps a readable system face instead of the 12px pixel design at
+   paragraph sizes.
+
+   Mono stack: W95FA carries no CJK at all, and the prompt/pre blocks
+   are the one place a Chinese run is expected inside a monospaced
+   surface.
+   ────────────────────────────────────────────────────────────────── */
+
+html[lang^="zh"] {
+  --font-heading: 'Fusion Pixel 12 SC', 'W95FA', 'SimSun', '宋体',
+                  'Songti SC', 'STSong', 'Microsoft YaHei', '微软雅黑',
+                  'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC',
+                  'Source Han Sans SC', 'Noto Sans SC', sans-serif;
+  --font-body: 'SimSun', '宋体', 'Songti SC', 'STSong',
+               'Microsoft YaHei', '微软雅黑', 'PingFang SC',
+               'Hiragino Sans GB', 'Noto Sans CJK SC', 'Source Han Sans SC',
+               'Noto Sans SC', sans-serif;
+  --font-mono: 'Sarasa Mono SC', 'Noto Sans Mono CJK SC', 'Microsoft YaHei',
+               'PingFang SC', 'Noto Sans CJK SC', 'Source Han Sans SC',
+               'Noto Sans SC', monospace;
+}
+
+html[lang^="zh"] pre,
+html[lang^="zh"] code,
+html[lang^="zh"] kbd,
+html[lang^="zh"] samp {
+  font-family: var(--font-mono);
+}
+
+
+/* ── 2. Neutralise negative letter-spacing ─────────────────────────────────
+
+   Overrides, in the files they originate from (css/theme-retro-os.css
+   declares letter-spacing: normal on every heading it touches, so it adds no
+   entry here):
+     css/results.css:29       .results-title-name      letter-spacing: -0.02em
+     styles.css:88            #landing-view h1         letter-spacing: -0.02em
+     styles.css:148           #landing-view h1 (≤480px) letter-spacing: -0.01em
+
+   Han glyphs are monospaced squares with no side bearing to absorb tightening, so a
+   negative em value pulls neighbouring strokes into each other. `normal` is the
+   correct neutral value for the script; it is not "no tracking" by omission.
+   ────────────────────────────────────────────────────────────────── */
+
+html[lang^="zh"] h1,
+html[lang^="zh"] h2,
+html[lang^="zh"] h3,
+html[lang^="zh"] h4,
+html[lang^="zh"] h5,
+html[lang^="zh"] h6,
+html[lang^="zh"] #landing-view h1,
+html[lang^="zh"] .results-title-name,
+html[lang^="zh"] .results-title-pct,
+html[lang^="zh"] .results-section-title {
+  letter-spacing: normal;
+}
+
+html[lang^="zh"] body,
+html[lang^="zh"] p,
+html[lang^="zh"] li,
+html[lang^="zh"] button,
+html[lang^="zh"] a {
+  letter-spacing: normal;
+}
+
+
+/* ── 3. Uppercase micro-labels ────────────────────────────────────────────
+
+   Overrides, in the files they originate from:
+     css/quiz.css:218-219      .quiz-label        uppercase + letter-spacing 0.06em
+     css/results.css:393-394   .results-review-phase  uppercase + 0.05em
+     styles.css:104-105        #landing-view .meta  uppercase + 0.05em
+
+   text-transform: uppercase is a no-op on Han characters, so a translated label
+   keeps no visual weight advantage while still paying the wide tracking that was
+   only ever paired with the uppercase Latin form. Both halves of the pair are reset
+   together: dropping the tracking while leaving the transform would fix neither.
+   ────────────────────────────────────────────────────────────────── */
+
+html[lang^="zh"] .quiz-label,
+html[lang^="zh"] .results-review-phase,
+html[lang^="zh"] #landing-view .meta {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* The remaining chips and counters carry wide positive tracking for the same
+   Latin-micro-label reason; reset the tracking so a Chinese label is not stranded
+   mid-air, but leave text-transform alone since these never declare one. */
+html[lang^="zh"] .quiz-status-phase,
+html[lang^="zh"] .quiz-status-counter,
+html[lang^="zh"] .quiz-number-chip,
+html[lang^="zh"] .results-ast-chip {
+  letter-spacing: normal;
+}
+
+
+/* ── 4. Line-height ───────────────────────────────────────────────────────
+
+   Tight line-heights this overrides, in the files they originate from
+   (css/theme-retro-os.css declares no line-heights of its own):
+     styles.css:11            body                 1.6
+     styles.css:86            #landing-view h1      1.1
+     styles.css:96            #landing-view .subtitle 1.4
+     css/quiz.css:82                         .quiz-scenario        1.55
+     css/quiz.css:91                         .quiz-question        1.4
+     css/quiz.css:109                        .quiz-option-btn      1.45
+     css/results.css:169                     .results-action-narrative 1.6
+     css/results.css:226                     .results-action-desc  1.5
+     css/results.css:273                     .results-deep-dive-sub 1.5
+     css/results.css:303                     .results-prompt-pre   1.5
+     css/results.css:401                     .results-review-scenario 1.5
+     css/results.css:415                     .results-review-option 1.5
+     css/results.css:436                     .results-review-feedback 1.5
+     css/results.css:449                     .results-review-best  1.5
+
+   A Latin line box is sized around ascender/descender and needs ~1.15 to sit
+   cleanly; a CJK glyph occupies nearly the full em square, so the same ratio clips
+   the visual gap between consecutive lines. Body copy goes to 1.75 and the largest
+   display type is floored at 1.4 rather than tracking the Latin 1.1/1.2.
+   ────────────────────────────────────────────────────────────────── */
+
+html[lang^="zh"] body {
+  line-height: 1.75;
+}
+
+html[lang^="zh"] p,
+html[lang^="zh"] li,
+html[lang^="zh"] dd,
+html[lang^="zh"] blockquote,
+html[lang^="zh"] .subtitle,
+html[lang^="zh"] .error,
+html[lang^="zh"] .quiz-notice {
+  line-height: 1.75;
+}
+
+/* Headings — floored at 1.4, opened up further as the type grows. */
+html[lang^="zh"] h1,
+html[lang^="zh"] #landing-view h1,
+html[lang^="zh"] .results-title-name {
+  line-height: 1.4;
+}
+
+html[lang^="zh"] h2,
+html[lang^="zh"] h3,
+html[lang^="zh"] h4,
+html[lang^="zh"] h5,
+html[lang^="zh"] h6,
+html[lang^="zh"] .results-section-title {
+  line-height: 1.5;
+}
+
+/* The 120px Progression Title percentage is digit-only and is deliberately left on
+   the original 0.9 — it holds no CJK glyph, and the single line never wraps. */
+
+/* Question Card and its children. */
+html[lang^="zh"] .quiz-card,
+html[lang^="zh"] .quiz-scenario,
+html[lang^="zh"] .quiz-question,
+html[lang^="zh"] .quiz-option-btn,
+html[lang^="zh"] .quiz-option-text {
+  line-height: 1.7;
+}
+
+html[lang^="zh"] .quiz-back-btn {
+  line-height: 1.7;
+}
+
+/* Results prose: Action Plan, Narrative, Deep-Dive, Review, Best Practice. */
+html[lang^="zh"] .results-action-narrative,
+html[lang^="zh"] .results-action-title,
+html[lang^="zh"] .results-action-desc,
+html[lang^="zh"] .results-deep-dive-sub,
+html[lang^="zh"] .results-review-summary,
+html[lang^="zh"] .results-review-scenario,
+html[lang^="zh"] .results-review-question,
+html[lang^="zh"] .results-review-option,
+html[lang^="zh"] .results-review-feedback,
+html[lang^="zh"] .results-review-best,
+html[lang^="zh"] .results-review-link,
+html[lang^="zh"] .results-narrative-summary {
+  line-height: 1.7;
+}
+
+/* Buttons in the results view are single-line controls, but their labels can be
+   Chinese; 1.7 keeps them optically consistent with the prose above them. */
+html[lang^="zh"] .results-download-btn,
+html[lang^="zh"] .results-share-btn,
+html[lang^="zh"] .results-copy-btn,
+html[lang^="zh"] .results-review-btn,
+html[lang^="zh"] .results-review-back-btn,
+html[lang^="zh"] .results-retake-btn {
+  line-height: 1.7;
+}
+
+/* Deep-Dive Prompt and any other preformatted block. */
+html[lang^="zh"] pre,
+html[lang^="zh"] .results-prompt-pre,
+html[lang^="zh"] code {
+  line-height: 1.7;
+}
+
+
+/* ── 5. Risk Radar axis labels ────────────────────────────────────────────
+
+   js/results.js buildRadar() sets a font-family presentation attribute on both
+   tspans of every axis label. A presentation attribute is the weakest thing in the
+   author origin — it sits below every selector-based rule — so this stylesheet rule
+   wins over it without !important. It carries the CJK-capable heading stack for
+   the Chinese page only (Latin AST IDs and digits stay on the W95FA pixel face,
+   Han glyphs land on the Fusion Pixel subset); the attribute keeps applying
+   unchanged on the English page.
+   ────────────────────────────────────────────────────────────────── */
+
+html[lang^="zh"] .results-radar-svg text,
+html[lang^="zh"] .results-radar-svg tspan,
+html[lang^="zh"] .results-radar-svg text tspan {
+  font-family: var(--font-heading);
+  letter-spacing: normal;
+}

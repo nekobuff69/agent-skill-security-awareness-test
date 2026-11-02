@@ -116,11 +116,11 @@ Compromise a trusted skill author’s account, push a backdoored version.
 
 ## Related Risks
 
-- [AST01 — Malicious Skills](https://owasp.org/www-project-agentic-skills-top-10/ast01.html): Supply chain compromise enables delivery of malicious skills.
-- [AST05 — Untrusted External Instructions](https://owasp.org/www-project-agentic-skills-top-10/ast05.html): Externally referenced documentation is a supply-chain surface that code-integrity controls cannot pin or verify.
-- [AST07 — Update Drift](https://owasp.org/www-project-agentic-skills-top-10/ast07.html): Lack of immutable updates exacerbates supply chain risks.
-- [AST08 — Poor Scanning](https://owasp.org/www-project-agentic-skills-top-10/ast08.html): Inadequate scanning misses supply chain vulnerabilities.
-- [AST10 — Cross-Platform Reuse](https://owasp.org/www-project-agentic-skills-top-10/ast10.html): Inconsistent security across platforms creates supply chain gaps.
+- [AST01 — Malicious Skills](https://owasp.github.io/www-project-agentic-skills-top-10/ast01.html): Supply chain compromise enables delivery of malicious skills.
+- [AST05 — Untrusted External Instructions](https://owasp.github.io/www-project-agentic-skills-top-10/ast05.html): Externally referenced documentation is a supply-chain surface that code-integrity controls cannot pin or verify.
+- [AST07 — Update Drift](https://owasp.github.io/www-project-agentic-skills-top-10/ast07.html): Lack of immutable updates exacerbates supply chain risks.
+- [AST08 — Poor Scanning](https://owasp.github.io/www-project-agentic-skills-top-10/ast08.html): Inadequate scanning misses supply chain vulnerabilities.
+- [AST10 — Cross-Platform Reuse](https://owasp.github.io/www-project-agentic-skills-top-10/ast10.html): Inconsistent security across platforms creates supply chain gaps.
 
 ## References
 

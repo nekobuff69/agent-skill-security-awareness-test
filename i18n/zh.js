@@ -20,21 +20,28 @@
 
     /* ── 语言 ── */
     'lang.name': '简体中文',
-    'lang.otherName': 'English',
+    'lang.otherName': '英文',
+    'lang.otherShort': 'EN',
     'lang.switchLabel': '切换到英文',
-    'lang.offerQuestion': '要用{language}阅读吗？',
-    'lang.offerAccept': '继续',
-    'lang.offerDismiss': '暂不',
+    'lang.offerTitle': '语言',
+    'lang.selfName': '中文',
+    'lang.switchUnavailable': '暂时无法切换到{language}。',
 
     /* ── 加载与错误 ── */
     'loading.bank': '加载中……',
     'error.loadBank': '题库加载失败：{message}',
     'error.retry': '重试',
 
-    /* ── 落地页 ── */
+    /* ── 启动闪屏（issue #39） ──
+       闪屏复用落地页标题作为应用名，保证开机画面与随后的程序同名。 */
+    'boot.status': '正在启动程序……',
+
+    /* ── 落地页（issue #53） ── */
+    'landing.headline1': '了解风险',
+    'landing.headline2': '保持警觉',
     'landing.titleFallback': '智能体安全意识测评',
-    'landing.subtitleFallback': '',
-    'landing.meta': '{count} 道问题，约 {time}',
+    'landing.body': '{count} 道题，关于你安装的技能和你运行的智能体。如实作答，结果用于生成你的个性化建议。',
+    'landing.meta': '{count} 道问题 · {time}',
     'landing.metaCountFallback': '20',
     'landing.timeFallback': '8-12 分钟',
     'landing.start': '开始测评',
@@ -54,9 +61,7 @@
     'results.deepDiveTitle': '深度提问',
     'results.planLoading': '正在生成你的行动计划……',
     'results.narrativeSummary': '为什么是这些行动？展开分析',
-    'results.deepDiveHeading': '想再深入一点？',
     'results.deepDiveSub': '把它粘贴到你的智能体对话里：它会针对你的盲区，把你的智能体变成一个私人的安全导师。',
-    'results.showPrompt': '查看深度提问',
     'results.copy': '复制到剪贴板',
     'results.copied': '已复制！',
     'results.copyFailed': '复制失败',
@@ -69,10 +74,64 @@
     'results.reviewTitle': '回顾你的作答',
     'results.reviewBack': '← 返回结果',
 
+    /* ── 测验窗口菜单（#65） ──
+       菜单里放着下载、分享、回顾、重测这些命令，窗口正文只留总分、
+       风险雷达图与盲区排行。命令文案复用上面 results.* 字符串，
+       这里只新增菜单名称。 */
+    'results.menuBar': '测验窗口菜单',
+
     /* ── 回顾 ── */
     'review.feedbackLabel': '反馈：',
     'review.bestPracticeLabel': '最佳实践：',
     'review.viewOnOwasp': '在 OWASP 查看 ↗',
+
+    /* ── 桌面外壳（ticket #38） ──
+       窗口框架、任务栏、开始菜单与关于窗口。 */
+    'shell.windowTitle': '智能体安全意识测评',
+    'shell.minimize': '最小化',
+    'shell.maximize': '最大化',
+    'shell.close': '关闭',
+    'shell.start': '开始',
+    'shell.menuAbout': '关于……',
+    'shell.menuQuit': '结束程序',
+    'shell.aboutTitle': '关于智能体安全意识测评',
+    'shell.aboutBody': '面向构建和运营智能体人群的安全意识测评，' +
+      '情境取材于 OWASP 智能体技能十大风险。',
+    'shell.aboutLink': 'OWASP 智能体技能十大风险（英文）',
+    'shell.aboutCredits': '界面字体：W95FA（作者 Alina Sava，' +
+      'SIL OFL 1.1 许可）。',
+    'shell.ok': '确定',
+
+    /* ── 程序窗口（ticket #61） ──
+       行动计划与深度提问各自成窗：这些是它们的标题栏与任务栏按钮文案。
+       'shell.programs' 是任务栏窗口列表的名称。 */
+    'shell.actionPlanWindow': '行动计划',
+    'shell.deepDiveWindow': '深度提问',
+    'shell.programs': '程序',
+
+    /* ── 结束程序对话框（ticket #43） ──
+       措辞对应 Win95 的“结束程序”确认框：标题栏点名被结束的程序，
+       正文只问一个问题。可复用原语 App.Windows.openSystemDialog 在打开时
+       通过 I18n.t() 解析这些 id；#44 与 #47 复用该原语时传入各自的 id。 */
+    'windows.endProgramTitle': '结束程序 - 智能体安全意识测评',
+    'windows.endProgramMessage': '确定要结束这个程序吗？',
+    'windows.retakeTitle': '重新开始 - 智能体安全意识测评',
+    'windows.retakeMessage': '确定要放弃这次测评、重新开始吗？所有作答都会被清除。',
+    'windows.yes': '是',
+    'windows.no': '否',
+
+    /* ── 开始菜单声音开关（ticket #41） ── */
+    'sound.menuItem': '声音',
+
+    /* ── 向导按钮行（ticket #40，ADR 0020） ── */
+    'wizard.back': '< 上一步',
+    'wizard.next': '下一步 >',
+    'wizard.finish': '完成',
+
+    /* ── 结果页标题（ticket #45，#60 之后） ──
+       总分小标题在窗口正文的第一块面板上；复古皮肤新增的假窗框与它的 [—][□][×]
+       aria-label 一起不再使用（真标题栏只有一块，由 shell 提供）。 */
+    'results.overall': '总分',
 
     /* ── AST 风险名称（术语表定稿） ── */
     'ast.AST01': '恶意技能',

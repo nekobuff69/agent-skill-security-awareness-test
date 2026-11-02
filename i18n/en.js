@@ -19,23 +19,31 @@
     /* ── Language ── */
     'lang.name': 'English',
     'lang.otherName': '中文',
+    'lang.otherShort': '中文',
     'lang.switchLabel': 'Switch to Chinese',
-    'lang.offerQuestion': 'Read this in {language}?',
-    'lang.offerAccept': 'Continue',
-    'lang.offerDismiss': 'Not now',
+    'lang.offerTitle': 'Language',
+    'lang.selfName': 'EN',
+    'lang.switchUnavailable': 'Switching to {language} isn\'t available right now.',
 
     /* ── Loading & errors ── */
     'loading.bank': 'Loading…',
     'error.loadBank': 'Failed to load question bank: {message}',
     'error.retry': 'Retry',
 
-    /* ── Landing view ── */
+    /* ── Boot splash (issue #39) ──
+       The splash reuses the landing title as its app-name string so the boot
+       screen always names the program that follows it. */
+    'boot.status': 'Starting application…',
+
+    /* ── Landing view (welcome splash, issue #53) ── */
+    'landing.headline1': 'Be Informed.',
+    'landing.headline2': 'Be Aware.',
     'landing.titleFallback': 'Agent Security Awareness Quiz',
-    'landing.subtitleFallback': '',
-    'landing.meta': '{count} questions {time}',
+    'landing.body': '{count} questions about the skills you install and the agents you run. Answer honestly; your answers shape the personalized plan.',
+    'landing.meta': '{count} questions · {time}',
     'landing.metaCountFallback': '20',
     'landing.timeFallback': '8-12 minutes',
-    'landing.start': 'Start Assessment',
+    'landing.start': 'Start',
 
     /* ── Quiz Chrome & Question Card ── */
     'quiz.phaseChip': 'Phase {number} · {title}',
@@ -52,9 +60,7 @@
     'results.deepDiveTitle': 'Deep-Dive Prompt',
     'results.planLoading': 'Crafting your action plan…',
     'results.narrativeSummary': 'Why these actions? Read the analysis',
-    'results.deepDiveHeading': 'Want to go deeper?',
     'results.deepDiveSub': 'Copy this into your agent chat: it turns your agent into a private security tutor for your exact blind spots.',
-    'results.showPrompt': 'Show Deep-Dive Prompt',
     'results.copy': 'Copy to Clipboard',
     'results.copied': 'Copied!',
     'results.copyFailed': 'Copy failed',
@@ -67,10 +73,72 @@
     'results.reviewTitle': 'Review Your Answers',
     'results.reviewBack': '← Back to results',
 
+    /* ── Quiz window menu bar (ticket #65) ──
+       The bar owns the four commands above (Download PNG, Share, Review
+       answers, Retake) at the head of the Quiz window's body, so the body
+       itself carries only the score header, the Risk Radar and the
+       Blind-Spot Bars. This is the bar's accessible name; the command
+       labels are the results.* strings they always were. */
+    'results.menuBar': 'Quiz window menu',
+
     /* ── Review ── */
     'review.feedbackLabel': 'Feedback: ',
     'review.bestPracticeLabel': 'Best Practice: ',
     'review.viewOnOwasp': 'View on OWASP ↗',
+
+    /* ── Desktop shell (ticket #38) ──
+       Window frame, taskbar, Start menu and the About window. */
+    'shell.windowTitle': 'Agent Security Awareness Quiz',
+    'shell.minimize': 'Minimize',
+    'shell.maximize': 'Maximize',
+    'shell.close': 'Close',
+    'shell.start': 'Start',
+    'shell.menuAbout': 'About…',
+    'shell.menuQuit': 'End Program',
+    'shell.aboutTitle': 'About Agent Security Awareness Quiz',
+    'shell.aboutBody': 'A security-awareness assessment for people who ' +
+      'build and run AI agents, with scenarios drawn from the OWASP Agentic Skills Top 10.',
+    'shell.aboutLink': 'OWASP Agentic Skills Top 10',
+    'shell.aboutCredits': 'Chrome typeface: W95FA by Alina Sava ' +
+      '(SIL Open Font License 1.1).',
+    'shell.ok': 'OK',
+
+    /* ── Program windows (ticket #61) ──
+       The Action Plan and the Deep-Dive Prompt are programs of their own:
+       these are their title bars and taskbar buttons. 'shell.programs' is
+       the accessible name of the running-windows list in the taskbar. */
+    'shell.actionPlanWindow': 'Action Plan',
+    'shell.deepDiveWindow': 'Deep-Dive Prompt',
+    'shell.programs': 'Programs',
+
+    /* ── End Program dialog (ticket #43) ──
+       Wording mirrors the Win95 "End Program" confirmation: the title bar
+       names the program being ended, the message asks the single question.
+       The reusable primitive (App.Windows.openSystemDialog) resolves these
+       ids through I18n.t() at open time; tickets #44 and #47 reuse the
+       primitive with their own ids. */
+    'windows.endProgramTitle': 'End Program - Agent Security Awareness Quiz',
+    'windows.endProgramMessage': 'Are you sure you want to end this program?',
+    'windows.retakeTitle': 'Retake - Agent Security Awareness Quiz',
+    'windows.retakeMessage': 'Retake clears this run and the desktop. All your answers will be lost. Start over?',
+    'windows.yes': 'Yes',
+    'windows.no': 'No',
+
+    /* ── Start-menu sound toggle (ticket #41) ── */
+    'sound.menuItem': 'Sound',
+
+    /* ── Wizard Row (ticket #40, ADR 0020) ── */
+    'wizard.back': '< Back',
+    'wizard.next': 'Next >',
+    'wizard.finish': 'Finish',
+
+    /* ── Results header (ticket #45, re-rendered by #60) ──
+       Section headings and panel copy resolve from the results.* ids above;
+       this is the retro addition: the Overall caption of the window's first
+       body panel. The fake Title Card's drawn [—][□][×] aria-labels left
+       with the fake chrome (#60) — the real title bar speaks through the
+       shell.* strings. */
+    'results.overall': 'Overall',
 
     /* ── AST Risk names (ADR-0013: ids and severities stay in js/ast.js) ── */
     'ast.AST01': 'Malicious Skills',
