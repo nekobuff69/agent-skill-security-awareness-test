@@ -184,6 +184,24 @@ exports.run = function() {
   require('../../js/quiz.js');
   require('../../js/results.js');
   require('../../js/main.js');
+  // Ticket #66: Retake is the destructive path — it ends the run, so the
+  // per-tab desktop Record goes with it. The Windows namespace supplies
+  // the system dialog this page asks its confirmation on, and the Record
+  // store is the real one on an in-memory sessionStorage.
+  var Windows66 = require('../../js/windows.js');
+  var DesktopStore66 = require('../../js/desktop-store.js');
+  var sessionData66 = {};
+  globalThis.sessionStorage = {
+    getItem: function(k) {
+      return Object.prototype.hasOwnProperty.call(sessionData66, k) ? sessionData66[k] : null;
+    },
+    setItem: function(k, v) { sessionData66[k] = String(v); },
+    removeItem: function(k) { delete sessionData66[k]; }
+  };
+  var desktopResets = 0;
+  Windows66.controller = {
+    resetPrograms: function() { desktopResets++; return true; }
+  };
 
   // Seam seams only, not the behaviours under test: the re-render contract
   // owns view rebuilding, not scoring maths or the Action Plan path
@@ -499,9 +517,70 @@ exports.run = function() {
     return String(b.className || '').indexOf('results-retake-btn') >= 0;
   })[0];
   check('the Retake control exists on the re-rendered results view', !!retakeBtn);
+
+  // Ticket #66: Retake ends the run, so it asks on the system dialog tier
+  // first, and only the confirmed answer runs the tail. The committed run
+  // is persisted on BOTH records before the gesture.
+  function retakeAsk() {
+    var stack = fakeDoc.body.children.slice();
+    while (stack.length) {
+      var n = stack.shift();
+      if (n && n.attrs && n.attrs.role === 'dialog' &&
+        allText(n).join(' ').indexOf(I18n.t('windows.retakeMessage')) >= 0) return n;
+      if (n && n.children) stack = stack.concat(n.children);
+    }
+    return null;
+  }
+  function buttonLabeled(root, label) {
+    var stack = [root];
+    while (stack.length) {
+      var n = stack.shift();
+      if (n && n.tagName === 'BUTTON' && n.textContent === label) return n;
+      if (n && n.children) stack = stack.concat(n.children);
+    }
+    return null;
+  }
+  check('the finished run is persisted as a Session AND a desktop Record',
+    globalThis.localStorage.getItem('quiz-session') !== null &&
+    DesktopStore66.exists() === true);
+
+  var viewBeforeRetake = App.currentView();
   retakeBtn.click();
+  var ask = retakeAsk();
+  check('Retake asks for confirmation instead of destroying on the click',
+    !!ask && Windows66.isDialogOpen() === true &&
+    globalThis.localStorage.getItem('quiz-session') !== null &&
+    DesktopStore66.exists() === true && desktopResets === 0 &&
+    App.currentView() === viewBeforeRetake, 'ask=' + !!ask);
+
+  buttonLabeled(ask, I18n.t('windows.no')).click();
+  check('the cancelled Retake leaves the run exactly as it was',
+    Windows66.isDialogOpen() === false &&
+    globalThis.localStorage.getItem('quiz-session') !== null &&
+    DesktopStore66.exists() === true && desktopResets === 0 &&
+    App.currentView() === viewBeforeRetake);
+
+  retakeBtn.click();
+  var ask2 = retakeAsk();
+  ask2.handlers.keydown({
+    key: 'Escape', preventDefault: function() {}, stopPropagation: function() {}
+  });
+  check('Escape cancels the Retake question — never confirms a destroy',
+    Windows66.isDialogOpen() === false &&
+    globalThis.localStorage.getItem('quiz-session') !== null &&
+    DesktopStore66.exists() === true && desktopResets === 0);
+
+  retakeBtn.click();
+  buttonLabeled(retakeAsk(), I18n.t('windows.yes')).click();
   check('Retake clears the Session and returns to the landing view (unchanged)',
-    App.currentView() === 'landing-view' && globalThis.localStorage.getItem('quiz-session') === null);
+    App.currentView() === 'landing-view' &&
+    globalThis.localStorage.getItem('quiz-session') === null);
+  check('the confirmed Retake clears the desktop Record and takes the desktop down',
+    DesktopStore66.exists() === false && desktopResets === 1 &&
+    Windows66.isDialogOpen() === false);
+  check('a reload after the confirmed Retake restores nothing',
+    DesktopStore66.restore(bankEn) === false);
+  delete Windows66.controller;
 
   // Real timers for the promise tail; queued beats above are dropped.
   timerQueue.length = 0;

@@ -76,6 +76,12 @@
     'results.reviewTitle': '回顾你的作答',
     'results.reviewBack': '← 返回结果',
 
+    /* ── 测验窗口菜单（#65） ──
+       菜单里放着下载、分享、回顾、重测这些命令，窗口正文只留总分、
+       风险雷达图与盲区排行。命令文案复用上面 results.* 字符串，
+       这里只新增菜单名称。 */
+    'results.menuBar': '测验窗口菜单',
+
     /* ── 回顾 ── */
     'review.feedbackLabel': '反馈：',
     'review.bestPracticeLabel': '最佳实践：',
@@ -89,6 +95,7 @@
     'shell.close': '关闭',
     'shell.start': '开始',
     'shell.menuAbout': '关于……',
+    'shell.menuQuit': '结束程序',
     'shell.aboutTitle': '关于智能体安全意识测评',
     'shell.aboutBody': '面向构建和运营智能体人群的安全意识测评，' +
       '情境取材于 OWASP Top 10。',
@@ -97,12 +104,21 @@
       'SIL OFL 1.1 许可）。',
     'shell.ok': '确定',
 
+    /* ── 程序窗口（ticket #61） ──
+       行动计划与深度提问各自成窗：这些是它们的标题栏与任务栏按钮文案。
+       'shell.programs' 是任务栏窗口列表的名称。 */
+    'shell.actionPlanWindow': '行动计划',
+    'shell.deepDiveWindow': '深度提问',
+    'shell.programs': '程序',
+
     /* ── 结束程序对话框（ticket #43） ──
        措辞对应 Win95 的“结束程序”确认框：标题栏点名被结束的程序，
        正文只问一个问题。可复用原语 App.Windows.openSystemDialog 在打开时
        通过 I18n.t() 解析这些 id；#44 与 #47 复用该原语时传入各自的 id。 */
     'windows.endProgramTitle': '结束程序 - 智能体安全意识测评',
     'windows.endProgramMessage': '确定要结束这个程序吗？',
+    'windows.retakeTitle': '重新开始 - 智能体安全意识测评',
+    'windows.retakeMessage': '确定要放弃这次测评、重新开始吗？所有作答都会被清除。',
     'windows.yes': '是',
     'windows.no': '否',
 
@@ -114,13 +130,10 @@
     'wizard.next': '下一步 >',
     'wizard.finish': '完成',
 
-    /* ── 结果页标题卡（ticket #45） ──
-       标题与面板文案由上面的 results.* id 提供；这里是复古皮肤的新增：
-       总分小标题，以及标题卡标题栏上 [—][□][×] 的 aria-label。 */
+    /* ── 结果页标题（ticket #45，#60 之后） ──
+       总分小标题在窗口正文的第一块面板上；复古皮肤新增的假窗框与它的 [—][□][×]
+       aria-label 一起不再使用（真标题栏只有一块，由 shell 提供）。 */
     'results.overall': '总分',
-    'results.titleBtnMin': '最小化',
-    'results.titleBtnMax': '最大化',
-    'results.titleBtnClose': '关闭',
 
     /* ── AST 风险名称（术语表定稿） ── */
     'ast.AST01': '恶意技能',

@@ -162,6 +162,24 @@
   }
 
   /**
+   * Ticket #63: a committed desktop Record means the entry view is the
+   * restored desktop, so the landing section is taken out of the first
+   * paint — synchronously, while this script tag still runs, before the
+   * Question Bank can arrive. js/main.js puts it back when the Record turns
+   * out to be invalid (a quiet discard, never a notice).
+   *
+   * @returns {boolean} true when a landing section was hidden.
+   */
+  function suppressLanding() {
+    var doc = global.document;
+    if (!doc || typeof doc.getElementById !== 'function') return false;
+    var landing = doc.getElementById('landing-view');
+    if (!landing) return false;
+    landing.hidden = true;
+    return true;
+  }
+
+  /**
    * Arm the boot for this page load. Reads storage, consults the live
    * Session (its presence means the initial view is a mid-quiz/review
    * restore, not a landing), decides, writes the flag exactly once, and
@@ -178,6 +196,11 @@
 
     // The initial view is not a landing when a Session to restore or a
     // Results/Review record already exists — those views never replay.
+    // Ticket #63 adds a third signal: a committed desktop Record. The boot
+    // cannot validate it against the bank (the bank has not loaded yet), so
+    // mere presence suppresses the splash; if js/desktop-store.js then
+    // discards an invalid Record, the landing simply appears — no splash,
+    // no notice, exactly the quiet discard the ticket asks for.
     var restoring = false;
     try {
       if (app.SessionStore && typeof app.SessionStore.exists === 'function') {
@@ -186,6 +209,20 @@
     } catch (err) {
       restoring = false;
     }
+
+    // Probed on its own, not only when the Session said "landing": a tab
+    // with both a Session and a committed desktop Record enters on the
+    // desktop, and the landing must not paint in front of it either way.
+    var desktopRecord = false;
+    try {
+      if (app.DesktopStore && typeof app.DesktopStore.exists === 'function') {
+        desktopRecord = !!app.DesktopStore.exists();
+      }
+    } catch (err) {
+      desktopRecord = false;
+    }
+    if (desktopRecord) suppressLanding();
+    restoring = restoring || desktopRecord;
 
     var reducedMotion = false;
     try {

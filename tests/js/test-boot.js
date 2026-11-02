@@ -73,8 +73,18 @@ exports.run = function() {
   // "initial view is landing vs restore" input is deterministic.
   globalThis.App = globalThis.App || {};
   var origSessionStore = globalThis.App.SessionStore;
+  var origDesktopStore = globalThis.App.DesktopStore;
   var origSessionStorage = globalThis.sessionStorage;
   var origMatchMedia = globalThis.matchMedia;
+  var origDocument = globalThis.document;
+
+  // Every row states its own desktop-Record answer, so an App.DesktopStore
+  // registered by another suite can never leak into these decisions.
+  function setDesktopRecord(present) {
+    globalThis.App.DesktopStore = {
+      exists: function() { return present; }
+    };
+  }
 
   function setSession(exists) {
     globalThis.App.SessionStore = {
@@ -90,7 +100,7 @@ exports.run = function() {
     // 1. Fresh landing: splash plays, flag written.
     var store1 = fakeStorage();
     globalThis.sessionStorage = store1;
-    setSession(false);
+    setSession(false); setDesktopRecord(false);
     Boot = freshBoot();
     var state1 = Boot.init();
     check('init on fresh landing decides splash',
@@ -120,7 +130,7 @@ exports.run = function() {
     //    not the landing, so the splash is suppressed.
     var store4 = fakeStorage();
     globalThis.sessionStorage = store4;
-    setSession(true);
+    setSession(true); setDesktopRecord(false);
     Boot = freshBoot();
     var state4 = Boot.init();
     check('mid-quiz restore → instant', state4 === 'instant', state4);
@@ -129,7 +139,7 @@ exports.run = function() {
     //    so every later load in this tab stays instant by flag too.
     var store5 = fakeStorage();
     globalThis.sessionStorage = store5;
-    setSession(false);
+    setSession(false); setDesktopRecord(false);
     globalThis.matchMedia = function() { return { matches: true }; };
     Boot = freshBoot();
     var state5 = Boot.init();
@@ -143,7 +153,7 @@ exports.run = function() {
     // 6. Storage unavailable (private mode): fail open — no splash is
     //    attempted, no key is touched, and init must not throw.
     globalThis.sessionStorage = throwingStorage();
-    setSession(false);
+    setSession(false); setDesktopRecord(false);
     Boot = freshBoot();
     var state6 = null;
     var threw = null;
@@ -163,13 +173,85 @@ exports.run = function() {
     var state7 = Boot.init();
     check('missing sessionStorage → instant fail-open',
       state7 === 'instant', state7);
+
+    // 8. Ticket #63: a committed desktop Record means the entry view is the
+    //    restored desktop, so the splash is suppressed even with no
+    //    Session in localStorage — and the flag is still written once.
+    //    Row 5 left prefers-reduced-motion armed; these rows read the boot
+    //    decision, so the live-motion answer goes back to false first.
+    globalThis.matchMedia = function() { return { matches: false }; };
+    function fakePage() {
+      var landing = { id: 'landing-view', hidden: false };
+      return {
+        landing: landing,
+        getElementById: function(id) { return id === 'landing-view' ? landing : null; }
+      };
+    }
+    var page8 = fakePage();
+    globalThis.document = page8;
+    var store8 = fakeStorage();
+    globalThis.sessionStorage = store8;
+    setSession(false); setDesktopRecord(true);
+    Boot = freshBoot();
+    var state8 = Boot.init();
+    check('desktop Record present → instant', state8 === 'instant', state8);
+    check('desktop Record instant still writes the flag once',
+      store8.getItem(Boot.FLAG_KEY) === '1' && store8.setCalls === 1,
+      'setCalls=' + store8.setCalls);
+    check('a desktop Record takes the landing out of the first paint (#63)',
+      page8.landing.hidden === true, String(page8.landing.hidden));
+
+    // 9. No Record: the boot is exactly as before — the landing splashes.
+    var page9 = fakePage();
+    globalThis.document = page9;
+    var store9 = fakeStorage();
+    globalThis.sessionStorage = store9;
+    setSession(false); setDesktopRecord(false);
+    Boot = freshBoot();
+    var state9 = Boot.init();
+    check('no desktop Record → splash as before', state9 === 'splash', state9);
+    check('no desktop Record leaves the landing for the ordinary boot (#63)',
+      page9.landing.hidden === false, String(page9.landing.hidden));
+    delete globalThis.document;
+
+    // 10. A store that cannot answer is not a Record: the probe fails
+    //     closed to the ordinary landing boot, and nothing throws.
+    var store10 = fakeStorage();
+    globalThis.sessionStorage = store10;
+    setSession(false);
+    globalThis.App.DesktopStore = {
+      exists: function() { throw new Error('storage denied'); }
+    };
+    Boot = freshBoot();
+    var state10 = null, threw10 = null;
+    try {
+      state10 = Boot.init();
+    } catch (err) {
+      threw10 = err;
+    }
+    check('a throwing desktop-Record probe degrades to the landing boot',
+      state10 === 'splash' && threw10 === null,
+      'state=' + String(state10) + ' threw=' + String(threw10));
+
+    // 11. A tab carrying the flag stays instant whatever the Record says.
+    var store11 = fakeStorage({ 'quiz-os-booted': '1' });
+    globalThis.sessionStorage = store11;
+    setSession(false); setDesktopRecord(true);
+    Boot = freshBoot();
+    var state11 = Boot.init();
+    check('flagged tab with a desktop Record → instant',
+      state11 === 'instant', state11);
   } finally {
     if (origSessionStore === undefined) delete globalThis.App.SessionStore;
     else globalThis.App.SessionStore = origSessionStore;
+    if (origDesktopStore === undefined) delete globalThis.App.DesktopStore;
+    else globalThis.App.DesktopStore = origDesktopStore;
     if (origSessionStorage === undefined) delete globalThis.sessionStorage;
     else globalThis.sessionStorage = origSessionStorage;
     if (origMatchMedia === undefined) delete globalThis.matchMedia;
     else globalThis.matchMedia = origMatchMedia;
+    if (origDocument === undefined) delete globalThis.document;
+    else globalThis.document = origDocument;
   }
 
   return results;

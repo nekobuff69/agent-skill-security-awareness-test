@@ -1,6 +1,8 @@
 exports.name = 'Shell';
 
 exports.run = function() {
+  var fs = require('fs');
+  var path = require('path');
   var results = [];
 
   function check(desc, pass, extra) {
@@ -148,7 +150,7 @@ exports.run = function() {
       return zh.ctl.titleButtons[a].innerHTML === en.ctl.titleButtons[a].innerHTML;
     }));
 
-  check('the glyph table is exported so the results Title Card reuses it',
+  check('the glyph table is exported from the module that owns the ONE title bar',
     Shell.TITLE_BAR_GLYPHS && actions.every(function(a) {
       return Shell.TITLE_BAR_GLYPHS[a] === en.ctl.titleButtons[a].innerHTML;
     }));
@@ -347,7 +349,10 @@ exports.run = function() {
     langEn.menu.children.every(function(child) {
       return child.getAttribute('data-os-menu') !== 'language';
     }) &&
-    langEn.menu.children.length === 1,
+    langEn.menu.children.every(function(child) {
+      return child.textContent !== I18n.t('lang.selfName') &&
+        child.textContent !== I18n.t('lang.otherShort');
+    }),
     'items=' + langEn.menu.children.length);
 
   I18n.use('en');
@@ -403,6 +408,433 @@ exports.run = function() {
   else globalThis.localStorage = savedStorage;
   if (savedLocation === undefined) delete globalThis.location;
   else globalThis.location = savedLocation;
+
+  // ── Keyboard floor wiring (ticket #67) ────────────────────────────────
+  // The shell's side of the floor: every window announces its program by
+  // name through a labelled grouping, no window claims a modal, the
+  // retargeted pointer stream has a wrapper to land in, and Escape's
+  // window tier is asked LAST — dialog, then About, then Start menu.
+  //
+  // ── Desktop shortcuts (ticket #62) ───────────────────────────────────
+  // A top-left column with one shortcut per program, glyph over a localized
+  // label, ALWAYS present — running or not. Double-click, Enter and Space
+  // launch through the ONE launch action; a single click never does.
+  //
+  // Both suites mount through the same helper: the controller carries the
+  // floor's Escape hook and the shortcut launch action side by side.
+
+  var launches = [];
+  var preventions = 0;
+  function fakeLaunch(id) { launches.push(id); }
+  function keyEvent(key) {
+    return { key: key, preventDefault: function() { preventions++; } };
+  }
+  function clickEvent() {
+    return { preventDefault: function() { preventions++; } };
+  }
+
+  I18n.use('en');
+  var esc67 = 0;
+
+  function mountWithLaunch(locale) {
+    I18n.use(locale);
+    var doc = fakeDoc();
+    var appEl = fakeEl('div');
+    appEl.setAttribute('id', 'app');
+    doc.body.appendChild(appEl);
+    var ctl = Shell.build({
+      doc: doc,
+      appEl: appEl,
+      strings: Shell.resolveStrings(I18n, Shell.STRING_IDS),
+      onWindowEscape: function() { esc67++; return true; },
+      launchProgram: fakeLaunch
+    });
+    return { doc: doc, appEl: appEl, ctl: ctl };
+  }
+
+  var floorMount = mountWithLaunch('en');
+  var floor = floorMount.ctl;
+  var sZh = mountWithLaunch('zh');
+  var ORDER = ['quiz', 'action-plan', 'deep-dive'];
+
+  check('every window is announced by its program name through a labelled grouping',
+    floor.windowEl.getAttribute('role') === 'group' &&
+    floor.programFrames['action-plan'].windowEl.getAttribute('role') === 'group' &&
+    floor.programFrames['deep-dive'].windowEl.getAttribute('role') === 'group' &&
+    floor.windowEl.getAttribute('aria-label') === 'Agent Security Awareness Quiz' &&
+    floor.programFrames['action-plan'].windowEl.getAttribute('aria-label') === 'Action Plan' &&
+    floor.programFrames['deep-dive'].windowEl.getAttribute('aria-label') === 'Deep-Dive Prompt',
+    floor.windowEl.getAttribute('aria-label') + '/' +
+    floor.programFrames['action-plan'].windowEl.getAttribute('aria-label'));
+
+  check('no window claims aria-modal: the desktop frames are peers on one stage',
+    floor.windowEl.getAttribute('aria-modal') === null &&
+    Object.keys(floor.programFrames).every(function(id) {
+      return floor.programFrames[id].windowEl.getAttribute('aria-modal') === null;
+    }));
+
+  check('the labelled groupings re-resolve on an in-place language switch',
+    (I18n.use('zh'), floor.refreshLang(),
+      floor.windowEl.getAttribute('aria-label') === '智能体安全意识测评' &&
+      floor.programFrames['action-plan'].windowEl.getAttribute('aria-label') === '行动计划' &&
+      floor.programFrames['deep-dive'].windowEl.getAttribute('aria-label') === '深度提问'),
+    floor.windowEl.getAttribute('aria-label'));
+  I18n.use('en');
+
+  check('the taskbar program buttons are native buttons (Enter/Space activate them)',
+    floor.programBtn.tagName === 'BUTTON' && floor.programBtn.type === 'button' &&
+    Object.keys(floor.programBtns).every(function(id) {
+      return floor.programBtns[id].tagName === 'BUTTON' &&
+        floor.programBtns[id].type === 'button';
+    }));
+
+  floor.openAbout();
+  floor.handleKeydown('Escape');
+  check('Escape with About open closes About and never reaches the window tier',
+    !floor.isAboutOpen() && esc67 === 0);
+
+  floor.openMenu();
+  floor.handleKeydown('Escape');
+  check('Escape with the Start menu open closes the menu before the window tier',
+    !floor.isMenuOpen() && esc67 === 0);
+
+  floor.handleKeydown('Escape');
+  check('with nothing above it open, Escape drops to the window tier exactly once',
+    esc67 === 1);
+
+  floor.handleKeydown('Enter');
+  floor.handleKeydown('Tab');
+  check('the window tier answers Escape only — no other key is intercepted',
+    esc67 === 1);
+
+  // #62's shortcut suite mounts its own en shell: the floor suite above
+  // re-resolved the shared controller's labels under zh.
+  I18n.use('en');
+  var sEn = mountWithLaunch('en');
+
+  check('the shortcut column carries one shortcut per program, in the stable order',
+    ORDER.every(function(id, i) {
+      var item = sEn.ctl.shortcutBar.children[i];
+      return item && item.getAttribute('data-os-shortcut') === id;
+    }) && sEn.ctl.shortcutBar.children.length === 3,
+    sEn.ctl.shortcutBar.children.map(function(c) {
+      return c.getAttribute('data-os-shortcut');
+    }).join(','));
+
+  check('every shortcut is a keyboard-reachable button with a drawn glyph',
+    ORDER.every(function(id) {
+      var item = sEn.ctl.shortcutEls[id];
+      return item.tagName === 'BUTTON' && item.type === 'button' &&
+        item.children.length === 2 &&
+        item.children[0].innerHTML.indexOf('<svg') === 0 &&
+        item.children[0].getAttribute('aria-hidden') === 'true' &&
+        item.children[1].textContent.length > 0;
+    }));
+
+  check('shortcut labels come from the en dictionary',
+    sEn.ctl.shortcutLabels['quiz'].textContent === 'Agent Security Awareness Quiz' &&
+    sEn.ctl.shortcutLabels['action-plan'].textContent === 'Action Plan' &&
+    sEn.ctl.shortcutLabels['deep-dive'].textContent === 'Deep-Dive Prompt',
+    [sEn.ctl.shortcutLabels['quiz'].textContent,
+     sEn.ctl.shortcutLabels['action-plan'].textContent,
+     sEn.ctl.shortcutLabels['deep-dive'].textContent].join('|'));
+
+  check('shortcut labels come from the zh dictionary',
+    sZh.ctl.shortcutLabels['quiz'].textContent === '智能体安全意识测评' &&
+    sZh.ctl.shortcutLabels['action-plan'].textContent === '行动计划' &&
+    sZh.ctl.shortcutLabels['deep-dive'].textContent === '深度提问',
+    [sZh.ctl.shortcutLabels['quiz'].textContent,
+     sZh.ctl.shortcutLabels['action-plan'].textContent,
+     sZh.ctl.shortcutLabels['deep-dive'].textContent].join('|'));
+
+  check('the shortcuts mount on the desktop surface (one column in the body)',
+    sEn.ctl.shortcutBar.parentNode === sEn.doc.body &&
+    sEn.doc.body.children.filter(function(c) {
+      return c === sEn.ctl.shortcutBar;
+    }).length === 1);
+
+  check('the shortcut column is built even with no launch action (drawn, inert)',
+    (function() {
+      var plain = mount('en');
+      var item = plain.ctl.shortcutEls['quiz'];
+      return !!item && !item.handlers.dblclick && !item.handlers.keydown;
+    })());
+
+  // Launch gestures: double-click, Enter, Space. One click: nothing.
+  launches = [];
+  sEn.ctl.shortcutEls['deep-dive'].handlers.dblclick(clickEvent());
+  check('double-clicking a shortcut launches that program',
+    launches.join(',') === 'deep-dive', 'launches=' + launches.join(','));
+
+  launches = [];
+  sEn.ctl.shortcutEls['quiz'].click();
+  check('a single click launches nothing (it only selects, as on a real desktop)',
+    launches.length === 0, 'launches=' + launches.join(','));
+
+  launches = [];
+  preventions = 0;
+  sEn.ctl.shortcutEls['action-plan'].handlers.keydown(keyEvent('Enter'));
+  check('Enter on a focused shortcut launches it',
+    launches.join(',') === 'action-plan' && preventions === 1,
+    'launches=' + launches.join(',') + ' prevented=' + preventions);
+
+  launches = [];
+  preventions = 0;
+  sEn.ctl.shortcutEls['quiz'].handlers.keydown(keyEvent(' '));
+  check('Space on a focused shortcut launches it (and never scrolls)',
+    launches.join(',') === 'quiz' && preventions === 1,
+    'launches=' + launches.join(',') + ' prevented=' + preventions);
+
+  launches = [];
+  sEn.ctl.shortcutEls['quiz'].handlers.keydown(keyEvent('a'));
+  sEn.ctl.shortcutEls['quiz'].handlers.keydown(keyEvent('Tab'));
+  check('any other key launches nothing', launches.length === 0);
+
+  // An in-place language switch re-resolves the labels (#55 contract).
+  I18n.use('en');
+  var swEn = mountWithLaunch('en');
+  I18n.use('zh');
+  swEn.ctl.refreshLang();
+  check('refreshLang re-resolves the shortcut labels in place',
+    swEn.ctl.shortcutLabels['action-plan'].textContent === '行动计划' &&
+    swEn.ctl.shortcutEls['action-plan'].getAttribute('title') === '行动计划',
+    swEn.ctl.shortcutLabels['action-plan'].textContent);
+
+  // The mobile rule: no shortcut column at ≤768px (presentation, exactly
+  // like the #46 maximized-by-default rule — the state model stays blind).
+  // Ticket #68 completes that layout: the frame fills the screen above the
+  // slim bar, its body scrolls inside, the chrome reduces to close, and
+  // the taskbar's three program entries — painted permanent by
+  // js/windows.js — share the bar as the only switcher.
+  var shellCss = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'css', 'shell.css'), 'utf8');
+  var mobileBlock = (function() {
+    var at = shellCss.indexOf('@media (max-width: 768px)');
+    return at < 0 ? '' : shellCss.slice(at);
+  })();
+  var mobileOnly = mobileBlock.slice(0, mobileBlock.indexOf('@media (max-width: 480px'));
+  check('css: the shortcut column disappears at ≤768px',
+    /\.os-shortcuts\s*\{[^}]*display:\s*none/.test(mobileOnly));
+  check('css: at ≤768px one program frame fills the screen above the slim taskbar',
+    /\.os-window\s*\{[^}]*position:\s*fixed[^}]*inset:\s*0 0 var\(--os-taskbar-height\) 0/.test(mobileOnly) &&
+    /:root\s*\{[^}]*--os-taskbar-height:\s*44px/.test(mobileOnly));
+  check('css: the window body keeps its own scroll inside the full-screen frame',
+    /\.os-window\s*\{[^}]*overflow:\s*hidden/.test(mobileOnly) &&
+    /\.os-window #app\s*\{[^}]*height:\s*100%[^}]*overflow:\s*auto/.test(mobileOnly));
+  check('css: the mobile chrome reduces to close — [—] and [□] leave the frame',
+    /\.os-titlebar-btn\[data-os-button="minimize"\][^}]*\{[^}]*display:\s*none/.test(mobileOnly) &&
+    /\.os-titlebar-btn\[data-os-button="maximize"\]/.test(mobileOnly));
+  check('css: the title bar is no drag handle at ≤768px (and no grip either)',
+    /\.os-window\.is-windowed \.os-titlebar\s*\{[^}]*cursor:\s*default/.test(mobileOnly) &&
+    /\.os-window\.is-windowed \.os-resize-grip\s*\{[^}]*display:\s*none/.test(mobileOnly));
+  check('css: the three program switches share the slim bar',
+    /\.os-taskbar \.os-program-btn\s*\{[^}]*flex:\s*1 1 0/.test(mobileOnly) &&
+    /\.os-taskbar-programs:has\(\.os-program-btn:not\(\[hidden\]\)\)\s*\{[^}]*flex:\s*2 1 0/.test(mobileOnly) &&
+    /\.os-start-btn,\s*\.os-program-btn,\s*\.os-lang-toggle\s*\{[^}]*height:\s*100%/.test(mobileOnly));
+  check('css: the desktop column is a top-left stack of icons',
+    /\.os-shortcuts\s*\{[^}]*position:\s*fixed/.test(shellCss) &&
+    /\.os-shortcuts\s*\{[^}]*flex-direction:\s*column/.test(shellCss) &&
+    /\.os-shortcuts\s*\{[^}]*left:\s*var\(--space-2\)/.test(shellCss) &&
+    /\.os-shortcuts\s*\{[^}]*top:\s*var\(--space-2\)/.test(shellCss));
+  check('css: the icons stay above the windows and below the bar (always visible)',
+    (function() {
+      var shortcutZ = Number(
+        (shellCss.match(/\.os-shortcuts\s*\{[^}]*z-index:\s*(\d+)/) || [])[1]);
+      var taskbarZ = Number(
+        (shellCss.match(/\.os-taskbar\s*\{[^}]*z-index:\s*(\d+)/) || [])[1]);
+      var dialogZ = Number(
+        (shellCss.match(/\.os-dialog-backdrop\s*\{[^}]*z-index:\s*(\d+)/) || [])[1]);
+      return shortcutZ > 0 && shortcutZ < taskbarZ && shortcutZ < dialogZ &&
+        taskbarZ === 1000;
+    })(),
+    'shortcuts above the window rung, under 1000');
+  // Reduced motion covers every window transition on this viewport: the
+  // gate is a top-level block, so the ≤768px layout inherits it, and it
+  // parks BOTH traces the switcher can paint.
+  check('css: reduced motion parks the window traces at every viewport',
+    (function() {
+      var rmAt = shellCss.indexOf('@media (prefers-reduced-motion: reduce)');
+      var mediaAt = shellCss.indexOf('@media (max-width: 768px)');
+      var rmBlock = rmAt < 0 ? '' : shellCss.slice(rmAt,
+        shellCss.indexOf('@media', rmAt + 1) < 0 ? shellCss.length
+          : shellCss.indexOf('@media', rmAt + 1));
+      return rmAt >= 0 && rmAt < mediaAt &&
+        /\.os-window\.is-minimizing/.test(rmBlock) &&
+        /\.os-window\.is-restoring/.test(rmBlock) &&
+        /animation:\s*none/.test(rmBlock);
+    })());
+
+  // ── Start-menu Quit: the destructive exit (ticket #66) ────────────────
+  // The Quit entry opens the SAME End Program confirmation the window [×]
+  // uses, and only its Yes runs the tail: Session cleared, per-tab desktop
+  // Record cleared whole, every program window destroyed, landing shown.
+  // No / Escape changes nothing. The dialog tier is the REAL js/windows.js
+  // primitive (so the Escape ordering under test is the live one); the
+  // stores and the controller are faked at their published seams and every
+  // shared global is handed back.
+  var quitPrev = {
+    document: globalThis.document,
+    windows: globalThis.App.Windows,
+    windowsController: globalThis.App.Windows && globalThis.App.Windows.controller,
+    sessionStore: globalThis.App.SessionStore,
+    desktopStore: globalThis.App.DesktopStore,
+    showView: globalThis.App.showView,
+    locale: I18n.locale
+  };
+  var Windows66 = require('../../js/windows.js');
+  globalThis.App.Windows = Windows66;
+
+  function textOf(node, out) {
+    out = out || [];
+    if (node == null) return out;
+    if (typeof node.textContent === 'string' && node.textContent !== '') out.push(node.textContent);
+    (node.children || []).forEach(function(kid) { textOf(kid, out); });
+    return out;
+  }
+  // The system dialog is the one that ASKS this question — the About
+  // window is a dialog too, so the message text is the identifier.
+  function systemDialog(doc, message) {
+    var stack = (doc.body.children || []).slice();
+    while (stack.length) {
+      var n = stack.shift();
+      if (n && n.attrs && n.attrs.role === 'dialog' &&
+          textOf(n).join(' ').indexOf(message) >= 0) return n;
+      if (n && n.children) stack = stack.concat(n.children);
+    }
+    return null;
+  }
+  function buttonLabeled(root, label) {
+    var nodes = [root].concat((root.children || []));
+    var stack = nodes.slice();
+    while (stack.length) {
+      var n = stack.shift();
+      if (n && n.tagName === 'BUTTON' && n.textContent === label) return n;
+      if (n && n.children) stack = stack.concat(n.children);
+    }
+    return null;
+  }
+
+  function quitPage(locale) {
+    I18n.use(locale);
+    var doc = fakeDoc();
+    var appEl = fakeEl('div');
+    appEl.setAttribute('id', 'app');
+    doc.body.appendChild(appEl);
+    globalThis.document = doc;          // the dialog builds on the live doc
+    var seen = [];                      // one ordered log of the tail
+    globalThis.App.SessionStore = {
+      clear: function() { seen.push('session'); },
+      load: function() { return { ok: false, answers: [] }; }
+    };
+    globalThis.App.DesktopStore = {
+      clear: function() { seen.push('record'); },
+      exists: function() { return false; }
+    };
+    globalThis.App.showView = function(id) { seen.push('view:' + id); };
+    Windows66.controller = {
+      resetPrograms: function() { seen.push('desktop'); return true; }
+    };
+    var ctl = Shell.build({
+      doc: doc,
+      appEl: appEl,
+      strings: Shell.resolveStrings(I18n, Shell.STRING_IDS),
+      onQuit: function(opener) { return Shell.openQuit(opener); }
+    });
+    return { doc: doc, ctl: ctl, seen: seen };
+  }
+
+  var q = quitPage('en');
+  var quitItem = q.ctl.menu.children[q.ctl.menu.children.length - 1];
+  check('the Start menu keeps About and adds Quit beneath it',
+    q.ctl.menu.children.length === 2 &&
+    q.ctl.menu.children[0].textContent === I18n.t('shell.menuAbout') &&
+    quitItem.textContent === I18n.t('shell.menuQuit'));
+
+  q.ctl.openMenu();
+  quitItem.click();
+  var ask = systemDialog(q.doc, I18n.t('windows.endProgramMessage'));
+  check('Quit closes the Start menu and opens the End Program confirmation',
+    q.ctl.isMenuOpen() === false && !!ask &&
+    Windows66.isDialogOpen() === true,
+    'dialog=' + !!ask);
+  check('an unconfirmed gesture destroys nothing',
+    q.seen.length === 0, q.seen.join(','));
+
+  // Escape ordering (unchanged): the dialog owns Escape, so the shell's
+  // menu tier steps aside while the question is on screen.
+  q.ctl.openMenu();
+  q.ctl.handleKeydown('Escape');
+  check('the open Quit dialog keeps the Escape tier from the Start menu',
+    q.ctl.isMenuOpen() === true && Windows66.isDialogOpen() === true);
+  ask.handlers.keydown({
+    key: 'Escape', preventDefault: function() {}, stopPropagation: function() {}
+  });
+  check('Escape cancels the question, and the cancel changed nothing',
+    Windows66.isDialogOpen() === false && q.seen.length === 0 &&
+    systemDialog(q.doc, I18n.t('windows.endProgramMessage')) === null);
+  q.ctl.closeMenu(false);
+
+  // The affirmative path: Yes ends the run, landing first, desktop last.
+  q.ctl.openMenu();
+  quitItem.click();
+  var ask2 = systemDialog(q.doc, I18n.t('windows.endProgramMessage'));
+  buttonLabeled(ask2, I18n.t('windows.yes')).click();
+  check('Yes clears the Session and the Record, shows landing, tears the desktop down',
+    q.seen.join(',') === 'session,record,view:landing-view,desktop',
+    q.seen.join(','));
+  check('the dialog leaves the page when it is answered',
+    Windows66.isDialogOpen() === false &&
+    systemDialog(q.doc, I18n.t('windows.endProgramMessage')) === null);
+
+  // The labels are Chrome Strings: zh page, zh dialog, in-place switch.
+  var qzh = quitPage('zh');
+  var zhQuit = qzh.ctl.menu.children[qzh.ctl.menu.children.length - 1];
+  zhQuit.click();
+  var askZh = systemDialog(qzh.doc, '确定要结束这个程序吗？');
+  check('the zh Quit entry and its confirmation resolve in Chinese',
+    zhQuit.textContent === '结束程序' && !!askZh,
+    zhQuit.textContent);
+  buttonLabeled(askZh, '否').click();
+  check('the zh cancel changes nothing either', qzh.seen.length === 0);
+  I18n.use('zh');
+  q.ctl.refreshLang();
+  check('refreshLang re-resolves the Quit label in place',
+    q.ctl.quitItem.textContent === '结束程序', q.ctl.quitItem.textContent);
+
+  // No Windows module: the entry stays inert rather than destroying data.
+  I18n.use('en');
+  var noWin = fakeDoc();
+  var noWinApp = fakeEl('div');
+  noWinApp.setAttribute('id', 'app');
+  noWin.body.appendChild(noWinApp);
+  var seenNoWin = [];
+  globalThis.App.SessionStore = { clear: function() { seenNoWin.push('session'); } };
+  globalThis.App.showView = function(id) { seenNoWin.push(id); };
+  var noWinCtl = Shell.build({
+    doc: noWin, appEl: noWinApp,
+    strings: Shell.resolveStrings(I18n, Shell.STRING_IDS),
+    onQuit: function(opener) { return Shell.openQuit(opener); }
+  });
+  globalThis.App.Windows = undefined;
+  noWinCtl.openMenu();
+  noWinCtl.menu.children[1].click();
+  check('without a dialog tier Quit asks nothing and destroys nothing',
+    seenNoWin.length === 0 && Windows66.isDialogOpen() === false);
+
+  // Hand every shared global back exactly as this suite found them.
+  delete Windows66.controller;
+  if (quitPrev.windows === undefined) delete globalThis.App.Windows;
+  else globalThis.App.Windows = quitPrev.windows;
+  if (quitPrev.windowsController !== undefined) {
+    globalThis.App.Windows.controller = quitPrev.windowsController;
+  }
+  ['SessionStore', 'DesktopStore', 'showView'].forEach(function(key) {
+    if (quitPrev[key] === undefined) delete globalThis.App[key];
+    else globalThis.App[key] = quitPrev[key];
+  });
+  if (quitPrev.document === undefined) delete globalThis.document;
+  else globalThis.document = quitPrev.document;
+  I18n.use(quitPrev.locale || 'en');
 
   return results;
 };

@@ -75,6 +75,14 @@
     'results.reviewTitle': 'Review Your Answers',
     'results.reviewBack': '← Back to results',
 
+    /* ── Quiz window menu bar (ticket #65) ──
+       The bar owns the four commands above (Download PNG, Share, Review
+       answers, Retake) at the head of the Quiz window's body, so the body
+       itself carries only the score header, the Risk Radar and the
+       Blind-Spot Bars. This is the bar's accessible name; the command
+       labels are the results.* strings they always were. */
+    'results.menuBar': 'Quiz window menu',
+
     /* ── Review ── */
     'review.feedbackLabel': 'Feedback: ',
     'review.bestPracticeLabel': 'Best Practice: ',
@@ -88,6 +96,7 @@
     'shell.close': 'Close',
     'shell.start': 'Start',
     'shell.menuAbout': 'About…',
+    'shell.menuQuit': 'End Program',
     'shell.aboutTitle': 'About Agent Security Awareness Quiz',
     'shell.aboutBody': 'A security-awareness assessment for people who ' +
       'build and run AI agents, with scenarios drawn from the OWASP Top 10.',
@@ -95,6 +104,14 @@
     'shell.aboutCredits': 'Chrome typeface: W95FA by Alina Sava ' +
       '(SIL Open Font License 1.1).',
     'shell.ok': 'OK',
+
+    /* ── Program windows (ticket #61) ──
+       The Action Plan and the Deep-Dive Prompt are programs of their own:
+       these are their title bars and taskbar buttons. 'shell.programs' is
+       the accessible name of the running-windows list in the taskbar. */
+    'shell.actionPlanWindow': 'Action Plan',
+    'shell.deepDiveWindow': 'Deep-Dive Prompt',
+    'shell.programs': 'Programs',
 
     /* ── End Program dialog (ticket #43) ──
        Wording mirrors the Win95 "End Program" confirmation: the title bar
@@ -104,6 +121,8 @@
        primitive with their own ids. */
     'windows.endProgramTitle': 'End Program - Agent Security Awareness Quiz',
     'windows.endProgramMessage': 'Are you sure you want to end this program?',
+    'windows.retakeTitle': 'Retake - Agent Security Awareness Quiz',
+    'windows.retakeMessage': 'Retake clears this run and the desktop. All your answers will be lost. Start over?',
     'windows.yes': 'Yes',
     'windows.no': 'No',
 
@@ -115,14 +134,13 @@
     'wizard.next': 'Next >',
     'wizard.finish': 'Finish',
 
-    /* ── Results Title Card (ticket #45) ──
+    /* ── Results header (ticket #45, re-rendered by #60) ──
        Section headings and panel copy resolve from the results.* ids above;
-       these are the retro additions: the Overall caption and the drawn,
-       DISABLED [—][□][×] aria-labels of the Title Card title bar. */
+       this is the retro addition: the Overall caption of the window's first
+       body panel. The fake Title Card's drawn [—][□][×] aria-labels left
+       with the fake chrome (#60) — the real title bar speaks through the
+       shell.* strings. */
     'results.overall': 'Overall',
-    'results.titleBtnMin': 'Minimize',
-    'results.titleBtnMax': 'Maximize',
-    'results.titleBtnClose': 'Close',
 
     /* ── AST Risk names (ADR-0013: ids and severities stay in js/ast.js) ── */
     'ast.AST01': 'Malicious Skills',

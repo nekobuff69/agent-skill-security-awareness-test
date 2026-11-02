@@ -70,79 +70,42 @@
     return map;
   }
 
-  /* ── Title Card ── */
-  /* Title-bar button glyphs for the Title Card window. Mirrors the shell's
-     idiom (js/shell.js): drawn, DISABLED, inert — aria-labels only, no live
-     controls on a static results document. The glyph markup itself is NOT
-     duplicated: the buttons read App.Shell.TITLE_BAR_GLYPHS (#49), the one
-     table both windows draw from, so the program window and this card can
-     never drift apart. shell.js is loaded before this module on both
-     language pages. */
-  var TITLE_BUTTON_ACTIONS = ['minimize', 'maximize', 'close'];
-  var TITLE_BUTTON_LABEL_IDS = [
-    'results.titleBtnMin', 'results.titleBtnMax', 'results.titleBtnClose'
-  ];
+  /* ── Results header panel ── */
 
-  function buildTitleCard(report) {
+  /**
+   * The window's first content panel under the menu bar (tickets #60, #65):
+   * the Progression Title and the Overall Percentage merged into one
+   * sunken-white client field. The fake Title Card window of #45 is gone —
+   * the shell frame IS the window now, its navy title bar carries the
+   * program title, so the tier name rides the body panel again via
+   * .results-title-name (css/
+   * theme-retro-os.css keeps its rule) and no second title bar exists.
+   *
+   * The tier data path (title.emoji / title.name / percentage) and the
+   * score-band colouring are unchanged from #45: the percentage is the
+   * most eye-catching element on the surface, so it carries scoreClass()
+   * — without it a perfect score and a failing one rendered identically
+   * in --color-accent while green bars sat beside them saying the opposite.
+   * The band rules in css/results.css resolve to the --color-score-* TEXT
+   * tokens (css/theme-retro-os.css), not the graphic fills, because the
+   * fill values do not meet the contrast floor for text on white.
+   */
+  function buildResultsHeader(report) {
     var title = report.title;
-    var frag = document.createDocumentFragment();
 
-    /* The percentage is the most eye-catching element on the results page, so it
-       has to carry the score's meaning. It previously had no score class at all
-       and inherited --color-accent from .results-title-pct — the same orange used
-       for every risk indicator in the bars and the radar — so a perfect score
-       and a failing one rendered identically, while green bars sat directly
-       beside the headline saying the opposite. scoreClass() already exists and
-       already drives the bar fills; applying it here makes the two agree.
-
-       The colours resolve in css/theme-retro-os.css to the *-text tokens
-       rather than the fill tokens, because the fill values do not meet the
-       contrast floor for text on a light background.
-
-       Ticket #45: the card is now a window in the .os-window idiom — a
-       silver raised frame with a navy title bar carrying the Progression
-       Title (emoji + name), and a sunken white client field carrying the
-       Overall Percentage. The title bar and its disabled control buttons
-       reuse the shell's classes (css/shell.css) so the two windows draw
-       identically; the tier data path (title.emoji/title.name/percentage +
-       scoreClass) is unchanged. */
-    var win = el('div', { className: 'results-title-window' });
-
-    var bar = el('div', { className: 'os-titlebar results-title-bar' });
-    bar.appendChild(el('div', {
-      className: 'os-titlebar-title results-title-caption',
-      textContent: title.emoji + ' ' + title.name
-    }));
-    var buttons = el('div', { className: 'os-titlebar-buttons' });
-    // The shell owns the drawn glyph table; a headless render without the
-    // shell loaded still builds the card, just with empty controls.
-    var glyphs = (app.Shell && app.Shell.TITLE_BAR_GLYPHS) || {};
-    for (var b = 0; b < TITLE_BUTTON_ACTIONS.length; b++) {
-      var action = TITLE_BUTTON_ACTIONS[b];
-      var btn = el('button', { className: 'os-titlebar-btn' });
-      btn.type = 'button';
-      btn.disabled = true;
-      btn.setAttribute('data-os-button', action);
-      btn.setAttribute('aria-label', t(TITLE_BUTTON_LABEL_IDS[b]));
-      btn.innerHTML = glyphs[action] || '';
-      buttons.appendChild(btn);
-    }
-    bar.appendChild(buttons);
-    win.appendChild(bar);
-
-    /* Client field: .results-title-card keeps its class, so the skin's
-       sunken-white rule (css/theme-retro-os.css) paints the Win95 field. */
-    var client = el('div', { className: 'results-title-card' }, [
+    /* .results-title-card keeps its class, so the skin's sunken-white rule
+       (css/theme-retro-os.css) paints the Win95 field. */
+    return el('div', { className: 'results-title-card' }, [
+      el('div', {
+        className: 'results-title-name results-title-caption',
+        textContent: title.emoji + ' ' + title.name
+      }),
       el('div', { className: 'results-overall-caption', textContent: t('results.overall') }),
       el('div', {
         className: 'results-title-pct ' + scoreClass(report.percentage),
         textContent: report.percentage + '%'
       })
     ]);
-    win.appendChild(client);
-    frag.appendChild(win);
-
-    return frag;
   }
 
   /* ── Risk Radar (hand-rolled SVG) ── */
@@ -288,9 +251,9 @@
 
       var tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
       tspan.setAttribute('x', lx);
-      tspan.setAttribute('y', ly - 6);
+      tspan.setAttribute('y', ly - 8);
       tspan.setAttribute('text-anchor', anchor);
-      tspan.setAttribute('font-size', '9');
+      tspan.setAttribute('font-size', '14');
       tspan.setAttribute('font-family', font);
       tspan.setAttribute('font-weight', '400');
       tspan.setAttribute('fill', '#000000');
@@ -298,9 +261,9 @@
 
       var tspan2 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
       tspan2.setAttribute('x', lx);
-      tspan2.setAttribute('y', ly + 6);
+      tspan2.setAttribute('y', ly + 8);
       tspan2.setAttribute('text-anchor', anchor);
-      tspan2.setAttribute('font-size', '8');
+      tspan2.setAttribute('font-size', '13');
       tspan2.setAttribute('font-family', font);
       tspan2.setAttribute('font-weight', '400');
       tspan2.setAttribute('fill', scoreColor(pct));
@@ -465,13 +428,37 @@
      The LLM Path prompt embeds the current dictionary, so one Completion
      needs at most one Action Plan generation per locale, never one per
      render. A completed slot re-renders instantly and locally on every
-     later visit or language switch; an in-flight slot keeps the
-     localized `results.planLoading` shown until its own resolution
-     lands. Late resolutions from superseded renders are dropped by the
-     render id — a language switch can neither paint the old language's
-     Narrative into the new view nor duplicate the generation. */
+     later visit or language switch; #64 makes "every later visit" span a
+     reload too: a settled plan is mirrored into the desktop Record's
+     language → payload cache, and the restore render refills the slot from
+     it without a request. An in-flight slot keeps the localized
+     `results.planLoading` shown until its own resolution lands. Late
+     resolutions from superseded renders are dropped by the render id — a
+     language switch can neither paint the old language's Narrative into
+     the new view nor duplicate the generation. */
   var _planSlots = {};        // locale → { report, promise, narrative, actions }
   var _planRenderId = 0;      // the live Action Plan render; 0 = none
+
+  /* Ticket #64 — the desktop restore bracket. js/desktop-store.js opens it
+     with the Record's trusted language → payload map (beginPlanRestore),
+     draws the restored desktop inside it, and closes it (finishPlanRestore)
+     the moment the restore has completed. Inside the bracket a cached
+     payload for the render's language seeds the slot and renders at once —
+     no request, no loading state — while a language without a payload
+     queues the restore's ONE request, fired by the close, so a reloaded
+     desktop never carries an Action Plan window stuck on loading and never
+     renders a payload cached for another language. Outside the bracket —
+     a live Finish or a language switch — the presenter behaves as before:
+     exactly one request per (report, locale), and the only regeneration
+     trigger is the switch itself. This replaces #63's hold seam. */
+  var _planRestoreCache = null;   // language → payload, or null outside a restore
+  var _planRestoreQueued = null;  // the restore render's deferred first request
+
+  /* The Completion the last Action Plan render showed: a settling request
+     caches into the Record only while its report is still the live one
+     (#64) — a late resolution of a dead Completion, outlasted by a Retake
+     or a quit, must never paint its payload into a new desktop's cache. */
+  var _planLiveReport = null;
 
   function planSlot(locale) {
     var slot = _planSlots[locale];
@@ -484,12 +471,8 @@
 
   function buildActionPlan(report, bank, scoringBank) {
     var wrap = el('div', { className: 'results-action-plan' });
-    var proxyUrl = window.APP_CONFIG && window.APP_CONFIG.proxyUrl;
     var corpus = window.Corpus;
-
-    // Loading indicator; on the fallback path assemble resolves in a
-    // microtask so this never visibly paints.
-    wrap.appendChild(el('p', { className: 'results-action-narrative results-loading', textContent: t('results.planLoading') }));
+    _planLiveReport = report;
 
     var locale = app.I18n.locale;
     var slot = planSlot(locale);
@@ -497,33 +480,117 @@
 
     if (slot.report === report && slot.narrative !== null) {
       // This Completion's plan for this locale already exists — re-render
-      // from the slot: no generation, no fetch.
+      // from the slot: no generation, no fetch. The content settles inside
+      // this very render, and the settle IS the arrival: the Action Plan
+      // window appears (or stays) with it (ticket #61).
       renderPlanContent(wrap, slot.narrative, slot.actions);
+      actionPlanSettled();
       return wrap;
     }
 
+    // #64 restore: the Record carries this language's settled plan. The
+    // cached payload seeds the slot and renders inside this very render —
+    // no request, no loading state, no flicker — and the settle is the
+    // same arrival. A payload cached for ANOTHER language is never looked
+    // at: the lookup is keyed by the locale the desktop renders in.
+    if (_planRestoreCache &&
+        Object.prototype.hasOwnProperty.call(_planRestoreCache, locale)) {
+      var cached = _planRestoreCache[locale];
+      if (cached && typeof cached.narrative === 'string' &&
+          Array.isArray(cached.actions)) {
+        slot.report = report;
+        slot.promise = null;
+        slot.narrative = cached.narrative;
+        slot.actions = cached.actions;
+        renderPlanContent(wrap, slot.narrative, slot.actions);
+        actionPlanSettled();
+        return wrap;
+      }
+    }
+
+    // #64 restore with no cached payload for this language: the desktop
+    // comes back with NO Action Plan window — the window is an arrival,
+    // and an arrival waits for content. finishPlanRestore() fires the
+    // restore's one queued request when the restore has completed; from
+    // there the LLM Path and the Deterministic Fallback follow the exact
+    // rule every other render already uses.
+    if (_planRestoreCache) {
+      _planRestoreQueued = function() {
+        _planRestoreQueued = null;
+        requestPlanRender(slot, locale, report, bank, scoringBank, corpus,
+          wrap, renderId);
+      };
+      return wrap;
+    }
+
+    requestPlanRender(slot, locale, report, bank, scoringBank, corpus,
+      wrap, renderId);
+    return wrap;
+  }
+
+  /** Issue (or reuse) this slot's single generation and paint it into the
+   *  render when it settles — the one request path for a live Finish, a
+   *  language switch and a restore's queued request alike (#64). */
+  function requestPlanRender(slot, locale, report, bank, scoringBank,
+    corpus, wrap, renderId) {
     if (slot.report !== report || !slot.promise) {
-      // A new Completion, or this locale's first request for it.
+      // A new Completion, or this locale's first request for it. The
+      // Action Plan module owns the path decision and the retry policy:
+      // the LLM Path and the Deterministic Fallback settle through one
+      // promise, cache through one rule and arrive through one gesture.
       slot.report = report;
       slot.promise = null;
       slot.narrative = null;
       slot.actions = null;
-      // The Action Plan module owns the path decision and retry policy
-      slot.promise = App.ActionPlan.assemble(localizedReport(report, bank, scoringBank), bank, corpus, window.APP_CONFIG);
+      slot.promise = App.ActionPlan.assemble(
+        localizedReport(report, bank, scoringBank), bank, corpus,
+        window.APP_CONFIG);
     }
+
+    // Loading indicator, owned by the in-flight request only: a render
+    // that already has settled content never builds it, and on the
+    // fallback path assemble resolves in a microtask so this never
+    // visibly paints.
+    wrap.appendChild(el('p', { className: 'results-action-narrative results-loading', textContent: t('results.planLoading') }));
 
     var mine = slot.promise;
     mine.then(function(plan) {
       if (slot.promise !== mine) return;  // a newer Completion took the slot
       slot.narrative = plan.narrative;
       slot.actions = plan.actions;
+      // #64: mirror the settled payload into the desktop Record, keyed by
+      // this request's own language — the language captured when the
+      // request was issued, not whatever dictionary is active when it
+      // lands. A Record a Retake or quit has already cleared is never
+      // rewritten (the store's savePlan no-ops without one).
+      persistPlan(locale, report, plan);
       // A newer render superseded this one (another language switch, a
-      // Retake, a Bank refresh): the late resolution must not paint into
-      // an evicted view.
-      if (_planRenderId !== renderId) return;
+      // Retake, a Bank refresh), or the desktop it belonged to has been
+      // torn down (#64/#66): the late resolution must not paint into an
+      // evicted view — and never re-arrives a window for a dead run.
+      if (_planLiveReport !== report || _planRenderId !== renderId) return;
       renderPlanContent(wrap, plan.narrative, plan.actions);
+      // Content settled → the window arrives. The Deterministic Fallback
+      // lands here on its microtask too, and that is the SAME rule with
+      // the same consequence: the LLM Path and the fallback are not two
+      // arrival paths (ticket #61).
+      actionPlanSettled();
     });
-    return wrap;
+  }
+
+  /** Persist one settled plan into the desktop Record under the language
+   *  that generated it — while its Completion is still the live desktop.
+   *  Guarded end to end: no desktop store, superseded report, or a store
+   *  that refuses, and the render never notices. */
+  function persistPlan(locale, report, plan) {
+    if (_planLiveReport !== report) return false;
+    var store = app.DesktopStore;
+    if (!store || typeof store.savePlan !== 'function') return false;
+    try {
+      return store.savePlan(locale, plan) === true;
+    } catch (e) {
+      return false;
+    }
   }
 
   function renderPlanContent(wrap, narrative, actions) {
@@ -713,22 +780,146 @@
     return wrap;
   }
 
+  /* ── PNG export composition (ticket #65) ──────────────────────────────
+
+     The export sheet shows the Quiz window's BODY only: the score header,
+     the Risk Radar and the Blind-Spot Bars. The window chrome (title bar
+     and menu bar) and the taskbar are never part of it — no snapshot of
+     the window is taken; the body content is RE-DRAWN from the report
+     through the same pure builders the window itself uses (buildRadar,
+     scoreColor, the localized AST names, the heading token stack), so the
+     exported sheet and the window cannot drift apart. SVG graphics inside
+     an <img>-decoded export render through their palette constants and the
+     font-family attribute, the same rule the radar already follows. */
+
+  /* The sheet is one layout, and the numbers ARE the design: an 800-wide
+     column, the radar centred at its natural 400×400, the Blind-Spot rows
+     ruled on a fixed pitch under it. */
+  var EXPORT_W = 800;
+  var EXPORT_X = 20;               // text column
+  var EXPORT_NAME_Y = 56;          // Progression Title
+  var EXPORT_OVERALL_Y = 82;       // Overall caption
+  var EXPORT_PCT_Y = 122;          // Overall Percentage
+  var EXPORT_RADAR_TITLE_Y = 164;
+  var EXPORT_RADAR_Y = 184;        // the 400×400 chart, centred
+  var EXPORT_BARS_TITLE_Y = 626;
+  var EXPORT_ROW_FIRST = 658;      // first Blind-Spot row's text baseline
+  var EXPORT_ROW_PITCH = 24;       // one Blind-Spot row's height
+  var EXPORT_ROW_BOX = 12;         // one Blind-Spot track's height
+  var EXPORT_TRACK_X = 330;
+  var EXPORT_TRACK_W = 370;
+  var EXPORT_BOTTOM = 24;          // pad under the last row
+
+  /** The sheet's raster size for a report: 800 wide, one row pitch per
+   *  ranked AST below the header and radar blocks. */
+  function exportMetrics(report) {
+    var rows = ((report && report.astRanked) || []).length;
+    return {
+      w: EXPORT_W,
+      h: EXPORT_ROW_FIRST + Math.max(rows - 1, 0) * EXPORT_ROW_PITCH +
+         EXPORT_ROW_BOX + EXPORT_BOTTOM
+    };
+  }
+
+  /** The full body sheet as one SVG document: score header, Risk Radar,
+   *  Blind-Spot Bars — body content only, no chrome. */
+  function buildExportSvg(report) {
+    var ns = 'http://www.w3.org/2000/svg';
+    var m = exportMetrics(report);
+    var svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('width', String(m.w));
+    svg.setAttribute('height', String(m.h));
+    svg.setAttribute('viewBox', '0 0 ' + m.w + ' ' + m.h);
+
+    var bg = document.createElementNS(ns, 'rect');
+    bg.setAttribute('x', '0');
+    bg.setAttribute('y', '0');
+    bg.setAttribute('width', String(m.w));
+    bg.setAttribute('height', String(m.h));
+    bg.setAttribute('fill', '#FFFFFF');
+    svg.appendChild(bg);
+
+    var font = headingFont();
+
+    function text(x, y, size, content, fill) {
+      var n = document.createElementNS(ns, 'text');
+      n.setAttribute('x', String(x));
+      n.setAttribute('y', String(y));
+      n.setAttribute('font-size', String(size));
+      n.setAttribute('font-family', font);
+      n.setAttribute('font-weight', '400');
+      n.setAttribute('fill', fill);
+      n.textContent = content;
+      svg.appendChild(n);
+      return n;
+    }
+
+    function rect(x, y, w, h, fill, stroke) {
+      var r = document.createElementNS(ns, 'rect');
+      r.setAttribute('x', String(x));
+      r.setAttribute('y', String(y));
+      r.setAttribute('width', String(w));
+      r.setAttribute('height', String(h));
+      r.setAttribute('fill', fill);
+      if (stroke) r.setAttribute('stroke', stroke);
+      return r;
+    }
+
+    // Score header — the tier name, the Overall caption, the band-coloured
+    // percentage: the same three fields .results-title-card shows.
+    text(EXPORT_X, EXPORT_NAME_Y, 20, report.title.emoji + ' ' + report.title.name, '#000000');
+    text(EXPORT_X, EXPORT_OVERALL_Y, 14, t('results.overall'), '#000000');
+    text(EXPORT_X, EXPORT_PCT_Y, 38, report.percentage + '%', scoreColor(report.percentage));
+
+    // Risk Radar — a fresh data-viz snapshot, embedded 1:1 at 400×400.
+    text(EXPORT_X, EXPORT_RADAR_TITLE_Y, 16, t('results.radarTitle'), '#000000');
+    var radar = buildRadar(report);
+    radar.setAttribute('x', String((EXPORT_W - 400) / 2));
+    radar.setAttribute('y', String(EXPORT_RADAR_Y));
+    radar.setAttribute('width', '400');
+    radar.setAttribute('height', '400');
+    svg.appendChild(radar);
+
+    // Blind-Spot Bars — weakest first, the localized full names, the same
+    // band colours: the sheet's mirror of .results-bars.
+    text(EXPORT_X, EXPORT_BARS_TITLE_Y, 16, t('results.barsTitle'), '#000000');
+    var ranked = ((report && report.astRanked) || []);
+    for (var i = 0; i < ranked.length; i++) {
+      var pct = ranked[i].percentage || 0;
+      var rowY = EXPORT_ROW_FIRST + i * EXPORT_ROW_PITCH;
+      text(EXPORT_X, rowY, 11, app.I18n.astName(ranked[i].id), '#000000');
+      svg.appendChild(rect(EXPORT_TRACK_X, rowY - 11, EXPORT_TRACK_W,
+        EXPORT_ROW_BOX, '#FFFFFF', '#808080'));
+      svg.appendChild(rect(EXPORT_TRACK_X, rowY - 11, EXPORT_TRACK_W * pct / 100,
+        EXPORT_ROW_BOX, scoreColor(pct)));
+      text(EXPORT_TRACK_X + EXPORT_TRACK_W + 8, rowY, 11, pct + '%', scoreColor(pct));
+    }
+
+    return svg;
+  }
+
   /* ── PNG Download ── */
-  function buildDownloadPng(svgEl) {
-    var btn = el('button', { className: 'results-download-btn', textContent: t('results.downloadPng') });
+  function buildDownloadPng(report) {
+    var btn = el('button', {
+      className: 'results-download-btn results-menu-item',
+      textContent: t('results.downloadPng'),
+      role: 'menuitem'
+    });
     btn.addEventListener('click', function() {
-      var svgStr = new XMLSerializer().serializeToString(svgEl);
+      var svg = buildExportSvg(report);
+      var svgStr = new XMLSerializer().serializeToString(svg);
       var blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
       var url = URL.createObjectURL(blob);
       var img = new Image();
       img.onload = function() {
+        var m = exportMetrics(report);
         var canvas = document.createElement('canvas');
-        canvas.width = 800;
-        canvas.height = 800;
+        canvas.width = m.w;
+        canvas.height = m.h;
         var ctx = canvas.getContext('2d');
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, 800, 800);
-        ctx.drawImage(img, 0, 0, 800, 800);
+        ctx.fillRect(0, 0, m.w, m.h);
+        ctx.drawImage(img, 0, 0, m.w, m.h);
         canvas.toBlob(function(pngBlob) {
           URL.revokeObjectURL(url);
           if (!pngBlob) return;
@@ -748,7 +939,11 @@
   /* ── Share Button ── */
   function buildShareBtn(report) {
     if (!navigator.share) return null;
-    var btn = el('button', { className: 'results-share-btn', textContent: t('results.share') });
+    var btn = el('button', {
+      className: 'results-share-btn results-menu-item',
+      textContent: t('results.share'),
+      role: 'menuitem'
+    });
     btn.addEventListener('click', function() {
       navigator.share({
         title: t('results.shareTitle'),
@@ -763,14 +958,73 @@
     return btn;
   }
 
-  /* ── Retake Button ── */
+  /* ── Retake Button (ticket #66: a confirmed destructive path) ── */
   function buildRetake() {
-    var btn = el('button', { className: 'results-retake-btn', textContent: t('results.retake') });
+    var btn = el('button', {
+      className: 'results-retake-btn results-menu-item',
+      textContent: t('results.retake'),
+      role: 'menuitem'
+    });
     btn.addEventListener('click', function() {
-      App.SessionStore.clear();
-      App.showView('landing-view');
+      // Ticket #66: Retake ends the run, so it asks first. The
+      // confirmation is a shell system dialog — the tier that owns
+      // Escape before About, the Start menu and the windows — and it
+      // opens wherever the page carries a surface to ask on. Yes runs
+      // the tail below; No / Escape changes nothing at all. A page with
+      // no dialog surface (a presenter rendered without the OS chrome)
+      // has nothing to ask through: there the click itself is the whole
+      // gesture and the run ends directly, exactly as before #66. While
+      // another system dialog owns the page the ask fails closed — no
+      // gesture is confirmed twice, and nothing is destroyed.
+      if (canAsk()) {
+        app.Windows.openSystemDialog({
+          icon: 'warn',
+          titleId: 'windows.retakeTitle',
+          messageId: 'windows.retakeMessage',
+          dangerous: true,
+          opener: btn,
+          onOk: endTheRun
+        });
+        return;
+      }
+      endTheRun();
     });
     return btn;
+  }
+
+  /** Can this page host the Retake confirmation? The dialog primitive
+   *  needs a document with a body, a dictionary to resolve through and
+   *  the Windows module to build on — without all three there is no
+   *  system dialog tier, and no confirmation can be asked. */
+  function canAsk() {
+    if (!app.Windows || typeof app.Windows.openSystemDialog !== 'function') return false;
+    if (!app.I18n) return false;
+    var doc = typeof document !== 'undefined' ? document : null;
+    return !!(doc && doc.body && typeof doc.createElement === 'function');
+  }
+
+  /**
+   * The Retake tail — the destructive path, behind the confirmation.
+   * App.Windows.endRun() is the ONE implementation (ticket #66): Session
+   * cleared, per-tab desktop Record cleared whole (the cached plan of
+   * ticket #63 rides along — a reload after this finds nothing to
+   * restore), the desktop taken down (every program Record destroyed, not
+   * put away), landing shown. Without the Windows module the guarded
+   * fallback keeps the pre-#66 behavior for the stores it can reach.
+   */
+  function endTheRun() {
+    if (app.Windows && typeof app.Windows.endRun === 'function') {
+      app.Windows.endRun();
+      return;
+    }
+    App.SessionStore.clear();
+    // Ticket #63: the desktop Record describes the run this Retake ends —
+    // a reload after it must land on the fresh run, not on the old
+    // desktop. Guarded so a page without js/desktop-store.js is unchanged.
+    if (app.DesktopStore && typeof app.DesktopStore.clear === 'function') {
+      app.DesktopStore.clear();
+    }
+    App.showView('landing-view');
   }
 
   /* ══════════════════════════════════════════
@@ -814,12 +1068,176 @@
   }
 
   function buildReviewBtn() {
-    var btn = el('button', { className: 'results-review-btn', textContent: t('results.reviewBtn') });
+    var btn = el('button', {
+      className: 'results-review-btn results-menu-item',
+      textContent: t('results.reviewBtn'),
+      role: 'menuitem'
+    });
     btn.addEventListener('click', function() {
       populateReview();
       if (app.showView) app.showView('review-view');
     });
     return btn;
+  }
+
+  /* ── Window menu bar (ticket #65) ─────────────────────────────────────
+
+     The Quiz window's four commands — Download PNG, Share, Review answers,
+     Retake — live in ONE menu bar at the head of the window body, so the
+     body below it carries only the score header, the Risk Radar and the
+     Blind-Spot Bars. The bar is built by the Quiz presenter and mounted
+     into the Quiz body alone: the Action Plan and the Deep-Dive Prompt are
+     sections of their own windows and own no commands, and the Deep-Dive
+     Copy control stays in that window's body.
+
+     Keyboard: the bar is a `menubar` of `menuitem`s with a roving tabindex,
+     so Arrow/Home/End move the command focus and Enter/Space (native button
+     activation) runs it. Tabbing into the bar lands on the remembered
+     command; nothing here reaches into the window chrome (js/shell.js owns
+     the frame, and the frame owns focus-in/raise on pointer interaction).
+
+     The command labels are the existing `results.*` Chrome Strings — the
+     menu speaks with the same words the buttons used, so no second copy of
+     each label exists to drift. Only the bar's own accessible name is new
+     (`results.menuBar`), and it resolves in both dictionaries like every
+     other id (ADR 0015). */
+  function buildMenuBar(shown) {
+    var items = [buildDownloadPng(shown)];
+    var share = buildShareBtn(shown);
+    if (share) items.push(share);
+    items.push(buildReviewBtn());
+    items.push(buildRetake());
+
+    var bar = el('div', {
+      className: 'results-menu-bar',
+      role: 'menubar',
+      'aria-label': t('results.menuBar')
+    });
+
+    // The four builders arrive as menu items already (role and class); the
+    // bar owns how they enter the page's tab order: one tab stop, and the
+    // bar's own key handler moves it.
+    for (var i = 0; i < items.length; i++) {
+      items[i].setAttribute('type', 'button');
+      items[i].setAttribute('tabindex', i === 0 ? '0' : '-1');
+      bar.appendChild(items[i]);
+    }
+
+    bar.addEventListener('keydown', function(event) {
+      var key = event && event.key;
+      var at = -1;
+      for (var i = 0; i < items.length; i++) {
+        if (items[i] === event.target) { at = i; break; }
+      }
+      if (at < 0) return;
+      var next = -1;
+      if (key === 'ArrowRight') next = (at + 1) % items.length;
+      else if (key === 'ArrowLeft') next = (at - 1 + items.length) % items.length;
+      else if (key === 'Home') next = 0;
+      else if (key === 'End') next = items.length - 1;
+      else return;
+      if (event.preventDefault) event.preventDefault();
+      items[at].setAttribute('tabindex', '-1');
+      items[next].setAttribute('tabindex', '0');
+      if (typeof items[next].focus === 'function') items[next].focus();
+    });
+
+    return bar;
+  }
+
+  /* ── Section mount points (tickets #59, #61) ────────────────────────── */
+
+  /**
+   * Stable hosts for the two sections the desktop tickets render into
+   * their own windows: the Action Plan and the Deep-Dive Prompt. The id
+   * rides on the host — the results view wrapper while the section is
+   * mounted in place, the program frame's BODY once the shell has built
+   * that frame (js/shell.js gives the body the same id and marks it with
+   * data-results-mount) — so nothing about a mount point is cached and
+   * resultsMount() keeps resolving the LIVE element on every call.
+   *
+   * renderResults() rebuilds everything it renders from scratch, including
+   * the in-place language-switch re-render of issue #56: the section
+   * subtree is re-MOUNTED (the host is cleared, then the fresh subtree is
+   * appended) so an in-place re-render neither duplicates a section nor
+   * leaves an orphan of the previous one behind.
+   */
+  var MOUNT_IDS = {
+    'action-plan': 'results-mount-action-plan',
+    'deep-dive': 'results-mount-deep-dive'
+  };
+
+  /** The current host element for a section mount point, or null when the
+   *  results view has not been rendered (or no document is available). */
+  function resultsMount(name) {
+    var id = MOUNT_IDS[name];
+    if (!id) return null;
+    if (typeof document === 'undefined' || !document ||
+        typeof document.getElementById !== 'function') return null;
+    return document.getElementById(id);
+  }
+
+  /** The desktop controller the shell wired in (null on a bare page). */
+  function desktop() {
+    return (app.Windows && app.Windows.controller) || null;
+  }
+
+  /**
+   * The host a movable section renders into, resolved through the Section
+   * Mount Point contract: the program frame's body when the desktop built
+   * it (the section then lives in ITS OWN window, not in the Quiz body),
+   * or null when there is no window — the flow stages and the headless
+   * renders, where the section mounts in place under its own id.
+   */
+  function programHost(name) {
+    var host = resultsMount(name);
+    if (!host || typeof host.getAttribute !== 'function') return null;
+    return host.getAttribute('data-results-mount') === name ? host : null;
+  }
+
+  /**
+   * Mount one section subtree: into its program window when that window
+   * exists, otherwise in place in the results view. Either way the host
+   * carries the mount id, so App.resultsMount(name) resolves the live node
+   * right after this returns.
+   */
+  function mountSection(name, section, view) {
+    var host = programHost(name);
+    if (host) {
+      host.innerHTML = '';
+      host.appendChild(section);
+      return host;
+    }
+    section.id = MOUNT_IDS[name];
+    view.appendChild(section);
+    return section;
+  }
+
+  /**
+   * The Action Plan window arrives when its content settles — the same
+   * rule on the LLM Path and on the Deterministic Fallback, and the same
+   * rule when the fallback settles inside the current render. The window
+   * manager owns the consequence: cascaded from the focused window, below
+   * it in the stacking order, no focus and no raise.
+   */
+  function actionPlanSettled() {
+    var win = desktop();
+    if (win && typeof win.actionPlanArrived === 'function') {
+      return win.actionPlanArrived();
+    }
+    return false;
+  }
+
+  /**
+   * The Deep-Dive Prompt arrives at the Finish Commit, minimized: a
+   * taskbar button and nothing else until the Participant opens it.
+   */
+  function deepDiveCommitted() {
+    var win = desktop();
+    if (win && typeof win.deepDiveArrived === 'function') {
+      return win.deepDiveArrived();
+    }
+    return false;
   }
 
   function renderResults(bank, report) {
@@ -841,8 +1259,12 @@
     var scoringBank = _scoredBank || bank;
     var shown = localizedReport(report, bank, scoringBank);
 
-    // Title Card
-    view.appendChild(buildTitleCard(shown));
+    // The window menu bar owns the four commands (ticket #65); the body
+    // under it is the score header, the Risk Radar and the Blind-Spot Bars.
+    view.appendChild(buildMenuBar(shown));
+
+    // Results header panel (ticket #60)
+    view.appendChild(buildResultsHeader(shown));
 
     // Section: Risk Radar
     var radarSection = el('div', { className: 'results-section' });
@@ -851,13 +1273,6 @@
     var svg = buildRadar(report);
     radarWrap.appendChild(svg);
     radarSection.appendChild(radarWrap);
-
-    // Buttons row
-    var btnRow = el('div', { className: 'results-btn-row' });
-    btnRow.appendChild(buildDownloadPng(svg));
-    var shareBtn = buildShareBtn(shown);
-    if (shareBtn) btnRow.appendChild(shareBtn);
-    radarSection.appendChild(btnRow);
     view.appendChild(radarSection);
 
     // Blind-Spot Bars
@@ -866,29 +1281,39 @@
     barsSection.appendChild(buildBars(report));
     view.appendChild(barsSection);
 
-    // Action Plan
-    var actionSection = el('div', { className: 'results-section' });
-    actionSection.appendChild(el('h2', { className: 'results-section-title', textContent: t('results.actionPlanTitle') }));
+    // Action Plan — mounted on its stable section host. The host is the
+    // Action Plan WINDOW's body when the desktop built that frame, and the
+    // section no longer renders inside the Quiz window's body (ticket #61).
     // The raw report is the slot identity; the localized prose and the
     // scoring Variant travel with it for the plan's prompt (#56).
+    var actionSection = el('div', { className: 'results-section' });
+    actionSection.appendChild(el('h2', { className: 'results-section-title', textContent: t('results.actionPlanTitle') }));
     actionSection.appendChild(buildActionPlan(report, bank, scoringBank));
-    view.appendChild(actionSection);
+    mountSection('action-plan', actionSection, view);
 
-    // Deep-Dive Prompt
+    // Deep-Dive Prompt — mounted on its stable section host, which is the
+    // Deep-Dive Prompt window's body on the desktop (#61). Its content is
+    // built synchronously (the Deterministic Prompt Builder), so the Finish
+    // Commit below is also its arrival.
     var ddSection = el('div', { className: 'results-section' });
     ddSection.appendChild(el('h2', { className: 'results-section-title', textContent: t('results.deepDiveTitle') }));
     ddSection.appendChild(buildDeepDive(shown));
-    view.appendChild(ddSection);
+    mountSection('deep-dive', ddSection, view);
 
-    // Button row: Review + Retake
-    var actionBtnRow = el('div', { className: 'results-action-btn-row' });
-    actionBtnRow.appendChild(buildReviewBtn());
-    actionBtnRow.appendChild(buildRetake());
-    view.appendChild(actionBtnRow);
+    // Review and Retake left the body with ticket #65: they are menu-bar
+    // commands now, mounted once at the head of the window.
 
-    // Switch views (hide quiz/landing, show results)
+    // Switch views (hide quiz/landing, show results) FIRST: the desktop
+    // stage is what the arriving windows stand on, and the Window Manager
+    // reads the stage off this DOM on every render (js/windows.js syncView).
     if (app.showView) app.showView('results-view');
     view.hidden = false;
+
+    // The Finish Commit: the desktop comes into being with this render, so
+    // this is where the Deep-Dive Prompt window opens — minimized, a
+    // taskbar button only (ticket #61). The Action Plan window arrives on
+    // its own settle, which is where a Narrative is known to be real.
+    deepDiveCommitted();
   }
 
   /**
@@ -944,20 +1369,59 @@
   app.rerenderResults  = rerenderResults;
   app.rerenderReview   = rerenderReview;
   app.resultsState     = resultsState;
+  app.resultsMount     = resultsMount;
+  app.resultsMountIds  = MOUNT_IDS;
+
+  /* Ticket #64 seam — js/desktop-store.js brackets the one restore render:
+     beginPlanRestore(plans) arms the Record's language → payload map for
+     exactly the render inside the bracket, and finishPlanRestore() closes
+     it, firing the restore's ONE queued request (if the bracketed render
+     found no cached payload for the language it rendered in). Returns true
+     when a request was fired — the page never reads that; the tests do. */
+  app.beginPlanRestore = function(plans) {
+    _planRestoreQueued = null;
+    _planRestoreCache = (plans && typeof plans === 'object' &&
+      !Array.isArray(plans)) ? plans : {};
+  };
+  app.finishPlanRestore = function() {
+    _planRestoreCache = null;
+    var queued = _planRestoreQueued;
+    _planRestoreQueued = null;
+    if (queued) queued();
+    return !!queued;
+  };
+
+  /* #64/#66 handshake — js/desktop-store.js calls this whenever the
+     Record is discarded (Quit, Retake, quiet invalidation): the desktop
+     is gone, so every live Action Plan render is evicted — a resolution
+     that lands late caches nothing, paints nothing, and never re-arrives
+     the Action Plan window over the teardown's resetPrograms(). The next
+     desktop renders fresh ids of its own. */
+  app.actionPlanRecordGone = function() {
+    _planLiveReport = null;
+    _planRestoreQueued = null;
+    _planRenderId++;
+  };
 
   /* Test seam (tests/js/test-results-retro.js, fakeEl pattern): the pure
-     DOM builders plus the two palette helpers. Not used by the page. */
+     DOM builders plus the two palette helpers, and #64's Action Plan
+     builder — its request/cache behaviour is asserted through it. Not
+     used by the page. */
   app.resultsInternals = {
     scoreColor: scoreColor,
     scoreClass: scoreClass,
     headingFont: headingFont,
-    buildTitleCard: buildTitleCard,
+    buildResultsHeader: buildResultsHeader,
     buildRadar: buildRadar,
     buildBars: buildBars,
     buildReview: buildReview,
     buildDeepDive: buildDeepDive,
     buildDownloadPng: buildDownloadPng,
-    localizedReport: localizedReport
+    buildMenuBar: buildMenuBar,
+    buildExportSvg: buildExportSvg,
+    exportMetrics: exportMetrics,
+    localizedReport: localizedReport,
+    buildActionPlan: buildActionPlan
   };
 
   if (typeof module !== 'undefined') module.exports = app;

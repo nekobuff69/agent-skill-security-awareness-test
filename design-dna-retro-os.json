@@ -130,8 +130,8 @@
       "reduced_motion_contract": "prefers-reduced-motion: no trace draws, no gated content — full content present immediately; blocks gate disjoint selectors in css/theme-retro-os.css and css/quiz.css (card wipes, Progress Fill, Blind-Spot Bar width easing); boot.js decides to skip the splash outright"
     },
     "components": [
-      "os-window (raised frame around #app on the teal desktop)",
-      "title bar (navy→#1084D0 gradient, 14px W95FA label, [—][□][×] controls drawn as inline-SVG era glyphs — 6×2 bar, 9×9 square, 8×7 cross in currentColor, black live / gray disabled, #49)",
+      "os-window (raised frame around #app on the teal desktop; on the results and review views it is positioned by the window's Geometry and carries a corner size grip — ticket #60)",
+      "title bar (navy→#1084D0 gradient, 14px W95FA label, [—][□][×] controls drawn as inline-SVG era glyphs — 6×2 bar, 9×9 square, 8×7 cross in currentColor, black live / gray disabled, #49; the ONE window chrome — the results header no longer fakes a window of its own)",
       "taskbar (start button + program button + the two-segment EN/中文 Language Toggle that replaced the clock tray, #50; pressed-state flip on minimize)",
       "start menu popup and about/system dialog primitive (js/windows.js App.Windows.openSystemDialog: backdrop dims desktop 25%, one dialog at a time, closes only by button/Escape)",
       "boot splash (sunken groove, segmented navy stepped fill, status line)",

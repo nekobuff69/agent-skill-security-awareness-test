@@ -6,7 +6,9 @@
    typeface come from the skin's tokens — no new palette here.
 
    Layering (z-index ladder):
-     .os-window (0)
+     .os-window (0 + the core's stack number)
+       <  .os-shortcuts (900, the icon column: visible even under a
+            maximized window, ticket #62)
        <  .os-taskbar (1000)  <  .os-start-menu (1100)
        <  .os-about-backdrop (1200)
        <  .os-dialog-backdrop (1300)
@@ -116,6 +118,170 @@ body:has(#app > #landing-view:not([hidden])) .os-window {
   height: auto;       /* content-sized: title bar + welcome card */
   max-height: 100%;   /* taller content scrolls inside the view body */
   margin: 0;
+}
+
+/* ── Desktop regime (ticket #60) ──────────────────────────────────────
+
+   On the results and review views the frame becomes a positioned window:
+   the controller (js/windows.js) adds .is-windowed and paints the core's
+   Geometry inline (left/top/width/height). Landing and quiz keep the
+   layout-flow frame above — the desktop does not exist before the Finish
+   Commit. The z ladder is untouched: the fixed taskbar (1000) still paints
+   over the window, exactly like the era's always-on-top bar. */
+
+.os-window.is-windowed {
+  position: fixed;   /* desktop coordinates, taskbar excluded by the clamp */
+  margin: 0;
+  max-width: none;
+  height: auto;      /* the inline Geometry IS the height */
+}
+
+/* The title bar is the drag handle while the window is a window: no text
+   selection under the pointer, and no browser scroll gesture stealing it
+   on touch. The buttons keep their own cursor. */
+.os-window.is-windowed .os-titlebar {
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+}
+
+/* Bottom-right corner grip (js/shell.js builds it; the controller resizes
+   through it). Shown only in the regime — on the flow views and on the
+   mobile layout there is nothing to grab. The dithered diagonal is the
+   era's sizing box, drawn with gradients, no image asset (ADR 0001). */
+.os-resize-grip {
+  display: none;
+}
+
+.os-window.is-windowed .os-resize-grip {
+  display: block;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  touch-action: none;
+  user-select: none;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--color-secondary) 0 1px,
+    var(--color-face) 1px 2px,
+    var(--color-surface) 2px 3px,
+    var(--color-face) 3px 4px
+  );
+}
+
+/* Live gesture: the bevel reads pressed while the Participant drags or
+   sizes (no text is selectable under the pointer either way). */
+.os-window.is-dragging .os-titlebar,
+.os-window.is-resizing .os-resize-grip {
+  filter: brightness(0.96);
+}
+
+/* A closed window is off the desktop (core hide(), ticket #60) AND off the
+   taskbar (ticket #62, every program): no frame, no client area, no button
+   — the bare teal desktop with the shortcut column stays, and the put-away
+   window's shortcut is the way back (its arrangement waits in the Record). */
+.os-window.is-hidden {
+  display: none;
+}
+
+/* ── Program windows (ticket #61) ─────────────────────────────────────
+
+   The Action Plan and the Deep-Dive Prompt frames: the same chrome as the
+   Quiz frame, and a client area that IS the section's mount host. They are
+   painted only while their window has a Record on the desktop stage; on
+   the flow stages the frame is .is-hidden (no Record) and on the ≤768px
+   layout the media block below takes them full-screen like every other
+   frame. The body scrolls on its own — the frame keeps its fixed height,
+   the section content does not. */
+.os-window-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-4);
+  background: var(--color-face);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);   /* the same column rhythm #results-view draws */
+}
+
+/* The active window is unmistakable: the era drew the active title bar in
+   navy and every inactive one in flat gray with black type (9.9:1 on the
+   darkest step of the ramp). The Quiz frame is the active window whenever
+   the desktop is not the stage, so the flow layout never loses its navy
+   bar, and the landing splash is untouched. */
+.os-window:not(.is-active) .os-titlebar {
+  background: linear-gradient(90deg, #B0B0B0 0%, #E4E4E4 100%);
+  color: var(--color-text);
+}
+
+/* The program frames are fixed-height windows on the desktop, sized by
+   their Geometry — the same rule the Quiz frame rides (.is-windowed). */
+.os-window.is-windowed .os-window-body {
+  max-width: none;
+}
+
+/* ── Desktop shortcuts (ticket #62) ──────────────────────────────────────
+
+   The top-left icon column: one shortcut per program, glyph over label,
+   ALWAYS present on the desktop-width layout — running or not, arrived or
+   not. The ticket's rule is that a window never takes the icons away,
+   "including while a window is maximized over them": the column therefore
+   sits on its own rung of the ladder, ABOVE every program window (their z
+   values are the core's small stack numbers) and BELOW the taskbar (1000),
+   the Start menu (1100) and the dialog rungs, which own the desktop.
+   Double-click, Enter or Space launch; a single click only selects, as on
+   a real desktop. The ≤768px layout removes the column entirely (media
+   block at the bottom): there the taskbar's PERMANENT program switches
+   (ticket #68) are the only route between the programs. */
+.os-shortcuts {
+  position: fixed;
+  top: var(--space-2);
+  left: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 96px;
+  z-index: 900;            /* over the windows, under the bar and the dialogs */
+}
+
+/* The desktop does not exist before the Finish Commit (spec #58): the
+   landing and answering stages keep their single-window presentation, so
+   the column is drawn only on the stages behind Completion. */
+body:has(#landing-view:not([hidden])) .os-shortcuts,
+body:has(#quiz-view:not([hidden])) .os-shortcuts {
+  display: none;
+}
+
+.os-shortcut {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  /* An era icon is not a push button: no face, no bevel, no field. */
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--color-text);
+  font-family: var(--font-heading);
+  font-weight: 400;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  text-align: center;
+  cursor: default;         /* one click selects; two launch */
+}
+
+.os-shortcut-glyph {
+  display: block;
+  line-height: 0;          /* the drawn icon hugs its box */
+}
+
+.os-shortcut-label {
+  display: block;
 }
 
 /* ── Title bar ─────────────────────────────────────────────────────────
@@ -230,12 +396,26 @@ body:has(#app > #landing-view:not([hidden])) .os-window {
 
 /* Program button: pressed state — this window is the running program. */
 
+/* The running-windows list (ticket #61): the Quiz button, then one button
+   per program window in the stable program order. The Windows controller
+   removes a button with its window's mode (an unarrived program and a
+   hidden window are both absent), so this row IS "exactly the running
+   windows" — the markup is built once, the list is painted per render. */
+.os-taskbar-programs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-right: auto;      /* the era packs its program buttons left */
+}
+
 .os-program-btn {
   flex: 0 1 auto;
   min-width: 0;
   height: calc(var(--os-taskbar-height) - 8px);
   padding: 0 var(--space-2);
-  margin-right: auto;
+  margin-right: 0;         /* the free space belongs after the bar (above) */
   font-family: var(--font-heading);
   background: var(--color-face);
   color: var(--color-text);
@@ -539,9 +719,25 @@ body:has(#app > #landing-view:not([hidden])) .os-window {
 /* Focus ring: era dotted rectangle (matches the skin's button focus). */
 .os-dialog-btn:focus-visible,
 .os-titlebar-btn:focus-visible,
-.os-program-btn:focus-visible {
+.os-program-btn:focus-visible,
+.os-start-btn:focus-visible {
   outline: 1px dotted var(--color-text);
   outline-offset: -4px;
+}
+
+/* The keyboard floor (#67): a window frame is focusable through its own
+   grouping (restore() lands focus there, so the Participant knows WHICH
+   program Tab will walk next). Every other window's CONTROLS wear the
+   inert attribute the controller paints — client area, title-bar buttons
+   and any region mounted into the frame — while the title bar and the
+   corner grip stay live, so the pointer keeps raising, dragging and
+   resizing exactly as before.
+   A desktop icon takes the same dotted ring (ticket #62): the outline sits
+   INSIDE the icon box so it never grows the column. */
+.os-window:focus-visible,
+.os-shortcut:focus-visible {
+  outline: 1px dotted var(--color-text);
+  outline-offset: -3px;
 }
 
 /* ── Reduced motion (ticket #43 extension of the #42 contract) ─────────
@@ -555,16 +751,20 @@ body:has(#app > #landing-view:not([hidden])) .os-window {
   }
 }
 
-/* ── Responsive: mobile maximized default + slim taskbar (ticket #46) ──
+/* ── Responsive: single-program layout — full-screen frame, slim switcher
+   taskbar (tickets #46, #68) ────────────────────────────────────────────
 
-   At ≤768px the window opens MAXIMIZED by DEFAULT: full-bleed above the
-   taskbar, title bar flush with the viewport's top edge, the teal desktop
-   visible only behind the taskbar. Implemented as pure presentation —
-   the media query decides, not .is-maximized — so the state machine in
-   js/windows.js stays viewport-blind and the "mobile rule" documented
-   there (□ disabled at these widths, — and × unchanged) carries the only
-   behavioral consequence. Crossing 768px is an instant class-free state
-   switch, never an animation: nothing resizes, nothing moves twice. */
+   At ≤768px the desktop is SINGLE-PROGRAM: one frame fills the screen
+   above the slim taskbar, its client area scrolls on its own, and the
+   taskbar is the only switcher between the three programs. Implemented
+   as pure presentation — the media query decides, not .is-maximized — so
+   the state machine in js/windows.js stays viewport-blind; the
+   controller carries the behavioral consequences behind the same query
+   (the mobile rule in its header: [—]/[□] dead, geometry refused, the
+   taskbar painted as three permanent switch entries). Crossing 768px is
+   an instant class-free state switch, never an animation: nothing
+   resizes, nothing moves twice, and no Record, mode or Geometry is lost
+   in either direction. */
 @media (max-width: 768px) {
   :root {
     /* Slim taskbar: 44px IS the slim form — the slimmest bar whose
@@ -583,6 +783,64 @@ body:has(#app > #landing-view:not([hidden])) .os-window {
     margin: 0;
     box-shadow: none;
     overflow: hidden;
+  }
+
+  /* The desktop regime (ticket #60) is a desktop-width presentation: the
+     controller never paints Geometry here, and the corner grip stays hidden
+     with it. Restated at mobile specificity so a class that outlives a
+     viewport crossing can never leave a half-positioned frame. */
+  .os-window.is-windowed {
+    inset: 0 0 var(--os-taskbar-height) 0;
+    max-width: none;
+  }
+
+  .os-window.is-windowed .os-resize-grip {
+    display: none;
+  }
+
+  /* Single-program layout (ticket #68): the chrome reduces to close.
+     There is no dragging, resizing or maximizing on this viewport — the
+     controller refuses every geometry write and both toggles behind the
+     same media query (js/windows.js) — so [—] and [□] would be controls
+     that lie about a gesture that cannot happen, exactly the way [□]
+     already did for #46. They leave the chrome; [×] stays, and it puts
+     the window away with the permanent taskbar switch as the way back. */
+  .os-window .os-titlebar-btn[data-os-button="minimize"],
+  .os-window .os-titlebar-btn[data-os-button="maximize"] {
+    display: none;
+  }
+
+  /* The title bar is not a handle on this layout. Restated at mobile
+     specificity so a regime class that outlives a viewport crossing can
+     never leave a frame asking for, or stealing, a drag gesture. */
+  .os-window.is-windowed .os-titlebar {
+    cursor: default;
+    touch-action: auto;
+    user-select: text;
+  }
+
+  /* The taskbar is the only switcher (the shortcut column above it does
+     not fit): its three program entries are PERMANENT — running, put away
+     or not arrived — and js/windows.js paints them so. The row shares the
+     room the Start button and the tray leave: the app's own button is one
+     slot and the programs bar is the two slots beside it, so the three
+     switches read equal, and each label flexes down with its ellipsis
+     rather than wrapping or pushing the tray off the bar. The bar only
+     claims its two slots when it actually lists a switch — on the flow
+     stages the Quiz entry takes the row for itself. */
+  .os-taskbar .os-program-btn {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .os-taskbar-programs {
+    flex: 0 1 auto;
+    min-width: 0;
+    margin-right: 0;   /* auto margins eat the switcher's slots */
+  }
+
+  .os-taskbar-programs:has(.os-program-btn:not([hidden])) {
+    flex: 2 1 0;
   }
 
   .os-window #app {
@@ -624,6 +882,14 @@ body:has(#app > #landing-view:not([hidden])) .os-window {
   /* System dialog command buttons (End Program / Language offer). */
   .os-dialog-btn {
     min-height: 44px;
+  }
+
+  /* Desktop shortcuts (ticket #62) do not exist on this layout: there is
+     no teal desktop to stand icons on — every frame is full-screen and the
+     taskbar's permanent switches (#68) are the only way between the
+     programs. */
+  .os-shortcuts {
+    display: none;
   }
 }
 

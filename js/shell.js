@@ -7,21 +7,42 @@
   /**
    * Desktop shell (ticket #38): window frame, taskbar, Start menu, About
    * window. Ticket #43 makes the title-bar controls live; ticket #50
-   * replaces the tray clock with the two-segment language toggle.
+   * replaces the tray clock with the two-segment language toggle; ticket
+   * #61 adds the Action Plan and the Deep-Dive Prompt windows, so the
+   * shell builds THREE program frames — one chrome, one control idiom, one
+   * taskbar button each — instead of wrapping #app alone. Ticket #62 puts
+   * the desktop's own icons on the screen: a top-left SHORTCUT COLUMN —
+   * Quiz, Action Plan, Deep-Dive Prompt — always present (running or not),
+   * launched by double-click or Enter/Space, and absent on the ≤768px
+   * layout where the taskbar is the only switcher. Ticket #68 makes that
+   * sentence the mobile model: at ≤768px the desktop is single-program —
+   * one frame fills the screen above the slim taskbar, whose THREE program
+   * entries are painted permanently (running, put away or not arrived) as
+   * the switches between them — and the window chrome reduces to [×].
    *
    * Layering: the shell WRAPS the existing `#app` node at runtime (no HTML
    * edits) — a `div.os-window` with a navy title bar takes `#app` as its
-   * content, and a fixed `div.os-taskbar` pins the Start button, the program
-   * button and the language toggle to the bottom of the screen.
+   * content, and a fixed `div.os-taskbar` pins the Start button, the
+   * program buttons and the language toggle to the bottom of the screen.
    *
    * The three title-bar buttons carry `data-os-button="minimize|maximize|
    * close"` and DELEGATE to an App.Windows controller when the page wires
-   * one in (js/shell.js start() builds it from js/windows.js). Without a
-   * controller they keep the era default: drawn, disabled, inert — a
-   * landing-state application that cannot close itself. The controller
-   * re-renders their disabled state on every view change, opens the End
-   * Program dialog on [×] away from the landing view, and drives the
-   * minimize/maximize trace classes on the window frame.
+   * one in (js/shell.js start() builds it from js/windows.js) — for the
+   * Quiz frame that is the controller's own action, for a program frame
+   * the same action bound to that program's Id. Without a controller they
+   * keep the era default: drawn, disabled, inert — a landing-state
+   * application that cannot close itself. The controller
+   * re-renders their disabled state on every view change, drives the
+   * minimize/maximize trace classes on the window frame, and decides what
+   * [×] means: the End Program dialog on a flow view, the core's hide()
+   * on the results/review desktop stage (ticket #60).
+   *
+   * Desktop regime (ticket #60): on the results and review views the frame
+   * is a positioned, draggable, resizable window (`.is-windowed` — see
+   * css/shell.css); the landing and quiz views keep the layout-flow frame
+   * above. The title bar and the bottom-right corner grip are the drag and
+   * resize handles; js/windows.js moves the window only by writing the
+   * core's Geometry.
    *
    * Pure logic (menu/About state transitions) is exposed on App.Shell and
    * runs headless with fakeEl stubs; DOM wiring is guarded so `require()`
@@ -37,9 +58,10 @@
    * extra fonts (ADR 0001). `fill="currentColor"` lets the button's own
    * color token paint the glyph: black while live, gray on the disabled
    * landing state (the 1px white drop shadow rides the glyph in
-   * css/shell.css's `.tb-glyph` rule). The results Title Card
-   * (js/results.js) reads this same table so both windows draw
-   * identically.
+   * css/shell.css's `.tb-glyph` rule). These are the ONE title bar: the
+   * results header panel (js/results.js, ticket #60) rides the window's
+   * body instead of drawing a second fake chrome — no other module copies
+   * this table.
    */
   var TITLE_BAR_GLYPHS = {
     minimize:
@@ -55,6 +77,57 @@
   };
 
   var shell = {};
+
+  /**
+   * The two programs that run in their own windows (ticket #61, spec #58):
+   * the Action Plan and the Deep-Dive Prompt. `id` is the program Id the
+   * Desktop Core keys its Window Record by, `mount` the Section Mount Point
+   * name js/results.js resolves through App.resultsMount, and `titleId` the
+   * Chrome String the title bar and the taskbar button carry.
+   */
+  var PROGRAM_FRAMES = [
+    { id: 'action-plan', mount: 'action-plan', titleId: 'shell.actionPlanWindow' },
+    { id: 'deep-dive', mount: 'deep-dive', titleId: 'shell.deepDiveWindow' }
+  ];
+
+  /**
+   * The desktop shortcuts (ticket #62, spec #58): one per program, in the
+   * STABLE PROGRAM ORDER, always present on the desktop whether or not the
+   * program is running. `titleId` is the SAME Chrome String the program's
+   * title bar and taskbar button carry — a shortcut never invents a second
+   * name for a program. `glyph` is drawn (currentColor, aria-hidden) so no
+   * new codepoint enters either dictionary and the CJK font subset stays
+   * untouched.
+   */
+  var SHORTCUTS = [
+    { id: 'quiz', titleId: 'shell.windowTitle', glyph:
+      '<svg class="os-shortcut-glyph" width="24" height="24" viewBox="0 0 12 12" aria-hidden="true">' +
+      '<rect x="1" y="1" width="10" height="10" fill="none" stroke="currentColor"/>' +
+      '<path d="M3.6 4.6c0-1.1 1-1.9 2.2-1.9 1.3 0 2.2.8 2.2 1.9 0 1-.6 1.5-1.5 2-.7.4-1 .8-1 1.4" ' +
+      'fill="none" stroke="currentColor"/></svg>' },
+    { id: 'action-plan', titleId: 'shell.actionPlanWindow', glyph:
+      '<svg class="os-shortcut-glyph" width="24" height="24" viewBox="0 0 12 12" aria-hidden="true">' +
+      '<rect x="1" y="1" width="10" height="10" fill="none" stroke="currentColor"/>' +
+      '<path d="M3 4h6M3 6h6M3 8h4" fill="none" stroke="currentColor"/></svg>' },
+    { id: 'deep-dive', titleId: 'shell.deepDiveWindow', glyph:
+      '<svg class="os-shortcut-glyph" width="24" height="24" viewBox="0 0 12 12" aria-hidden="true">' +
+      '<circle cx="5.2" cy="5.2" r="3.2" fill="none" stroke="currentColor"/>' +
+      '<path d="M7.6 7.6 10.4 10.4" fill="none" stroke="currentColor"/></svg>' }
+  ];
+
+  /**
+   * The stable host id a program frame's body carries. js/results.js owns
+   * the Section Mount Point names (App.resultsMountIds); the shell adopts
+   * them so `App.resultsMount('action-plan')` resolves the ACTION PLAN
+   * WINDOW's body on the desktop — the presenter renders the section into
+   * its own program without knowing the window exists. Without results.js
+   * (a bare shell in a headless test) the same ids are derived, and the
+   * strings match: the contract is the name, not the file.
+   */
+  function programBodyId(spec) {
+    var ids = app.resultsMountIds || {};
+    return ids[spec.mount] || 'results-mount-' + spec.mount;
+  }
 
   // ── State transitions (pure; headless-testable) ────────────────────────
 
@@ -89,28 +162,33 @@
   // ── Build ───────────────────────────────────────────────────────────────
 
   /**
-   * Build the whole shell around the given `#app` node and return a
-   * controller. `deps` supplies the collaborators so the same code runs in
-   * the page (real document + App.I18n) and in tests (fakeEl stubs +
-   * prepared strings):
+   * The frame chrome — one navy title bar with the three control buttons,
+   * plus the corner grip. Ticket #61 generalizes what used to be the one
+   * Quiz frame into a factory: every program frame is drawn with the same
+   * chrome and the same delegated buttons, so the desktop has ONE window
+   * idiom, not a per-program copy.
    *
-   *   deps.doc      - document or fakeEl document (createElement)
-   *   deps.appEl    - the existing #app node to re-parent
-   *   deps.strings  - resolved Chrome Strings map (shell.* ids → text)
-   *   deps.onOutsideClick - optional; receives the outside-click handler
+   *   opts.titleText   title-bar text (a resolved Chrome String)
+   *   opts.actions     {minimize, maximize, close} — the delegation target
+   *                    for this frame's control buttons (an App.Windows
+   *                    controller method bound to the frame's program Id);
+   *                    absent, the buttons keep the era default: drawn,
+   *                    disabled, inert.
    */
-  function build(deps) {
-    var doc = deps.doc;
-    var strings = deps.strings;
-    var appEl = deps.appEl;
-
-    // ── Window frame ─────────────────────────────────────────────────────
+  function buildFrameChrome(doc, strings, opts) {
     var windowEl = createEl(doc, 'div', 'os-window');
+    // Every window announces itself by its program name (ticket #67): a
+    // labelled grouping around the frame's content. NO aria-modal — the
+    // desktop's windows are peers on one stage, not dialogs; the keyboard
+    // floor that separates them is the inert attribute js/windows.js
+    // paints on the controls of every window but the focused one.
+    windowEl.setAttribute('role', 'group');
+    windowEl.setAttribute('aria-label', opts.titleText);
 
     var titleBar = createEl(doc, 'div', 'os-titlebar');
     titleBar.setAttribute('role', 'banner');
 
-    var titleText = createEl(doc, 'span', 'os-titlebar-title', strings['shell.windowTitle']);
+    var titleText = createEl(doc, 'span', 'os-titlebar-title', opts.titleText);
     titleBar.appendChild(titleText);
 
     var titleButtons = createEl(doc, 'div', 'os-titlebar-buttons');
@@ -131,8 +209,8 @@
         // Disabled buttons never fire (browser and fakeEl both).
         if (btn.disabled) return;
         if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
-        if (!deps.windows) return;
-        var fn = deps.windows[action];
+        if (!opts.actions) return;
+        var fn = opts.actions[action];
         if (typeof fn === 'function') fn();
       });
       titleButtons.appendChild(btn);
@@ -140,6 +218,64 @@
     });
     titleBar.appendChild(titleButtons);
     windowEl.appendChild(titleBar);
+
+    // Resize grip (ticket #60): the bottom-right corner handle of the
+    // positioned window. The shell builds it; the controller owns when it
+    // is live (css/shell.css shows it only while .is-windowed is on the
+    // frame, and js/windows.js refuses the write on the mobile layout and
+    // while maximized). It carries no label: [—][□][×] and the keyboard
+    // route stay the accessible controls, so the grip is presentation.
+    var resizeGrip = createEl(doc, 'div', 'os-resize-grip');
+    resizeGrip.setAttribute('aria-hidden', 'true');
+    windowEl.appendChild(resizeGrip);
+
+    return {
+      windowEl: windowEl,
+      titleBar: titleBar,
+      titleText: titleText,
+      resizeGrip: resizeGrip,
+      titleButtons: titleButtonEls
+    };
+  }
+
+  /**
+   * Build the whole shell around the given `#app` node and return a
+   * controller. `deps` supplies the collaborators so the same code runs in
+   * the page (real document + App.I18n) and in tests (fakeEl stubs +
+   * prepared strings):
+   *
+   *   deps.doc      - document or fakeEl document (createElement)
+   *   deps.appEl    - the existing #app node to re-parent
+   *   deps.strings  - resolved Chrome Strings map (shell.* ids → text)
+   *   deps.windows  - the Quiz window's control delegation (App.Windows)
+   *   deps.programWindows - { 'action-plan': {...}, 'deep-dive': {...} }
+   *                   the same three control actions bound to each program
+   *                   frame (ticket #61)
+   *   deps.launchProgram - optional fn(programId): the desktop shortcut's
+   *                   launch action (ticket #62), wired to the App.Windows
+   *                   controller's launchProgram. Without it the shortcuts
+   *                   stay drawn and inert, exactly like the title-bar
+   *                   controls before a controller exists.
+   *   deps.onOutsideClick - optional; receives the outside-click handler
+   *   deps.onWindowEscape - optional (ticket #67); the Escape stack's
+   *                   window tier, called only when no dialog, About or
+   *                   Start menu had anything to close
+   */
+  function build(deps) {
+    var doc = deps.doc;
+    var strings = deps.strings;
+    var appEl = deps.appEl;
+
+    // ── Window frame ─────────────────────────────────────────────────────
+    var chrome = buildFrameChrome(doc, strings, {
+      titleText: strings['shell.windowTitle'],
+      actions: deps.windows
+    });
+    var windowEl = chrome.windowEl;
+    var titleBar = chrome.titleBar;
+    var titleText = chrome.titleText;
+    var resizeGrip = chrome.resizeGrip;
+    var titleButtonEls = chrome.titleButtons;
 
     // ── Taskbar ───────────────────────────────────────────────────────────
     var taskbar = createEl(doc, 'div', 'os-taskbar');
@@ -162,6 +298,16 @@
     aboutItem.type = 'button';
     aboutItem.setAttribute('role', 'menuitem');
     menu.appendChild(aboutItem);
+
+    // The destructive exit (ticket #66): Quit sits under About — the era
+    // kept the shutdown command at the bottom of the Start menu — and
+    // opens the SAME End Program confirmation the Quiz window's [×] uses.
+    // Nothing is destroyed until the Participant answers Yes.
+    var quitItem = createEl(doc, 'button', 'os-start-menu-item', strings['shell.menuQuit']);
+    quitItem.type = 'button';
+    quitItem.setAttribute('role', 'menuitem');
+    quitItem.setAttribute('data-os-menu', 'quit');
+    menu.appendChild(quitItem);
 
     // ── Tray language toggle (tickets #50, #55) ──────────────────────────
     // Two segments name both languages: the active language renders
@@ -196,10 +342,67 @@
     var programLabel = createEl(doc, 'span', 'os-program-label', strings['shell.windowTitle']);
     programBtn.appendChild(programLabel);
 
+    // ── The running-windows list (ticket #61) ────────────────────────────
+    // One button per program window, in the stable program order: the Quiz
+    // button above, then the Action Plan and the Deep-Dive Prompt. The
+    // Windows controller shows a button only while its window is RUNNING
+    // (a program that has not arrived, or one the Participant put away, has
+    // no button), presses the ACTIVE window's button, and wires the click
+    // to focus-or-restore. The buttons carry no icon: the era's bar named
+    // its programs.
+    var programsBar = createEl(doc, 'div', 'os-taskbar-programs');
+    programsBar.setAttribute('role', 'toolbar');
+    programsBar.setAttribute('aria-label', strings['shell.programs']);
+    var programBtns = {};
+    var programLabels = { quiz: programLabel };
+    PROGRAM_FRAMES.forEach(function(spec) {
+      var btn = createEl(doc, 'button', 'os-program-btn os-program-taskbar-btn');
+      btn.type = 'button';
+      btn.setAttribute('data-os-program', spec.id);
+      btn.hidden = true;                 // not running until it arrives
+      var label = createEl(doc, 'span', 'os-program-label', strings[spec.titleId]);
+      btn.appendChild(label);
+      programsBar.appendChild(btn);
+      programBtns[spec.id] = btn;
+      programLabels[spec.id] = label;
+    });
+
     taskbar.appendChild(startBtn);
     taskbar.appendChild(menu);
     taskbar.appendChild(programBtn);
+    taskbar.appendChild(programsBar);
     if (langToggle) taskbar.appendChild(langToggle);
+
+    // ── Desktop shortcuts (ticket #62) ───────────────────────────────────
+    // The top-left column: one shortcut per program, glyph above label,
+    // ALWAYS present — running or not, arrived or not. The column is built
+    // once and painted by no mode: a window never takes the icons away,
+    // and the stylesheet keeps them visible even while a window is
+    // maximized over them (css/shell.css: the shortcut rung sits above
+    // the windows and below the taskbar). The ≤768px layout removes the
+    // column entirely. Double-click or Enter/Space launches through
+    // deps.launchProgram; a single click only moves focus, as on a real
+    // desktop icon. Labels are the SAME Chrome Strings the title bars and
+    // taskbar buttons carry, so no second name exists for a program.
+    var shortcutBar = createEl(doc, 'div', 'os-shortcuts');
+    shortcutBar.setAttribute('aria-label', strings['shell.programs']);
+    var shortcutEls = {};
+    var shortcutLabels = {};
+    SHORTCUTS.forEach(function(spec) {
+      var item = createEl(doc, 'button', 'os-shortcut');
+      item.type = 'button';
+      item.setAttribute('data-os-shortcut', spec.id);
+      item.setAttribute('title', strings[spec.titleId]);
+      var glyph = createEl(doc, 'span', 'os-shortcut-glyph');
+      glyph.innerHTML = spec.glyph;
+      glyph.setAttribute('aria-hidden', 'true');
+      var label = createEl(doc, 'span', 'os-shortcut-label', strings[spec.titleId]);
+      item.appendChild(glyph);
+      item.appendChild(label);
+      shortcutBar.appendChild(item);
+      shortcutEls[spec.id] = item;
+      shortcutLabels[spec.id] = label;
+    });
 
     // ── About window (over a dimmed backdrop) ────────────────────────────
     var aboutBackdrop = createEl(doc, 'div', 'os-about-backdrop');
@@ -234,16 +437,45 @@
     aboutEl.appendChild(okBtn);
     aboutBackdrop.appendChild(aboutEl);
 
+    // ── Program frames (ticket #61) ──────────────────────────────────────
+    // The Action Plan and the Deep-Dive Prompt each get a real window: the
+    // same chrome as the Quiz frame, and a body that IS the section's
+    // Mount Point host (the id js/results.js resolves through
+    // App.resultsMount rides this element). They start with no Record in
+    // the core, so the controller paints them UNSEEN: the Action Plan
+    // window does not exist until its content settles, and the Deep-Dive
+    // Prompt arrives minimized at the Finish Commit.
+    var programFrames = {};
+    PROGRAM_FRAMES.forEach(function(spec) {
+      var frame = buildFrameChrome(doc, strings, {
+        titleText: strings[spec.titleId],
+        actions: deps.programWindows && deps.programWindows[spec.id]
+      });
+      frame.windowEl.setAttribute('data-os-program', spec.id);
+      frame.bodyEl = createEl(doc, 'div', 'os-window-body os-program-body');
+      frame.bodyEl.id = programBodyId(spec);
+      frame.bodyEl.setAttribute('data-results-mount', spec.mount);
+      // Inserted before the grip so the grip stays the frame's last child.
+      frame.windowEl.insertBefore(frame.bodyEl, frame.resizeGrip);
+      programFrames[spec.id] = frame;
+    });
+
     // ── Re-parent into the live document ─────────────────────────────────
-    // All three top-level containers are built; now they enter the body and
+    // All the top-level containers are built; now they enter the body and
     // #app moves inside the window frame. The reference node (#app) stays in
     // the body until the frame is inserted, then its move re-parents it in
-    // one insert, so it never leaves the document.
+    // one insert, so it never leaves the document. The program frames enter
+    // the desktop AFTER the Quiz frame (the stack order is the core's z, not
+    // the DOM order, but the era's tab order follows the paint order).
     var body = doc.body;
     body.insertBefore(windowEl, appEl);
     body.insertBefore(taskbar, appEl);
+    body.insertBefore(shortcutBar, windowEl);
+    PROGRAM_FRAMES.forEach(function(spec) {
+      body.insertBefore(programFrames[spec.id].windowEl, taskbar);
+    });
     body.appendChild(aboutBackdrop);
-    windowEl.appendChild(appEl);
+    windowEl.insertBefore(appEl, resizeGrip);
 
     // ── Controller (pure state + thin DOM ops) ───────────────────────────
     var menuOpen = false;
@@ -252,14 +484,24 @@
     var controller = {
       windowEl: windowEl,
       titleBar: titleBar,
+      resizeGrip: resizeGrip,
       titleButtons: titleButtonEls,
       taskbar: taskbar,
       startBtn: startBtn,
       menu: menu,
+      quitItem: quitItem,
       programBtn: programBtn,
       programLabel: programLabel,
+      programsBar: programsBar,
+      programFrames: programFrames,
+      programBtns: programBtns,
+      programLabels: programLabels,
       langToggle: langToggle,
       langSegments: langSegments,
+      // Desktop shortcuts (ticket #62): the column, its items and labels.
+      shortcutBar: shortcutBar,
+      shortcutEls: shortcutEls,
+      shortcutLabels: shortcutLabels,
 
       /**
        * Re-resolve every Chrome String on the shell after an in-place
@@ -279,15 +521,41 @@
           langSegments.other.setAttribute('title', I18n.t('lang.switchLabel'));
         }
         titleText.textContent = I18n.t('shell.windowTitle');
+        windowEl.setAttribute('aria-label', I18n.t('shell.windowTitle'));
         programLabel.textContent = I18n.t('shell.windowTitle');
         startLabel.textContent = I18n.t('shell.start');
         aboutItem.textContent = I18n.t('shell.menuAbout');
+        quitItem.textContent = I18n.t('shell.menuQuit');
         aboutTitle.textContent = I18n.t('shell.aboutTitle');
         aboutApp.textContent = I18n.t('shell.windowTitle');
         aboutDesc.textContent = I18n.t('shell.aboutBody');
         aboutLink.textContent = I18n.t('shell.aboutLink');
         aboutCredits.textContent = I18n.t('shell.aboutCredits');
         okBtn.textContent = I18n.t('shell.ok');
+        // The program windows (#61): their title bars, their taskbar
+        // buttons and the bar's own label re-resolve with everything else.
+        PROGRAM_FRAMES.forEach(function(spec) {
+          var frame = programFrames[spec.id];
+          frame.titleText.textContent = I18n.t(spec.titleId);
+          frame.windowEl.setAttribute('aria-label', I18n.t(spec.titleId));
+          if (programLabels[spec.id]) {
+            programLabels[spec.id].textContent = I18n.t(spec.titleId);
+          }
+          TITLE_BUTTON_ACTIONS.forEach(function(action) {
+            var btn = frame.titleButtons[action];
+            if (btn) btn.setAttribute('aria-label', I18n.t('shell.' + action));
+          });
+        });
+        programsBar.setAttribute('aria-label', I18n.t('shell.programs'));
+        // The desktop shortcuts (#62): label and tooltip re-resolve from
+        // the same Chrome Strings; the launch wiring is language-blind.
+        SHORTCUTS.forEach(function(spec) {
+          var item = shortcutEls[spec.id];
+          if (!item) return;
+          var text = I18n.t(spec.titleId);
+          shortcutLabels[spec.id].textContent = text;
+          item.setAttribute('title', text);
+        });
         TITLE_BUTTON_ACTIONS.forEach(function(action) {
           var btn = titleButtonEls[action];
           if (btn) btn.setAttribute('aria-label', I18n.t('shell.' + action));
@@ -348,9 +616,15 @@
         return menuOpen;
       },
 
-      /** Document-level keydown: Escape closes About first, then the menu.
-       *  A system dialog owns Escape while it is open (its own keydown
-       *  handler cancels it), so the menu/About handlers step aside. */
+      /** Document-level keydown. Escape runs the fixed stack, outermost
+       *  owner first: a system dialog owns Escape while it is open (its own
+       *  keydown handler cancels it, so every tier below steps aside), then
+       *  About, then the Start menu, then — ticket #67 — the WINDOW TIER:
+       *  deps.onWindowEscape hides the focused window through the desktop
+       *  core and hands focus back to its taskbar button or the shortcut
+       *  that opened it. The window tier answers only when every tier
+       *  above it had nothing to close, and it is the LAST consumer:
+       *  nothing is intercepted on Alt+Tab, no focus trap is added. */
       handleKeydown: function(key) {
         if (key !== 'Escape') return { menu: menuOpen, about: aboutOpen };
         if (app.Windows && app.Windows.isDialogOpen &&
@@ -359,13 +633,23 @@
         }
         if (aboutOpen) controller.closeAbout();
         else if (menuOpen) controller.closeMenu(true);
+        else if (typeof deps.onWindowEscape === 'function') deps.onWindowEscape();
         return { menu: menuOpen, about: aboutOpen };
       },
 
       /** Tear the shell DOM down (test cleanup). */
       destroy: function() {
         if (windowEl.parentNode) windowEl.parentNode.removeChild(windowEl);
+        PROGRAM_FRAMES.forEach(function(spec) {
+          var frame = programFrames[spec.id];
+          if (frame.windowEl.parentNode) {
+            frame.windowEl.parentNode.removeChild(frame.windowEl);
+          }
+        });
         if (taskbar.parentNode) taskbar.parentNode.removeChild(taskbar);
+        if (shortcutBar.parentNode) {
+          shortcutBar.parentNode.removeChild(shortcutBar);
+        }
         if (aboutBackdrop.parentNode) aboutBackdrop.parentNode.removeChild(aboutBackdrop);
       }
     };
@@ -383,7 +667,32 @@
       controller.closeMenu(false);
       controller.openAbout();
     });
+    on(quitItem, 'click', function() {
+      controller.closeMenu(false);
+      if (typeof deps.onQuit === 'function') deps.onQuit(quitItem);
+    });
     on(okBtn, 'click', function() { controller.closeAbout(); });
+
+    // Desktop shortcut launch (ticket #62): the era's icon gestures —
+    // DOUBLE-click with the pointer, Enter or Space from the keyboard.
+    // A single click does nothing (it only moves focus, as on a real
+    // desktop). One launch action per program, so the SAME route serves
+    // pointer and keyboard: the controller raises a running window,
+    // restores a put-away one, and never opens a second copy.
+    if (typeof deps.launchProgram === 'function') {
+      SHORTCUTS.forEach(function(spec) {
+        var item = shortcutEls[spec.id];
+        var launch = function(ev) {
+          if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
+          deps.launchProgram(spec.id);
+        };
+        on(item, 'dblclick', launch);
+        on(item, 'keydown', function(ev) {
+          var key = ev && ev.key;
+          if (key === 'Enter' || key === ' ') launch(ev);
+        });
+      });
+    }
 
     if (typeof deps.onOutsideClick === 'function') {
       deps.onOutsideClick(function(ev) {
@@ -487,9 +796,11 @@
 
   var STRING_IDS = [
     'shell.windowTitle', 'shell.minimize', 'shell.maximize', 'shell.close',
-    'shell.start', 'shell.menuAbout',
+    'shell.start', 'shell.menuAbout', 'shell.menuQuit',
     'shell.aboutTitle', 'shell.aboutBody', 'shell.aboutLink',
     'shell.aboutCredits', 'shell.ok',
+    // The three-program desktop (ticket #61).
+    'shell.actionPlanWindow', 'shell.deepDiveWindow', 'shell.programs',
     'windows.endProgramTitle', 'windows.endProgramMessage',
     'windows.yes', 'windows.no'
   ];
@@ -520,6 +831,31 @@
       onCancel: function() {
         win.cancelClose();
       }
+    });
+  }
+
+  /**
+   * The Start-menu Quit (ticket #66): the destructive exit. It opens the
+   * SAME End Program confirmation the window [×] uses, but it answers to
+   * App.Windows.endRun() — the Session, the per-tab desktop Record (the
+   * cached plan rides along: the Record goes whole) and the whole desktop
+   * go, and the landing page returns with nothing left to restore. No /
+   * Escape changes NOTHING: windows, report, Session and Record stay
+   * exactly as they were (the dialog primitive closes itself; endRun only
+   * ever runs from the Yes branch). Unlike openEndProgram there is no
+   * requestClose behind it: Quit is offered on every view, including the
+   * landing page the core would refuse to close from.
+   */
+  function openQuit(opener) {
+    if (!app.Windows || !app.Windows.openSystemDialog ||
+        typeof app.Windows.endRun !== 'function') return null;
+    return app.Windows.openSystemDialog({
+      icon: 'warn',
+      titleId: 'windows.endProgramTitle',
+      messageId: 'windows.endProgramMessage',
+      dangerous: true,
+      opener: opener,
+      onOk: function() { app.Windows.endRun(); }
     });
   }
 
@@ -610,25 +946,92 @@
         minimize: function() { win.minimize(); },
         maximize: function() { win.toggleMaximize(); },
         close: function() {
-          if (!win.requestClose()) return;
+          // One decision (js/windows.js): on the windowed desktop stage the
+          // window is PUT AWAY (core hide(), no dialog — the program keeps
+          // its results; on the desktop layout its shortcut brings it back,
+          // ticket #62, and on the ≤768px layout its permanent taskbar
+          // switch does, ticket #68). A flow stage has no desktop in play
+          // and asks the End Program confirmation.
+          var decision = win.close();
+          if (decision !== 'dialog') return;
           // The opener explicitly: requestClose() renders all three
           // controls disabled, which blurs the focused [×] before the
           // dialog could read doc.activeElement.
           openEndProgram(win, controller.titleButtons.close);
         }
       } : null,
+      // The Start-menu Quit (ticket #66): the destructive exit. The item
+      // closes the menu, then asks the End Program confirmation; Yes ends
+      // the run through App.Windows.endRun().
+      onQuit: function(opener) { return openQuit(opener); },
+      // The Action Plan and the Deep-Dive Prompt frames (ticket #61): the
+      // same three controls, bound to that program's Id. Their [×] is
+      // always the core's hide() — these windows never own the Session, so
+      // there is no End Program dialog for them.
+      programWindows: win ? (function() {
+        var actions = {};
+        PROGRAM_FRAMES.forEach(function(spec) {
+          actions[spec.id] = {
+            minimize: function() { win.minimize(spec.id); },
+            maximize: function() { win.toggleMaximize(spec.id); },
+            close: function() { win.closeProgram(spec.id); }
+          };
+        });
+        return actions;
+      })() : null,
+      // The desktop shortcuts (ticket #62): every launch — pointer
+      // double-click or Enter/Space — goes through the controller, which
+      // raises a running window, restores a put-away one at its last mode
+      // and geometry, and opens an unarrived program at its designed
+      // arrangement. One Record per program: never a second window. When
+      // the keyboard floor's trigger ledger exists (#67), the shortcut
+      // records itself as the control that opened the window so Escape
+      // hands focus back here instead of the taskbar fallback.
+      launchProgram: win ? function(id) {
+        var item = controller.shortcutEls && controller.shortcutEls[id];
+        if (item && typeof win.recordTrigger === 'function') {
+          win.recordTrigger(id, item);
+        }
+        return win.launchProgram(id);
+      } : null,
       onOutsideClick: function(handler) {
         doc.addEventListener('click', handler);
-      }
+      },
+      // Escape's window tier (#67): the desktop controller hides the
+      // focused window and returns focus to the taskbar button or the
+      // shortcut that opened it. The shell asks it LAST, after the dialog,
+      // About and the Start menu have had their chance.
+      onWindowEscape: win ? function() { return win.escapeFocused(); } : null
     });
     appEl.setAttribute('data-shell-mounted', 'true');
     if (win) {
-      // Landing rules first: [×][□] gray, [—] live; the program-button
-      // click handler (restore when minimized) is wired here too.
+      // Landing rules first: [×][□] gray while no Session exists, [—] live
+      // on the desktop layout (dead too at ≤768px, where the chrome reduces
+      // to close — ticket #68). The program-button click handler — the
+      // desktop layout restores a MINIMIZED window and focuses a visible
+      // one, while the ≤768px switch entry runs the one launch gesture and
+      // is a hidden window's route back (#68) — and the title-bar drag /
+      // corner-grip resize handles are wired in there too.
       win.attach({
         windowEl: controller.windowEl,
+        titleBar: controller.titleBar,
+        resizeGrip: controller.resizeGrip,
         programBtn: controller.programBtn,
-        buttons: controller.titleButtons
+        buttons: controller.titleButtons,
+        shortcuts: controller.shortcutEls
+      });
+      // Each program frame paints from its own Record: no Record, no
+      // window. The taskbar button is the way to focus or restore it.
+      PROGRAM_FRAMES.forEach(function(spec) {
+        var frame = controller.programFrames[spec.id];
+        win.attachProgram(spec.id, {
+          windowEl: frame.windowEl,
+          titleBar: frame.titleBar,
+          bodyEl: frame.bodyEl,
+          resizeGrip: frame.resizeGrip,
+          buttons: frame.titleButtons,
+          taskbarBtn: controller.programBtns[spec.id]
+        });
       });
       app.Windows.controller = win;
     }
@@ -649,12 +1052,17 @@
   }
 
   shell.build = build;
+  shell.buildFrameChrome = buildFrameChrome;
+  shell.PROGRAM_FRAMES = PROGRAM_FRAMES;
+  shell.SHORTCUTS = SHORTCUTS;
+  shell.programBodyId = programBodyId;
   shell.start = start;
   shell.recordChoice = recordChoice;
   shell.switchLanguage = switchLanguage;
   shell.attachSoundEntry = attachSoundEntry;
   shell.withSoundModule = withSoundModule;
   shell.openEndProgram = openEndProgram;
+  shell.openQuit = openQuit;
   shell.toggleMenu = toggleMenu;
   shell.closeMenu = closeMenu;
   shell.closeAbout = closeAbout;
