@@ -247,6 +247,14 @@ body:has(#app > #landing-view:not([hidden])) .os-window {
   z-index: 900;            /* over the windows, under the bar and the dialogs */
 }
 
+/* The desktop does not exist before the Finish Commit (spec #58): the
+   landing and answering stages keep their single-window presentation, so
+   the column is drawn only on the stages behind Completion. */
+body:has(#landing-view:not([hidden])) .os-shortcuts,
+body:has(#quiz-view:not([hidden])) .os-shortcuts {
+  display: none;
+}
+
 .os-shortcut {
   display: flex;
   flex-direction: column;
