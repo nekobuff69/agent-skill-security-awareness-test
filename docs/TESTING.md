@@ -20,6 +20,8 @@ node tests/js/run-tests.js                    # JS module contracts + grounding 
 ./scripts/preflight.sh                        # both suites, the pre-deploy gate
 ```
 
+On Windows, where bash is unavailable, `scripts/preflight.ps1` mirrors `preflight.sh` — same suites, same order, same fail-fast behaviour, same exit codes. It adds one precondition check before any suite runs (exit code `2` if `python3` or `node` is missing or non-functional), because on Windows the `python3` name can resolve to a Microsoft Store stub that exits without running anything. **`preflight.sh` remains the source of truth**; keep the two in step whenever a suite is added or removed, or the platforms will diverge silently.
+
 
 ## 1a. Multi-Bank Discovery
 
