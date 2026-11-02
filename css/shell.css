@@ -33,9 +33,12 @@ body {
 
 /* ── Window frame ──────────────────────────────────────────────────────
 
-   Wraps #app at runtime (js/shell.js). Transparent background: the skin's
-   teal desktop shows wherever the window does not cover, and #app keeps its
-   own chrome face inside the frame. The window is FIXED HEIGHT on every
+   Wraps #app at runtime (js/shell.js). The frame itself paints the era
+   window's edge: an opaque chrome face with the raised bevel reserved by
+   padding, exactly like 98.css's `background: silver; padding: 3px`
+   idiom (ticket #71) — programs and the app host can no longer paint
+   over the edge, so stacked windows keep a visible seam. The window is
+   FIXED HEIGHT on every
    view (ticket #52): it fills the desktop above the taskbar, the title bar
    and the client area flex inside it, and overflow stays clipped so only
    the view bodies scroll. */
@@ -46,7 +49,14 @@ body {
   max-width: var(--max-width);
   height: calc(100vh - var(--os-taskbar-height));
   margin: 0 auto;
-  background: transparent;
+  /* Ticket #71: the face and the bevel are the frame's own paint. The
+     padding reserves the bevel's thickness (98.css: face + 3px edge) and
+     border-box keeps it inside the existing width/height — the outer
+     geometry, the flow layout and the inline drag Geometry the desktop
+     regime writes are all unchanged. */
+  box-sizing: border-box;
+  padding: 3px;
+  background: var(--color-face);
   box-shadow: var(--bevel-raised);
   border-radius: 0;
   overflow: hidden;
@@ -601,14 +611,15 @@ body:has(#quiz-view:not([hidden])) .os-shortcuts {
   display: none;
 }
 
-/* Maximized: full-viewport above the taskbar, no frame bevel, its own
-   scroll (ticket #46 tunes the mobile variant). */
+/* Maximized: full-viewport above the taskbar, its own scroll (ticket #46
+   tunes the mobile variant). The bevel stays (ticket #71): the frame
+   keeps its reserved edge and the client area sits inside it, exactly
+   like every other Program window on the desktop. */
 .os-window.is-maximized {
   position: fixed;
   inset: 0 0 var(--os-taskbar-height) 0;
   max-width: none;
   margin: 0;
-  box-shadow: none;
   overflow: hidden;
 }
 

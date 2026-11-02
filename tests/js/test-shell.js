@@ -664,6 +664,28 @@ exports.run = function() {
         /animation:\s*none/.test(rmBlock);
     })());
 
+  // Ticket #71: the frame draws its OWN edge — an opaque chrome face with
+  // the raised bevel reserved by padding (98.css's `silver` + 3px anatomy),
+  // so a Program's body can never paint over the seam and stacked windows
+  // read as two windows. border-box keeps the reserved edge inside the
+  // frame's geometry: the inline Geometry the desktop regime paints is
+  // still the outer box. A maximized Window keeps the bevel; the client
+  // area sits inside the edge.
+  check('css: the frame paints an opaque face and reserves the bevel edge',
+    /\.os-window\s*\{[^}]*background:\s*var\(--color-face\)/.test(shellCss) &&
+    /\.os-window\s*\{[^}]*box-shadow:\s*var\(--bevel-raised\)/.test(shellCss) &&
+    /\.os-window\s*\{[^}]*padding:\s*3px/.test(shellCss) &&
+    /\.os-window\s*\{[^}]*box-sizing:\s*border-box/.test(shellCss) &&
+    !/\.os-window\s*\{[^}]*background:\s*transparent/.test(shellCss));
+  check('css: the maximized window keeps its bevel — nothing strips the shadow',
+    (function() {
+      var at = shellCss.indexOf('.os-window.is-maximized {');
+      var block = at < 0 ? '' : shellCss.slice(at, shellCss.indexOf('}', at));
+      return at >= 0 && !/box-shadow/.test(block);
+    })());
+  check('css: the client host still fills the frame inside the reserved edge',
+    /\.os-window #app\s*\{[^}]*flex:\s*1 1 auto[^}]*min-height:\s*0/.test(shellCss));
+
   // ── Start-menu Quit: the destructive exit (ticket #66) ────────────────
   // The Quit entry opens the SAME End Program confirmation the window [×]
   // uses, and only its Yes runs the tail: Session cleared, per-tab desktop
