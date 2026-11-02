@@ -540,6 +540,12 @@ exports.run = function() {
     /\.quiz-statusbar\s*\{[^}]*flex:\s*none/.test(quizCss));
   check('quiz.css: footer is separated by a 1px rule',
     /\.quiz-footer\s*\{[^}]*border-top:\s*1px/.test(quizCss));
+  check('quiz.css: status bar is a readable 32px band (#73)',
+    /\.quiz-statusbar\s*\{[^}]*height:\s*32px/.test(quizCss));
+  check('quiz.css: progress track is 150×14 with the segmented fill at 100% (#73)',
+    /\.quiz-status-track\s*\{[^}]*width:\s*150px/.test(quizCss) &&
+    /\.quiz-status-track\s*\{[^}]*height:\s*14px/.test(quizCss) &&
+    /\.quiz-status-fill\s*\{[^}]*height:\s*100%/.test(quizCss));
 
   check('shell.css: window is fixed height above the taskbar',
     /\.os-window\s*\{[^}]*height:\s*calc\(100vh - var\(--os-taskbar-height\)\)/.test(shellCss));

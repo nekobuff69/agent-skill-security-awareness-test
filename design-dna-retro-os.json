@@ -137,7 +137,7 @@
       "boot splash (sunken groove, segmented navy stepped fill, status line)",
       "welcome splash (the compact landing wizard card, #53: 64px inline eye glyph, two-line uppercase catchphrase on the Silkscreen display face — 32px, the Fusion Pixel subset carrying it on the Chinese page at 36px — the Bank's title as subtitle, a hairline rule, one body line + time estimate, a single default [Start] — the language affordance is the taskbar toggle, never a dialog)",
       "locale-swap failure notice (`.quiz-notice` inside the current view: raised bevel strip, localized copy naming the other language, a beveled dismiss button, auto-dismissed; the language never changes unless the swap succeeds, #55/#56)",
-      "quiz status bar (pinned inside the fixed-height window, quiz view only, 22px: segmented navy Progress Fill + question counter + phase name; segmented = repeating gradient trick; only .quiz-body scrolls)",
+      "quiz status bar (pinned inside the fixed-height window, quiz view only, 32px: segmented navy Progress Fill on a 150×14 track + question counter + phase name; segmented = repeating gradient trick; only .quiz-body scrolls)",
       "question card / wizard (a flat grouping element since #52 — the raised card frame is gone; the sunken scenario field and the radiogroup rows with etched dial glyphs carry the depth; pinned footer [< Back] [Next >] / [Finish])",
       "title card (results window: navy bar + sunken white client field, percentage in --color-score-*)",
       "risk radar (sunken white field, black-on-white vector chart)",
