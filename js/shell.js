@@ -373,13 +373,14 @@
     taskbar.appendChild(programsBar);
     if (langToggle) taskbar.appendChild(langToggle);
 
-    // ── Desktop shortcuts (ticket #62) ───────────────────────────────────
+    // ── Desktop shortcuts (ticket #62, re-layered by #75) ────────────────
     // The top-left column: one shortcut per program, glyph above label,
     // ALWAYS present — running or not, arrived or not. The column is built
-    // once and painted by no mode: a window never takes the icons away,
-    // and the stylesheet keeps them visible even while a window is
-    // maximized over them (css/shell.css: the shortcut rung sits above
-    // the windows and below the taskbar). The ≤768px layout removes the
+    // once and painted by no mode: it belongs to the desktop surface, so
+    // the stylesheet puts it on the desktop's base rung (css/shell.css:
+    // .os-shortcuts 100) UNDER every Window, which js/windows.js paints
+    // from 200 upward — a Window covers the icons, and minimizing or
+    // moving one reveals them again. The ≤768px layout removes the
     // column entirely. Double-click or Enter/Space launches through
     // deps.launchProgram; a single click only moves focus, as on a real
     // desktop icon. Labels are the SAME Chrome Strings the title bars and

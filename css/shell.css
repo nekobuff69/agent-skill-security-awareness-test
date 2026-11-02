@@ -5,10 +5,12 @@
    base stylesheet on every page. All colours, bevels and the chrome
    typeface come from the skin's tokens — no new palette here.
 
-   Layering (z-index ladder):
-     .os-window (0 + the core's stack number)
-       <  .os-shortcuts (900, the icon column: visible even under a
-            maximized window, ticket #62)
+   Layering (z-index ladder, ticket #75):
+     .os-shortcuts (100, the icon column on the DESKTOP'S BASE LAYER:
+         every Window paints above it, so a window covers the column and
+         minimizing or moving reveals it again)
+       <  .os-window (200 + the core's stack number — the window base is
+         the floor js/windows.js paints, never a bare stack number)
        <  .os-taskbar (1000)  <  .os-start-menu (1100)
        <  .os-about-backdrop (1200)
        <  .os-dialog-backdrop (1300)
@@ -60,7 +62,9 @@ body {
   box-shadow: var(--bevel-raised);
   border-radius: 0;
   overflow: hidden;
-  z-index: 0;
+  z-index: 200;        /* the Window stack's base: above the shortcut
+                          column's rung (100); js/windows.js paints
+                          200 + the core's stack number inline */
 }
 
 /* The title bar is the window's fixed chrome: flex:none keeps it from
@@ -233,15 +237,16 @@ body:has(#app > #landing-view:not([hidden])) .os-window {
   max-width: none;
 }
 
-/* ── Desktop shortcuts (ticket #62) ──────────────────────────────────────
+/* ── Desktop shortcuts (ticket #62, re-layered by #75) ───────────────────
 
    The top-left icon column: one shortcut per program, glyph over label,
    ALWAYS present on the desktop-width layout — running or not, arrived or
-   not. The ticket's rule is that a window never takes the icons away,
-   "including while a window is maximized over them": the column therefore
-   sits on its own rung of the ladder, ABOVE every program window (their z
-   values are the core's small stack numbers) and BELOW the taskbar (1000),
-   the Start menu (1100) and the dialog rungs, which own the desktop.
+   not. The column belongs to the DESKTOP SURFACE, so it sits on the
+   desktop's base rung (100): every Window paints above it (the window base
+   in js/windows.js is 200 + the core's stack number), a window covers the
+   icons, and minimizing or moving a Window reveals the column again. The
+   rung stays below the taskbar (1000), the Start menu (1100) and the
+   dialog rungs, which own the desktop.
    Double-click, Enter or Space launch; a single click only selects, as on
    a real desktop. The ≤768px layout removes the column entirely (media
    block at the bottom): there the taskbar's PERMANENT program switches
@@ -254,12 +259,15 @@ body:has(#app > #landing-view:not([hidden])) .os-window {
   flex-direction: column;
   gap: var(--space-3);
   width: 96px;
-  z-index: 900;            /* over the windows, under the bar and the dialogs */
+  z-index: 100;            /* the desktop's base layer, under every Window */
 }
 
 /* The desktop does not exist before the Finish Commit (spec #58): the
-   landing and answering stages keep their single-window presentation, so
-   the column is drawn only on the stages behind Completion. */
+   landing and answering stages are the stages where a Window IS the whole
+   screen, so the column is drawn only on the stages behind Completion —
+   #75's layering already puts a Window over it, but on these two stages
+   there is no desktop to stand the icons on at all, and the maximized flow
+   frame would simply hide them. */
 body:has(#landing-view:not([hidden])) .os-shortcuts,
 body:has(#quiz-view:not([hidden])) .os-shortcuts {
   display: none;

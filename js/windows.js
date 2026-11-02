@@ -109,6 +109,18 @@
    * permanent switch entry instead. No aria-modal on a window, no Alt+Tab
    * interception, no focus trap: the desktop stays one Tab order.
    *
+   * The activation hand-off (ticket #75) is a CORE transition: minimize()
+   * moves activation to the topmost Window still visible, and with nothing
+   * left visible the desktop has no active Window at all. render() paints
+   * the consequences from the core's Id — the navy title bar and the
+   * keyboard floor on the newly active frame, the grey gradient and the
+   * inert floor on the Put Away one, the pressed Program Switch — and
+   * focusProgramSwitch() returns focus to the switch that was pressed when
+   * the hand-off leaves no Window to be active. The same ticket moves the
+   * Desktop Shortcut column to the desktop's base layer: every Window
+   * paints from WINDOW_Z_BASE upward, so the stacking numbers can never
+   * drop a Window behind the column.
+   *
    * Layering: js/desktop-core.js is the pure transition table (no DOM, no
    * timers, fully headless-testable). create() wraps it with the DOM
    * rendering (button disabled states, trace classes, program-button bevel)
@@ -313,6 +325,18 @@
    * vertically its whole height above the taskbar.
    */
   var TITLE_REACH = 60;
+
+  /**
+   * The Window stack's base rung — the z-index floor js/windows.js paints,
+   * mirroring `.os-window`'s rung in css/shell.css (ticket #75). The core's
+   * stack numbers are a RELATIVE order (0 upward, compacted by every
+   * arrival and every renumbering), so the shell adds this base: a Window
+   * can never be dropped behind the Desktop Shortcut column's rung
+   * (.os-shortcuts: 100) however the stack renumbers. The column belongs to
+   * the desktop surface: every Window covers it, minimizing or moving a
+   * Window reveals it again.
+   */
+  var WINDOW_Z_BASE = 200;
 
   function isWindowedView(view) {
     return !!WINDOWED_VIEWS[view];
@@ -559,7 +583,11 @@
       }
 
       var g = paintedGeometry(id);
-      win.style.zIndex = exists ? String(snap.z) : '';
+      // Ticket #75's floor: the core's number is the relative order, the
+      // painted rung is WINDOW_Z_BASE + that order, so no arrival or
+      // renumbering can ever stack a Window behind the shortcut column.
+      win.style.zIndex = exists
+        ? String(WINDOW_Z_BASE + Math.max(0, snap.z)) : '';
       if (!g) {
         win.classList.remove('is-windowed');
         win.style.left = '';
@@ -671,12 +699,22 @@
      *  chrome reduces to close and the permanent taskbar switch already
      *  owns the switch-away/switch-back gesture, so the gesture is refused
      *  here as well as in the button painting (the mobile consequence the
-     *  viewport-blind core never models). */
+     *  viewport-blind core never models).
+     *
+     *  Ticket #75's activation hand-off: the CORE moves activation to the
+     *  topmost Window still on the desktop (the newly active frame's title
+     *  bar turns navy, the keyboard floor and the pressed Program Switch
+     *  follow it — all derived by render(), never patched here). With no
+     *  Window left visible there is no active Window, so focus returns to
+     *  this program's Program Switch: the control that was pressed when
+     *  available, else the frame's own switch entry, else the Quiz program
+     *  button. The core stays DOM-blind — it only reports the active Id. */
     function minimize(id) {
       id = id || QUIZ;
       if (mobileMaximized()) return false;
       if (!machine.minimize(id)) return false;
       render();
+      if (!machine.activeId()) focusProgramSwitch(id);
       var refs = frameOf(id);
       var win = refs && refs.windowEl;
       if (win) {
@@ -689,6 +727,24 @@
         }, traceDelay());
       }
       return true;
+    }
+
+    /**
+     * Focus the Program Switch a Put Away Window comes back through
+     * (ticket #75): the trigger the controller recorded for this program
+     * (the taskbar switch pressed, or the control a keyboard route named
+     * via recordTrigger()), else the frame's own switch entry, else the
+     * Quiz program button — the taskbar's permanent control. Pure DOM
+     * knowledge; the core never sees an element.
+     */
+    function focusProgramSwitch(id) {
+      var trigger = lastTrigger[id] || null;
+      if (focusableEl(trigger)) { trigger.focus(); return true; }
+      var refs = frameOf(id);
+      var own = refs && refs.taskbarBtn;
+      if (focusableEl(own)) { own.focus(); return true; }
+      if (dom && focusableEl(dom.programBtn)) { dom.programBtn.focus(); return true; }
+      return false;
     }
 
     function restore(id) {
@@ -1508,7 +1564,10 @@
     MIN_H: MIN_H,
     TITLEBAR_H: TITLEBAR_H,
     TASKBAR_H: TASKBAR_H,
-    TITLE_REACH: TITLE_REACH
+    TITLE_REACH: TITLE_REACH,
+    // Ticket #75: the z-index floor every Window paints from, so the
+    // stacking numbers can never drop a Window behind the shortcut column.
+    WINDOW_Z_BASE: WINDOW_Z_BASE
   };
 
   if (typeof module !== 'undefined') module.exports = app.Windows;

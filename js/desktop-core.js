@@ -33,6 +33,17 @@
  * way to delete a program: closing puts a window away, it never destroys
  * anything.
  *
+ * Activation (ticket #75) is DERIVED too: the active Id names ONE visible
+ * Window, or no Window at all. minimize() hands activation to the topmost
+ * Window still visible through the same leaderId() query hide() uses, and
+ * with nothing left visible the desktop simply has no active Window (the Id
+ * is null, every focus query answers false); a restore() onto such a desktop
+ * takes activation back because there is nothing to displace. The
+ * controller renders every consequence of the hand-off — the navy title bar
+ * and the keyboard floor, the pressed Program Switch — from this one Id and
+ * keeps no copy of it, so the switch is also where it puts focus back when
+ * the Put Away leaves the desktop with nothing to be active.
+ *
  * Impossible moves are refused by the transitions themselves: minimize from
  * hidden; maximize from hidden or minimized; geometry writes while the
  * window is maximized or while the End Program dialog owns the desktop.
@@ -245,6 +256,8 @@
       return desktop.view;
     }
 
+    /** The active Window's Id, or null: ticket #75's desktop with no
+     *  Window visible has NO active Window. */
     function activeId() {
       return desktop.active;
     }
@@ -332,26 +345,38 @@
     // ── Transitions ────────────────────────────────────────────────────
 
     /** Minimize records what restore must come back to: the mode AND the
-     *  arrangement. */
+     *  arrangement. Ticket #75: putting the ACTIVE window away hands
+     *  activation to the topmost window still on the desktop; with none
+     *  left there is no active Window — nothing participates in focus
+     *  until a restore or a raise puts a window back on the screen. */
     function minimize(id) {
       if (!canMinimize(id)) return false;
+      var rid = target(id);
       var r = record(id);
       r.lastMode = r.mode;
       r.lastGeometry = copyGeometry(r.geometry);
       r.mode = MODE_MINIMIZED;
+      if (desktop.active === rid) desktop.active = leaderId();
       return true;
     }
 
     /** Restore lands on lastMode with lastGeometry — the Win95 rule that a
      *  window minimized while maximized comes back maximized, and the
      *  spec's rule that a shortcut brings a hidden window back exactly as
-     *  it was left. */
+     *  it was left. Ticket #75's counterpart to the minimize hand-off: a
+     *  restored Window takes activation only when the desktop has no
+     *  VISIBLE active Window to keep it (all Put Away); a desktop someone
+     *  is reading is never stolen. The arrangement itself is untouched —
+     *  restore lands where the window was left, exactly as the era says. */
     function restore(id) {
       if (desktop.confirmOpen) return false;
+      var rid = target(id);
       var r = record(id);
       if (!r || (r.mode !== MODE_MINIMIZED && r.mode !== MODE_HIDDEN)) return false;
       r.mode = r.lastMode;
       r.geometry = copyGeometry(r.lastGeometry);
+      var cur = desktop.windows[desktop.active];
+      if (!cur || !isDeskMode(cur.mode)) desktop.active = rid;
       return true;
     }
 
@@ -543,11 +568,12 @@
      * All-or-nothing, and never a throw: every key must name a program,
      * every Record must carry a legal mode, a lastMode that can be a desk
      * mode, valid Geometry in BOTH geometry and lastGeometry, and a finite
-     * z; the active Id must address a loaded Record; the view must be a
-     * non-empty string. A snapshot that fails any of it changes NOTHING —
-     * there is no partial restore. confirmOpen is never restored: the End
-     * Program dialog is not a persisted state, and a snapshot carrying it
-     * open is refused outright.
+     * z; the active Id must address a loaded Record or be null (ticket #75:
+     * with every window Put Away the desktop has NO active Window); the view
+     * must be a non-empty string. A snapshot that fails any of it changes
+     * NOTHING — there is no partial restore. confirmOpen is never restored:
+     * the End Program dialog is not a persisted state, and a snapshot
+     * carrying it open is refused outright.
      *
      * A program missing from the snapshot keeps NO Record — absence is not
      * a mode (the Action Plan that had not settled at the commit is born by
@@ -584,7 +610,10 @@
         };
       }
 
-      if (typeof snap.active !== 'string' || !next[snap.active]) return false;
+      // The active Id addresses a loaded Record — or null, the ticket #75
+      // desktop with nothing visible to be active.
+      if (snap.active !== null &&
+          (typeof snap.active !== 'string' || !next[snap.active])) return false;
 
       desktop.windows = next;
       desktop.active = snap.active;
