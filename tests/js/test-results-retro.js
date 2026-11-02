@@ -782,11 +782,18 @@ exports.run = async function() {
   check('the clone is laid out at this device\'s width with its scrolling unclipped',
     clone.style.width === '411px' &&
     clone.style.height === 'auto' &&
-    clone.style.position === 'static' &&
     clone.style.overflow === 'visible' &&
     innerBoxes.every(function (b) {
       return b.style.overflow === 'visible' && b.style.height === 'auto';
     }), JSON.stringify(clone.style));
+  /* The frame is the resize grip's containing block. A `static` clone
+     handed that job to the SVG viewport: the dithered 16px corner painted
+     at the bottom of the SHEET — over the white slack band — instead of
+     at the window's bottom bevel, and the crop read that orphan as the
+     last painted row, shipping the white band the desktop export showed. */
+  check('the clone stays the grip\'s containing block',
+    clone.style.position === 'relative' &&
+    clone.style.left === '0' && clone.style.top === '0');
   check('the menu bar is cut out of the capture',
     removedBar !== null && removedBar.parentNode !== undefined);
 
@@ -843,6 +850,35 @@ exports.run = async function() {
       return internals.cropToInk(stub) === stub;
     })());
 
+  /* The sheet's own bottom edge lies: a `height: auto` clone stretches to
+     the SVG document's viewport, not to the page's measurement, so a
+     desktop band of white can sit under the content with the grip riding
+     at the viewport corner inside it. The calibration pass therefore
+     looks for the last row with REAL content — one that spans at least
+     ~5% of the width — and a lone 16px grip strip never counts. */
+  check('the calibration ignores an orphaned grip strip at the sheet bottom',
+    (function () {
+      var w = 100, h = 10;
+      var px = new Uint8ClampedArray(w * h * 4).fill(255);
+      function paintRow(y, from, to) {
+        for (var x = from; x < to; x++) {
+          var i = (y * w + x) * 4;
+          px[i] = 192; px[i + 1] = 192; px[i + 2] = 192;
+        }
+      }
+      paintRow(4, 0, w);          // the full-width last row of real content
+      paintRow(9, 97, w);         // a detached grip: 3px, under the 5% floor
+      var cv = { width: w, height: h, _cssH: h,
+        getContext: function () { return { getImageData: function () { return { data: px }; } }; } };
+      return internals.lastSignificantRow(cv) === 4;
+    })());
+  check('an unreadable canvas reports no measurement',
+    (function () {
+      var stub = { width: 100, height: 10, getContext: function () { return {}; } };
+      return internals.lastSignificantRow(stub) === -1 &&
+        internals.lastSignificantRow({ width: 4, height: 10, getContext: function () { return null; } }) === -1;
+    })());
+
   var exportBar = internals.buildMenuBar(report);
   var dlBtn = walk(exportBar, 'button')[0];
   check('the Download PNG command is the menu bar\'s own',
@@ -872,11 +908,18 @@ exports.run = async function() {
   captured.calls.length = 0;      // the crop checks above share the stub
   var rasterised = await internals.rasteriseWindow(
     { markup: '<svg/>', w: 411, h: 1200 });
-  check('the rasteriser paints the capture at the screen density',
+  /* The source rect is explicit — a destination-only drawImage would
+     aspect-FIT the sheet into the rounded device size and letterbox it at
+     any fractional device-pixel ratio. The stub canvas reports no pixels,
+     so the calibration pass cannot measure it and must fall back to
+     repainting the original sheet (the second drawImage call). */
+  check('the rasteriser paints the capture at the screen density, source rect and all',
     rasterised.width === 411 && rasterised.height === 1200 &&
     captured.calls[0] && captured.calls[0].join(',') === 'fillRect,0,0,411,1200' &&
     captured.calls[1] && captured.calls[1][0] === 'drawImage' &&
-    captured.calls[1].slice(2).join(',') === '0,0,411,1200',
+    captured.calls[1].slice(2).join(',') === '0,0,411,1200,0,0,411,1200' &&
+    captured.calls.length === 4 &&
+    captured.calls[1].join(',') === captured.calls[captured.calls.length - 1].join(','),
     JSON.stringify(captured.calls));
 
   fakeDoc.createElement = origCreate;

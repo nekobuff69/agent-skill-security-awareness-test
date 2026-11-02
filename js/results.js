@@ -930,11 +930,21 @@
   }
 
   /** The clone laid out as the sheet will be: this device's width, no
-   *  internal scrolling, no menu bar. */
+   *  internal scrolling, no menu bar. `position: relative` — NOT `static`:
+   *  the frame is the resize grip's containing block, and a static clone
+   *  lets the viewport own it, stranding the dithered corner at the bottom
+   *  right of the SHEET (over the white band the crop exists to remove)
+   *  instead of at the window's bottom bevel. */
   function prepareClone(clone, width) {
     var lang = document.documentElement && document.documentElement.getAttribute('lang');
     if (lang) clone.setAttribute('lang', lang);
-    clone.style.position = 'static';
+    clone.style.position = 'relative';
+    // The windowed controller parks the frame with inline `left`/`top`
+    // offsets. `fixed` made those viewport coordinates; as the sheet's own
+    // containing block they would shift the whole capture down and right,
+    // painting a white gutter where the title bar belongs. Zero them.
+    clone.style.left = '0';
+    clone.style.top = '0';
     clone.style.margin = '0';
     clone.style.width = width + 'px';
     clone.style.maxWidth = 'none';
@@ -1021,7 +1031,10 @@
       var markup = new XMLSerializer().serializeToString(
         buildForeignSvg(clone, css, width, height));
       cleanup();
-      return { markup: markup, w: width, h: height };
+      // clone + css ride along: the rasteriser re-authors the sheet at the
+      // height the SVG viewport actually lays out (see rasteriseWindow).
+      // Detached from the removed holder, it belongs to the shot now.
+      return { markup: markup, w: width, h: height, clone: clone, css: css };
     }).catch(function (err) { cleanup(); throw err; });
   }
 
@@ -1048,9 +1061,15 @@
   /* An SVG rasterised through an <img> lays its content out in the SVG
      document's own viewport, which is not the page's: the same tree can end
      up a few dozen pixels shorter there than it measured in the live
-     document. So the sheet carries a little slack and the canvas is then
-     cropped to its last painted row — the image ends where the window's
-     bottom bevel does, never at a band of white. */
+     document — and the stretch of a `height: auto` window tracks THAT
+     viewport, so the sheet's own bottom edge says nothing useful about
+     where the content ends. The fixed slack alone shipped a band of white
+     under the Blind-Spot Bars on a desktop window (the grip floated into it
+     as an orphaned corner). So the rasteriser measures the first pass by
+     its last significant painted row, re-authors the sheet at that height
+     with a little slack, and the canvas is then cropped to its last painted
+     row — the image ends where the window's bottom bevel does, never at a
+     band of white. */
   var CAPTURE_SLACK = 32;
 
   function cropToInk(canvas) {
@@ -1081,26 +1100,93 @@
     return out;
   }
 
+  /** Last row with real content: a row counts when at least 5% of its
+   *  width is painted, so the 16px resize grip (≈2% of any window it could
+   *  still be detached from) never marks the sheet's bottom by itself.
+   *  Returns a CSS-pixel row, or -1 when the canvas is too narrow to
+   *  sample or its pixels cannot be read. */
+  function lastSignificantRow(canvas) {
+    if (!canvas || canvas.width < 20 || !canvas.getContext) return -1;
+    var ctx = canvas.getContext('2d');
+    if (!ctx || typeof ctx.getImageData !== 'function') return -1;
+    var data;
+    try {
+      data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    } catch (e) {
+      return -1;
+    }
+    if (!data) return -1;
+    var need = Math.max(2, Math.floor(canvas.width / 20));
+    for (var y = canvas.height - 1; y >= 0; y--) {
+      var painted = 0;
+      var row = y * canvas.width * 4;
+      for (var x = 0; x < canvas.width; x++) {
+        var i = row + x * 4;
+        if (data[i] !== 255 || data[i + 1] !== 255 || data[i + 2] !== 255) {
+          if (++painted >= need) return Math.floor(y * canvas._cssH / canvas.height);
+        }
+      }
+    }
+    return -1;
+  }
+
   function rasteriseWindow(shot) {
     return new Promise(function (resolve, reject) {
-      var url = svgDataUrl(shot.markup);
-      var img = new Image();
-      img.onload = function () {
-        var raw = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
-        var dpr = Math.min(raw, CAPTURE_MAX_DPR);
-        var canvas = document.createElement('canvas');
-        canvas.width = Math.round(shot.w * dpr);
-        canvas.height = Math.round(shot.h * dpr);
-        var ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(cropToInk(canvas));
-      };
-      img.onerror = function () {
-        reject(new Error('capture: raster'));
-      };
-      img.src = url;
+      var dprDone = false, dpr = 1;   // decided on the FIRST paint, reused on the final one
+
+      function paint(markup, w, h, final) {
+        var img = new Image();
+        img.onload = function () {
+          if (!dprDone) {
+            var raw = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+            dpr = Math.min(raw, CAPTURE_MAX_DPR);
+            dprDone = true;
+          }
+          var canvas = document.createElement('canvas');
+          canvas.width = Math.round(w * dpr);
+          canvas.height = Math.round(h * dpr);
+          var ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          /* Destination-only drawImage honours the SVG's own aspect-fit
+             (preserveAspectRatio): at a fractional device-pixel ratio the
+             rounded device size is never EXACTLY the sheet's ratio, and the
+             sheet lands letterboxed inside a white band. Paint the whole
+             intrinsic box into the whole canvas — a defined source rect
+             bypasses the fit — and the band is gone at the source. */
+          ctx.drawImage(img, 0, 0, img.width || w, img.height || h,
+                        0, 0, canvas.width, canvas.height);
+          if (final) { canvas._cssH = h; resolve(cropToInk(canvas)); return; }
+          canvas._cssH = h;
+          var last = lastSignificantRow(canvas);
+          var sheetH = Math.round(shot.h * (img.height || h) / h);
+          var clone = shot.clone;
+          var css = shot.css;
+          if (last < 1 || last >= sheetH - 1 ||          // already full, or…
+              !clone || !css || typeof XMLSerializer === 'undefined') {
+            // …unreadable / nothing to re-author with: ship the first pass.
+            paint(shot.markup, shot.w, shot.h, true);
+            return;
+          }
+          // The window's sheet at the height it actually laid out, plus slack.
+          var cssH = last + CAPTURE_SLACK;
+          var markup2;
+          try {
+            markup2 = new XMLSerializer().serializeToString(
+              buildForeignSvg(clone, css, shot.w, cssH));
+          } catch (e) {
+            paint(shot.markup, shot.w, shot.h, true);
+            return;
+          }
+          paint(markup2, shot.w, cssH, true);
+        };
+        img.onerror = function () {
+          reject(new Error('capture: raster'));
+        };
+        img.src = svgDataUrl(markup);
+      }
+
+      paint(shot.markup, shot.w, shot.h, false);
     });
   }
 
@@ -1632,6 +1718,7 @@
     captureHeight: captureHeight,
     rasteriseWindow: rasteriseWindow,
     cropToInk: cropToInk,
+    lastSignificantRow: lastSignificantRow,
     svgDataUrl: svgDataUrl,
     saveBlob: saveBlob,
     localizedReport: localizedReport,
