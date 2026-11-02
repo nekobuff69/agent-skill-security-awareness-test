@@ -39,7 +39,7 @@
     'landing.headline1': 'Be Informed.',
     'landing.headline2': 'Be Aware.',
     'landing.titleFallback': 'Agent Security Awareness Quiz',
-    'landing.body': '{count} questions about the skills you install and the agents you run. Answer honestly; the results are for you.',
+    'landing.body': '{count} questions about the skills you install and the agents you run. Answer honestly; your answers shape the personalized plan.',
     'landing.meta': '{count} questions · {time}',
     'landing.metaCountFallback': '20',
     'landing.timeFallback': '8-12 minutes',
@@ -97,8 +97,8 @@
     'shell.menuQuit': 'End Program',
     'shell.aboutTitle': 'About Agent Security Awareness Quiz',
     'shell.aboutBody': 'A security-awareness assessment for people who ' +
-      'build and run AI agents, with scenarios drawn from the OWASP Top 10.',
-    'shell.aboutLink': 'OWASP Top 10 for Agentic Applications',
+      'build and run AI agents, with scenarios drawn from the OWASP Agentic Skills Top 10.',
+    'shell.aboutLink': 'OWASP Agentic Skills Top 10',
     'shell.aboutCredits': 'Chrome typeface: W95FA by Alina Sava ' +
       '(SIL Open Font License 1.1).',
     'shell.ok': 'OK',

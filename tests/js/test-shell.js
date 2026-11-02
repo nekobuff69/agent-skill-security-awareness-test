@@ -257,7 +257,7 @@ exports.run = function() {
   check('About carries app name, description, OWASP link, credits',
     body.children[0].textContent === 'Agent Security Awareness Quiz' &&
     body.children[1].textContent.length > 0 &&
-    link.href === 'https://owasp.org/Top10/AST10/' &&
+    link.href === 'https://owasp.org/projects/agentic-skills-top-10' &&
     body.children[3].textContent.length > 0);
 
   check('About title is a Chrome String (en/zh)',

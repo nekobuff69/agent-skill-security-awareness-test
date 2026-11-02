@@ -40,7 +40,7 @@
     'landing.headline1': '了解风险',
     'landing.headline2': '保持警觉',
     'landing.titleFallback': '智能体安全意识测评',
-    'landing.body': '{count} 道题，关于你安装的技能和你运行的智能体。如实作答，结果只给你自己看。',
+    'landing.body': '{count} 道题，关于你安装的技能和你运行的智能体。如实作答，结果用于生成你的个性化建议。',
     'landing.meta': '{count} 道问题 · {time}',
     'landing.metaCountFallback': '20',
     'landing.timeFallback': '8-12 分钟',
@@ -96,8 +96,8 @@
     'shell.menuQuit': '结束程序',
     'shell.aboutTitle': '关于智能体安全意识测评',
     'shell.aboutBody': '面向构建和运营智能体人群的安全意识测评，' +
-      '情境取材于 OWASP Top 10。',
-    'shell.aboutLink': 'OWASP 智能体应用十大风险（英文）',
+      '情境取材于 OWASP 智能体技能十大风险。',
+    'shell.aboutLink': 'OWASP 智能体技能十大风险（英文）',
     'shell.aboutCredits': '界面字体：W95FA（作者 Alina Sava，' +
       'SIL OFL 1.1 许可）。',
     'shell.ok': '确定',
