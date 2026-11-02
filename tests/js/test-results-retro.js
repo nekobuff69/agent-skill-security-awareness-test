@@ -474,6 +474,104 @@ exports.run = function() {
   check('Retake keeps its behaviour: Session cleared, landing in view',
     sessionClears === 1 && viewsShown[viewsShown.length - 1] === 'landing-view',
     viewsShown.join(','));
+
+  // ── Retake is a CONFIRMED destructive path (ticket #66) ───────────────
+  // The page above carries no dialog surface (this suite's fake document
+  // has no body), so the command ended the run directly — the pre-#66
+  // semantic a surface-less page keeps. On a page WITH the surface the
+  // same menu-bar command asks first, and nothing goes until Yes.
+  (function() {
+    var prev = {
+      document: globalThis.document,
+      windows: globalThis.App.Windows,
+      sessionStore: globalThis.App.SessionStore,
+      desktopStore: globalThis.App.DesktopStore,
+      showView: globalThis.App.showView
+    };
+    var Windows66 = require('../../js/windows.js');
+    var askDoc = {
+      body: fakeEl('body'),
+      activeElement: null,
+      createElement: function(tag) { return fakeEl(tag); },
+      createElementNS: function(ns, tag) { return fakeEl(tag); }
+    };
+    globalThis.document = askDoc;
+    globalThis.App.Windows = Windows66;
+    var tail = [];
+    globalThis.App.SessionStore = {
+      clear: function() { tail.push('session'); }
+    };
+    globalThis.App.DesktopStore = {
+      clear: function() { tail.push('record'); }
+    };
+    globalThis.App.showView = function(id) { tail.push('view:' + id); };
+    Windows66.controller = {
+      resetPrograms: function() { tail.push('desktop'); return true; }
+    };
+
+    function texts(node, out) {
+      out = out || [];
+      if (node == null) return out;
+      if (typeof node.textContent === 'string' && node.textContent !== '') out.push(node.textContent);
+      (node.children || []).forEach(function(kid) { texts(kid, out); });
+      return out;
+    }
+    function askDialog() {
+      var stack = askDoc.body.children.slice();
+      while (stack.length) {
+        var n = stack.shift();
+        if (n && n.attrs && n.attrs.role === 'dialog' &&
+          texts(n).join(' ').indexOf(I18n.t('windows.retakeMessage')) >= 0) return n;
+        if (n && n.children) stack = stack.concat(n.children);
+      }
+      return null;
+    }
+    function labeled(root, label) {
+      var stack = [root];
+      while (stack.length) {
+        var n = stack.shift();
+        if (n && n.tagName === 'BUTTON' && n.textContent === label) return n;
+        if (n && n.children) stack = stack.concat(n.children);
+      }
+      return null;
+    }
+
+    var askBtn = askDialog();
+    check('nothing has been asked or destroyed before the command runs',
+      askBtn === null && tail.length === 0, 'tail=' + tail.join(','));
+
+    // Escape owns the dialog tier: it cancels the question, never confirms
+    // it, and the run survives untouched.
+    menuBtns[menuBtns.length - 1].click();
+    var ask1 = askDialog();
+    check('the menu-bar Retake opens the confirmation and destroys nothing yet',
+      !!ask1 && Windows66.isDialogOpen() === true && tail.length === 0);
+    ask1.handlers.keydown({
+      key: 'Escape', preventDefault: function() {}, stopPropagation: function() {}
+    });
+    check('Escape cancels the Retake question — the run stays intact',
+      Windows66.isDialogOpen() === false && tail.length === 0);
+
+    // The affirmative path clears BOTH records, shows landing and takes
+    // the desktop down.
+    menuBtns[menuBtns.length - 1].click();
+    labeled(askDialog(), I18n.t('windows.yes')).click();
+    check('the confirmed Retake clears Session and Record, then shows landing and ends the desktop',
+      tail.join(',') === 'session,record,view:landing-view,desktop', tail.join(','));
+    check('the answer leaves no dialog on the page',
+      Windows66.isDialogOpen() === false && askDialog() === null);
+
+    // Hand the page and the shared seams back.
+    delete Windows66.controller;
+    if (prev.windows === undefined) delete globalThis.App.Windows;
+    else globalThis.App.Windows = prev.windows;
+    ['SessionStore', 'DesktopStore', 'showView'].forEach(function(key) {
+      if (prev[key] === undefined) delete globalThis.App[key];
+      else globalThis.App[key] = prev[key];
+    });
+    if (prev.document === undefined) delete globalThis.document;
+    else globalThis.document = prev.document;
+  })();
   menuBtns[1].click();
   check('Share hands the Web Share dialog this Completion\'s score',
     shareCalls.length === 1 && String(shareCalls[0].text).indexOf('62') >= 0,

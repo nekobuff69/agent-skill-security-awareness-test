@@ -1212,5 +1212,147 @@ exports.run = function() {
       return el.getAttribute('inert') === null;
     }) && wctl.snapshot().active === 'action-plan');
 
+  // ── The destructive tail: endRun + resetPrograms (ticket #66) ─────────
+  // Quit and Retake END the run: the Session and the per-tab desktop
+  // Record go with it, and every program window is destroyed — not put
+  // away — so a reload finds nothing to restore. The stores here are the
+  // REAL modules on in-memory storage; the controller is a live desktop
+  // with all three programs arrived.
+  var prevTail = {
+    controller: Windows.controller,
+    showView: globalThis.App.showView,
+    sessionStore: globalThis.App.SessionStore,
+    desktopStore: globalThis.App.DesktopStore,
+    localStorage: globalThis.localStorage,
+    sessionStorage: globalThis.sessionStorage
+  };
+  function memStorage() {
+    var data = {};
+    return {
+      getItem: function(k) {
+        return Object.prototype.hasOwnProperty.call(data, k) ? data[k] : null;
+      },
+      setItem: function(k, v) { data[k] = String(v); },
+      removeItem: function(k) { delete data[k]; }
+    };
+  }
+  globalThis.localStorage = memStorage();
+  globalThis.sessionStorage = memStorage();
+  // Requiring is not enough in a shared batch: a sibling suite may have
+  // handed App.SessionStore / App.DesktopStore back (deleting the seam)
+  // while the cached module no longer re-registers them. Bind the seams
+  // to the modules' own functions, and restore what this suite found.
+  var SS66 = require('../../js/session-store.js');
+  var DS66 = require('../../js/desktop-store.js');
+  globalThis.App.SessionStore = SS66;
+  globalThis.App.DesktopStore = DS66;
+  var bank66 = require('../../questions.json');
+  var answers66 = bank66.questions.map(function() { return 1; });
+
+  var tdoc = fakeDoc();
+  var tctl = Windows.create({
+    doc: tdoc,
+    schedule: function(fn) { fn(); },
+    viewport: function() { return VP61; }
+  });
+  var trefs = {
+    windowEl: fakeEl('div'),
+    titleBar: fakeEl('div'),
+    resizeGrip: fakeEl('div'),
+    programBtn: fakeEl('button'),
+    buttons: {
+      minimize: fakeEl('button'), maximize: fakeEl('button'), close: fakeEl('button')
+    }
+  };
+  var tplan = programFrame();
+  var tdd = programFrame();
+  tctl.attach(trefs);
+  tctl.attachProgram('action-plan', tplan);
+  tctl.attachProgram('deep-dive', tdd);
+  tctl.setView('results-view');
+  tctl.actionPlanArrived();
+  tctl.deepDiveArrived();
+  Windows.controller = tctl;
+
+  SS66.save(bank66, answers66);
+  DS66.captureAtCommit(bank66, answers66);
+  check('the completed run is persisted on both records',
+    SS66.load(bank66).ok === true && DS66.exists() === true);
+  check('the committed desktop runs all three programs',
+    tctl.runningPrograms().join(',') === 'quiz,action-plan,deep-dive' &&
+    tctl.hasWindow('action-plan') === true && tctl.hasWindow('deep-dive') === true);
+
+  // The Participant moves work around before the exit: the teardown has
+  // to rewind the arrangement, not merely drop the extra windows.
+  tctl.applyGeometry({ x: 300, y: 220, w: 700, h: 500 });
+  var movedQuiz = tctl.geometry('quiz');
+  var views66 = [];
+  globalThis.App.showView = function(id) { views66.push(id); };
+
+  var gone = Windows.endRun();
+  check('endRun reports every part of the tail it ran',
+    gone.session === true && gone.record === true &&
+    gone.landing === true && gone.desktop === true,
+    JSON.stringify(gone));
+  check('the Session and the desktop Record are gone, so a reload restores nothing',
+    SS66.load(bank66).ok === false && DS66.exists() === false &&
+    globalThis.localStorage.getItem('quiz-session') === null &&
+    globalThis.sessionStorage.getItem('quiz-desktop') === null &&
+    DS66.restore(bank66) === false);
+  check('the landing page is what the tail shows',
+    views66.join(',') === 'landing-view', views66.join(','));
+  check('every program window is destroyed, not put away',
+    tctl.hasWindow('action-plan') === false &&
+    tctl.hasWindow('deep-dive') === false &&
+    tctl.runningPrograms().join(',') === 'quiz' &&
+    tplan.taskbarBtn.hidden === true && tdd.taskbarBtn.hidden === true);
+  check('the Quiz window is back at the arrangement it was born with',
+    movedQuiz.x === 300 &&
+    JSON.stringify(tctl.geometry('quiz')) ===
+      JSON.stringify(globalThis.App.Desktop.DESIGN_DEFAULTS.quiz));
+  check('the torn-down desktop hosts the next run: a program arrives fresh',
+    tctl.deepDiveArrived() === true &&
+    tctl.hasWindow('deep-dive') === true &&
+    (function() {
+      var born = globalThis.App.Desktop.DESIGN_DEFAULTS;
+      var g = tctl.geometry('deep-dive');
+      // A newcomer cascades off the born Quiz window, exactly as it did
+      // on the desktop's first Finish Commit.
+      return g.x === born.quiz.x + globalThis.App.Desktop.CASCADE &&
+        g.y === born.quiz.y + globalThis.App.Desktop.CASCADE &&
+        g.w === born['deep-dive'].w && g.h === born['deep-dive'].h;
+    })(),
+    JSON.stringify(tctl.geometry('deep-dive')));
+  check('endRun is quiet about a desktop with nothing to remove',
+    tctl.resetPrograms() === true && tctl.resetPrograms() === true &&
+    tctl.runningPrograms().join(',') === 'quiz');
+
+  // The machine-level rule behind the controller: resetPrograms closes
+  // the End Program gate too — the destructive tail never waits on it.
+  var g66 = Windows.createMachine();
+  g66.setView('results-view');
+  g66.open('action-plan');
+  g66.requestClose();
+  check('resetPrograms clears a pending confirm and destroys the arrivals',
+    g66.getState().confirmOpen === true &&
+    g66.resetPrograms() === true &&
+    g66.getState().confirmOpen === false &&
+    g66.hasWindow('action-plan') === false &&
+    g66.taskbarList().join(',') === 'quiz');
+
+  // Hand the shared globals back exactly as this suite found them.
+  if (prevTail.controller === undefined) delete Windows.controller;
+  else Windows.controller = prevTail.controller;
+  if (prevTail.showView === undefined) delete globalThis.App.showView;
+  else globalThis.App.showView = prevTail.showView;
+  ['SessionStore', 'DesktopStore'].forEach(function(key) {
+    if (prevTail[key] === undefined) delete globalThis.App[key];
+    else globalThis.App[key] = prevTail[key];
+  });
+  ['localStorage', 'sessionStorage'].forEach(function(key) {
+    if (prevTail[key] === undefined) delete globalThis[key];
+    else globalThis[key] = prevTail[key];
+  });
+
   return results;
 };

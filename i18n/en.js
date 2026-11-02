@@ -96,6 +96,7 @@
     'shell.close': 'Close',
     'shell.start': 'Start',
     'shell.menuAbout': 'About…',
+    'shell.menuQuit': 'End Program',
     'shell.aboutTitle': 'About Agent Security Awareness Quiz',
     'shell.aboutBody': 'A security-awareness assessment for people who ' +
       'build and run AI agents, with scenarios drawn from the OWASP Top 10.',
@@ -120,6 +121,8 @@
        primitive with their own ids. */
     'windows.endProgramTitle': 'End Program - Agent Security Awareness Quiz',
     'windows.endProgramMessage': 'Are you sure you want to end this program?',
+    'windows.retakeTitle': 'Retake - Agent Security Awareness Quiz',
+    'windows.retakeMessage': 'Retake clears this run and the desktop. All your answers will be lost. Start over?',
     'windows.yes': 'Yes',
     'windows.no': 'No',
 

@@ -349,7 +349,10 @@ exports.run = function() {
     langEn.menu.children.every(function(child) {
       return child.getAttribute('data-os-menu') !== 'language';
     }) &&
-    langEn.menu.children.length === 1,
+    langEn.menu.children.every(function(child) {
+      return child.textContent !== I18n.t('lang.selfName') &&
+        child.textContent !== I18n.t('lang.otherShort');
+    }),
     'items=' + langEn.menu.children.length);
 
   I18n.use('en');
@@ -625,6 +628,178 @@ exports.run = function() {
         taskbarZ === 1000;
     })(),
     'shortcuts above the window rung, under 1000');
+
+  // ── Start-menu Quit: the destructive exit (ticket #66) ────────────────
+  // The Quit entry opens the SAME End Program confirmation the window [×]
+  // uses, and only its Yes runs the tail: Session cleared, per-tab desktop
+  // Record cleared whole, every program window destroyed, landing shown.
+  // No / Escape changes nothing. The dialog tier is the REAL js/windows.js
+  // primitive (so the Escape ordering under test is the live one); the
+  // stores and the controller are faked at their published seams and every
+  // shared global is handed back.
+  var quitPrev = {
+    document: globalThis.document,
+    windows: globalThis.App.Windows,
+    windowsController: globalThis.App.Windows && globalThis.App.Windows.controller,
+    sessionStore: globalThis.App.SessionStore,
+    desktopStore: globalThis.App.DesktopStore,
+    showView: globalThis.App.showView,
+    locale: I18n.locale
+  };
+  var Windows66 = require('../../js/windows.js');
+  globalThis.App.Windows = Windows66;
+
+  function textOf(node, out) {
+    out = out || [];
+    if (node == null) return out;
+    if (typeof node.textContent === 'string' && node.textContent !== '') out.push(node.textContent);
+    (node.children || []).forEach(function(kid) { textOf(kid, out); });
+    return out;
+  }
+  // The system dialog is the one that ASKS this question — the About
+  // window is a dialog too, so the message text is the identifier.
+  function systemDialog(doc, message) {
+    var stack = (doc.body.children || []).slice();
+    while (stack.length) {
+      var n = stack.shift();
+      if (n && n.attrs && n.attrs.role === 'dialog' &&
+          textOf(n).join(' ').indexOf(message) >= 0) return n;
+      if (n && n.children) stack = stack.concat(n.children);
+    }
+    return null;
+  }
+  function buttonLabeled(root, label) {
+    var nodes = [root].concat((root.children || []));
+    var stack = nodes.slice();
+    while (stack.length) {
+      var n = stack.shift();
+      if (n && n.tagName === 'BUTTON' && n.textContent === label) return n;
+      if (n && n.children) stack = stack.concat(n.children);
+    }
+    return null;
+  }
+
+  function quitPage(locale) {
+    I18n.use(locale);
+    var doc = fakeDoc();
+    var appEl = fakeEl('div');
+    appEl.setAttribute('id', 'app');
+    doc.body.appendChild(appEl);
+    globalThis.document = doc;          // the dialog builds on the live doc
+    var seen = [];                      // one ordered log of the tail
+    globalThis.App.SessionStore = {
+      clear: function() { seen.push('session'); },
+      load: function() { return { ok: false, answers: [] }; }
+    };
+    globalThis.App.DesktopStore = {
+      clear: function() { seen.push('record'); },
+      exists: function() { return false; }
+    };
+    globalThis.App.showView = function(id) { seen.push('view:' + id); };
+    Windows66.controller = {
+      resetPrograms: function() { seen.push('desktop'); return true; }
+    };
+    var ctl = Shell.build({
+      doc: doc,
+      appEl: appEl,
+      strings: Shell.resolveStrings(I18n, Shell.STRING_IDS),
+      onQuit: function(opener) { return Shell.openQuit(opener); }
+    });
+    return { doc: doc, ctl: ctl, seen: seen };
+  }
+
+  var q = quitPage('en');
+  var quitItem = q.ctl.menu.children[q.ctl.menu.children.length - 1];
+  check('the Start menu keeps About and adds Quit beneath it',
+    q.ctl.menu.children.length === 2 &&
+    q.ctl.menu.children[0].textContent === I18n.t('shell.menuAbout') &&
+    quitItem.textContent === I18n.t('shell.menuQuit'));
+
+  q.ctl.openMenu();
+  quitItem.click();
+  var ask = systemDialog(q.doc, I18n.t('windows.endProgramMessage'));
+  check('Quit closes the Start menu and opens the End Program confirmation',
+    q.ctl.isMenuOpen() === false && !!ask &&
+    Windows66.isDialogOpen() === true,
+    'dialog=' + !!ask);
+  check('an unconfirmed gesture destroys nothing',
+    q.seen.length === 0, q.seen.join(','));
+
+  // Escape ordering (unchanged): the dialog owns Escape, so the shell's
+  // menu tier steps aside while the question is on screen.
+  q.ctl.openMenu();
+  q.ctl.handleKeydown('Escape');
+  check('the open Quit dialog keeps the Escape tier from the Start menu',
+    q.ctl.isMenuOpen() === true && Windows66.isDialogOpen() === true);
+  ask.handlers.keydown({
+    key: 'Escape', preventDefault: function() {}, stopPropagation: function() {}
+  });
+  check('Escape cancels the question, and the cancel changed nothing',
+    Windows66.isDialogOpen() === false && q.seen.length === 0 &&
+    systemDialog(q.doc, I18n.t('windows.endProgramMessage')) === null);
+  q.ctl.closeMenu(false);
+
+  // The affirmative path: Yes ends the run, landing first, desktop last.
+  q.ctl.openMenu();
+  quitItem.click();
+  var ask2 = systemDialog(q.doc, I18n.t('windows.endProgramMessage'));
+  buttonLabeled(ask2, I18n.t('windows.yes')).click();
+  check('Yes clears the Session and the Record, shows landing, tears the desktop down',
+    q.seen.join(',') === 'session,record,view:landing-view,desktop',
+    q.seen.join(','));
+  check('the dialog leaves the page when it is answered',
+    Windows66.isDialogOpen() === false &&
+    systemDialog(q.doc, I18n.t('windows.endProgramMessage')) === null);
+
+  // The labels are Chrome Strings: zh page, zh dialog, in-place switch.
+  var qzh = quitPage('zh');
+  var zhQuit = qzh.ctl.menu.children[qzh.ctl.menu.children.length - 1];
+  zhQuit.click();
+  var askZh = systemDialog(qzh.doc, '确定要结束这个程序吗？');
+  check('the zh Quit entry and its confirmation resolve in Chinese',
+    zhQuit.textContent === '结束程序' && !!askZh,
+    zhQuit.textContent);
+  buttonLabeled(askZh, '否').click();
+  check('the zh cancel changes nothing either', qzh.seen.length === 0);
+  I18n.use('zh');
+  q.ctl.refreshLang();
+  check('refreshLang re-resolves the Quit label in place',
+    q.ctl.quitItem.textContent === '结束程序', q.ctl.quitItem.textContent);
+
+  // No Windows module: the entry stays inert rather than destroying data.
+  I18n.use('en');
+  var noWin = fakeDoc();
+  var noWinApp = fakeEl('div');
+  noWinApp.setAttribute('id', 'app');
+  noWin.body.appendChild(noWinApp);
+  var seenNoWin = [];
+  globalThis.App.SessionStore = { clear: function() { seenNoWin.push('session'); } };
+  globalThis.App.showView = function(id) { seenNoWin.push(id); };
+  var noWinCtl = Shell.build({
+    doc: noWin, appEl: noWinApp,
+    strings: Shell.resolveStrings(I18n, Shell.STRING_IDS),
+    onQuit: function(opener) { return Shell.openQuit(opener); }
+  });
+  globalThis.App.Windows = undefined;
+  noWinCtl.openMenu();
+  noWinCtl.menu.children[1].click();
+  check('without a dialog tier Quit asks nothing and destroys nothing',
+    seenNoWin.length === 0 && Windows66.isDialogOpen() === false);
+
+  // Hand every shared global back exactly as this suite found them.
+  delete Windows66.controller;
+  if (quitPrev.windows === undefined) delete globalThis.App.Windows;
+  else globalThis.App.Windows = quitPrev.windows;
+  if (quitPrev.windowsController !== undefined) {
+    globalThis.App.Windows.controller = quitPrev.windowsController;
+  }
+  ['SessionStore', 'DesktopStore', 'showView'].forEach(function(key) {
+    if (quitPrev[key] === undefined) delete globalThis.App[key];
+    else globalThis.App[key] = quitPrev[key];
+  });
+  if (quitPrev.document === undefined) delete globalThis.document;
+  else globalThis.document = quitPrev.document;
+  I18n.use(quitPrev.locale || 'en');
 
   return results;
 };
