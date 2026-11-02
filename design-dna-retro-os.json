@@ -142,7 +142,7 @@
       "title card (results window: navy bar + sunken white client field, percentage in --color-score-*)",
       "risk radar (sunken white field, black-on-white vector chart)",
       "blind-spot bars (sunken dithered track — 1px repeating-conic dither, graphics-only; square dark fills)",
-      "action plan + expanders (navy title-bar head rows; review accordion in the Explorer tree idiom)",
+      "action plan + expanders (action plan = ONE ranked list: the Actions are rows in a single sunken white field — sunken priority badge, title, AST chip, description, hairline separators, no navy head row and no raised card frame, #72; the Narrative Expander and the Review accordion share the Explorer disclosure idiom — a silver row led by the square [+]/[-] glyph, black on the face, never navy; the Deep-Dive Prompt expander keeps its navy title-bar summary until ticket #74)",
       "system dialog warn/info icons (flat 32px circles)",
       "command buttons on every surface (raised bevel, dotted focus rectangle, sunken press)"
     ]

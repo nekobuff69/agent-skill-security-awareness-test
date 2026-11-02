@@ -105,7 +105,8 @@ questions.json — or a Bank Variant, e.g. questions.zh.json (each loaded once)
     │           reads: same bank fields as the Deep-Dive Prompt Builder
     │
     │     Either path resolves {narrative, actions, path}; the Action Plan
-    │     presenter renders action cards + Narrative in the expander inside
+    │     presenter renders the ranked action rows in one sunken panel and
+    │     the Narrative in its expander row inside
     │     the Action Plan's own Program Window (or in place where no window
     │     exists), and caches the settled payload in the desktop Record
     │     under the language that issued the request — one payload per
@@ -188,8 +189,8 @@ questions.json — or a Bank Variant, e.g. questions.zh.json (each loaded once)
 │         ┌▓▓▓ Action Plan ─────────────────── [—][□][×] ▓▓▓┐│
 │         │ arrives when its content settles, cascaded 24px  ││
 │         │ off the focused window and stacked BELOW it      ││
-│         │ 1. [Prioritized action card]  2. [… card]        ││
-│         │ ▸ Why these actions? Read the analysis           ││
+│         │ sunken panel · one row per Action, badge-led     ││
+│         │ [+] Why these actions? Read the analysis         ││
 │         └───────────────────────────────────────────────────┘│
 │    ┌▓▓▓ Deep-Dive Prompt ───────────── [—][□][×] ▓▓▓┐       │
 │    │ arrives MINIMIZED at the Finish Commit          │       │

@@ -596,7 +596,8 @@
   function renderPlanContent(wrap, narrative, actions) {
     wrap.innerHTML = '';
 
-    // Action cards are the always-visible content
+    // The ranked list: every Action is a row inside one sunken panel
+    // (ticket #72 — no per-action header, no per-action card frame).
     if (actions && actions.length > 0) {
       var list = el('div', { className: 'results-action-list' });
       for (var i = 0; i < actions.length; i++) {
@@ -614,7 +615,8 @@
       wrap.appendChild(list);
     }
 
-    // Narrative prose in a collapsed expander after the action cards
+    // The Narrative in its disclosure row below the ranked list: the same
+    // square [+]/[-] idiom the Review rows use, closed by default.
     if (narrative) {
       var narrativeDetails = el('details', { className: 'results-narrative-details' });
       narrativeDetails.appendChild(el('summary', { className: 'results-narrative-summary' }, [
