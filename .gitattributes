@@ -1,0 +1,12 @@
+# Line-ending policy: one canonical form across every checkout.
+#
+# This repo is edited from both Windows and WSL (see docs/adr/). Without a
+# pinned policy, `core.autocrlf` decides per-machine and the two environments
+# write different bytes for the same file.
+#
+# Blobs are stored LF; every working tree is checked out LF, so the bytes on
+# disk are identical regardless of platform or local git config.
+#
+# Binary assets (og-card.png, fonts/*) are detected by git's auto heuristic and
+# left untouched, as are the self-hosted font subsets.
+* text=auto eol=lf
