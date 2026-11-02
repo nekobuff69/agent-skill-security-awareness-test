@@ -412,19 +412,16 @@
   padding-bottom: var(--space-3);
 }
 
-/* ── Deep-Dive Prompt ── */
+/* ── Deep-Dive Prompt (ticket #74) ──
+
+   The fold is gone: the window body is the one-line guidance above the
+   prompt's sunken scrollable field, and the window's one Copy Prompt
+   command sits in the bar above it (the .results-menu-bar surface the
+   Quiz window shares). The navy expander row went with the <details>. */
 .results-deep-dive {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-}
-
-.results-deep-dive-heading {
-  font-family: var(--font-heading);
-  font-size: 1.5rem;
-  font-weight: 400;
-  color: var(--color-text);
-  margin: 0;
 }
 
 .results-deep-dive-sub {
@@ -434,38 +431,10 @@
   margin: 0;
 }
 
-.results-prompt-details {
-  border: 0;
-  border-radius: 0;
-  overflow: hidden;
-  background: var(--color-face);
-  box-shadow: var(--bevel-raised);
-}
-
-.results-prompt-summary {
-  cursor: pointer;
-  padding: 4px var(--space-3);
-  font-family: var(--font-heading);
-  font-size: 0.9375rem;
-  font-weight: 400;
-  color: #FFFFFF;
-  background: linear-gradient(90deg, #000080 0%, #1084D0 100%);
-  user-select: none;
-}
-
-.results-prompt-summary:hover {
-  background: linear-gradient(90deg, #000080 0%, #1084D0 100%);
-  color: #FFFFFF;
-}
-
-.results-prompt-details[open] > .results-prompt-summary {
-  border-bottom: 1px solid #000000;
-}
-
 .results-prompt-pre {
   max-height: 300px;
   overflow: auto;
-  margin: var(--space-3);
+  margin: 0;
   padding: var(--space-3);
   font-size: 0.8125rem;
   line-height: 1.5;
@@ -486,8 +455,6 @@
   background: var(--color-bg);
   color: var(--color-accent);
   cursor: pointer;
-  margin: var(--space-2) var(--space-4) var(--space-3);
-  width: calc(100% - var(--space-8));
   transition: all var(--transition-fast);
 }
 

@@ -568,7 +568,7 @@ function mountPointChecks(check) {
       App.rerenderResults();
       check('switching back re-mounts the English section copy',
         mountText('action-plan').indexOf(t('results.actionPlanTitle')) >= 0 &&
-        mountText('deep-dive').indexOf(t('results.deepDiveHeading')) >= 0,
+        mountText('deep-dive').indexOf(t('results.deepDiveSub')) >= 0,
         String(mountText('deep-dive')).slice(0, 60));
     } catch (err) {
       check('mount-point block ran without throwing', false, err && err.stack || String(err));

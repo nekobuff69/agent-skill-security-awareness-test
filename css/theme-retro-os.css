@@ -458,8 +458,7 @@ button:disabled {
   letter-spacing: normal;
 }
 
-.results-section-title,
-.results-deep-dive-heading {
+.results-section-title {
   font-family: var(--font-heading);
   letter-spacing: normal;
 }
@@ -494,31 +493,17 @@ button:disabled {
               inset -1px -1px #FFFFFF;
 }
 
-/* The Deep-Dive Prompt expander keeps the Win95 title-bar summary. The
-   Narrative Expander and the Review accordion are list rows now (#72):
-   their summary rows sit on the silver face in black type, so the skin
-   paints no navy title bar on them. */
+/* The two disclosures that remain — the Narrative Expander and the Review
+   accordion — are list rows (#72): their summary rows sit on the silver
+   face in black type, so the skin paints no navy title bar on them. The
+   Deep-Dive Prompt's navy expander row went with the fold itself (#74). */
 .results-narrative-details,
-.results-prompt-details,
 .results-review-item {
   background: var(--color-face);
   border: 0;
   border-radius: 0;
   overflow: hidden;
   box-shadow: var(--bevel-raised);
-}
-
-.results-prompt-summary {
-  font-family: var(--font-heading);
-  font-weight: 400;
-  background: linear-gradient(90deg, #000080 0%, #1084D0 100%);
-  color: #FFFFFF;
-  padding: 4px var(--space-3);
-}
-
-.results-prompt-summary:hover {
-  background: linear-gradient(90deg, #000080 0%, #1084D0 100%);
-  color: #FFFFFF;
 }
 
 .results-narrative-summary,
@@ -795,8 +780,7 @@ html[lang^="zh"] h6,
 html[lang^="zh"] #landing-view h1,
 html[lang^="zh"] .results-title-name,
 html[lang^="zh"] .results-title-pct,
-html[lang^="zh"] .results-section-title,
-html[lang^="zh"] .results-deep-dive-heading {
+html[lang^="zh"] .results-section-title {
   letter-spacing: normal;
 }
 
@@ -891,8 +875,7 @@ html[lang^="zh"] h3,
 html[lang^="zh"] h4,
 html[lang^="zh"] h5,
 html[lang^="zh"] h6,
-html[lang^="zh"] .results-section-title,
-html[lang^="zh"] .results-deep-dive-heading {
+html[lang^="zh"] .results-section-title {
   line-height: 1.5;
 }
 
@@ -924,8 +907,7 @@ html[lang^="zh"] .results-review-option,
 html[lang^="zh"] .results-review-feedback,
 html[lang^="zh"] .results-review-best,
 html[lang^="zh"] .results-review-link,
-html[lang^="zh"] .results-narrative-summary,
-html[lang^="zh"] .results-prompt-summary {
+html[lang^="zh"] .results-narrative-summary {
   line-height: 1.7;
 }
 
