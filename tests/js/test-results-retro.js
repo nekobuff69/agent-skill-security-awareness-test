@@ -807,6 +807,30 @@ exports.run = function() {
         saved.length === savedBeforeStale + 1 &&
         saved[saved.length - 1][1].narrative === 'LIVE COMPLETION',
         JSON.stringify(saved.map(function(r) { return r[1].narrative; })));
+
+      // ── #64/#66 handshake: discarding the desktop Record (Quit, Retake,
+      //    quiet invalidation — desktop-store's clear() calls the
+      //    presenter's actionPlanRecordGone) evicts the live render: a
+      //    resolution that lands late caches nothing, paints nothing, and
+      //    above all never ARRIVES an Action Plan window over the
+      //    teardown's resetPrograms(). ──
+      var arrivals = 0;
+      AppG.Windows = {
+        controller: { actionPlanArrived: function() { arrivals++; return true; } }
+      };
+      var reportT = planReport(61);
+      var wrapT = internals.buildActionPlan(reportT, bankPlan, bankPlan);
+      var savedAtTeardown = saved.length;
+      AppG.actionPlanRecordGone();
+      resolvers[resolvers.length - 1]({ narrative: 'AFTER TEARDOWN', actions: [], path: 'llm' });
+      await settlePlan();
+      check('the resolution landing after the Record teardown caches nothing (#64/#66)',
+        saved.length === savedAtTeardown &&
+        saved.every(function(r) { return r[1].narrative !== 'AFTER TEARDOWN'; }),
+        JSON.stringify(saved.map(function(r) { return r[1].narrative; })));
+      check('…paints nothing and arrives no window over the teardown (#64/#66)',
+        arrivals === 0 && planText(wrapT).indexOf('AFTER TEARDOWN') < 0,
+        'arrivals=' + arrivals);
     } catch (err) {
       check('Action Plan cache block ran without throwing', false,
         err && err.stack || String(err));

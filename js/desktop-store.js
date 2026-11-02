@@ -126,6 +126,13 @@
     } catch (e) {
       // unavailable — swallow silently
     }
+    // #64/#66 handshake: the desktop this Record described is gone (Quit,
+    // Retake, or a quiet invalidation) — the presenter evicts its live
+    // Action Plan render so a resolution still in flight caches nothing,
+    // paints nothing, and never re-arrives the window over the teardown.
+    if (typeof app.actionPlanRecordGone === 'function') {
+      try { app.actionPlanRecordGone(); } catch (e2) { /* best-effort */ }
+    }
   }
 
   /* ── Action Plan cache (ticket #64) ─────────────────────────────── */

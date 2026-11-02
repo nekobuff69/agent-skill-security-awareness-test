@@ -565,9 +565,10 @@
       // rewritten (the store's savePlan no-ops without one).
       persistPlan(locale, report, plan);
       // A newer render superseded this one (another language switch, a
-      // Retake, a Bank refresh): the late resolution must not paint into
-      // an evicted view.
-      if (_planRenderId !== renderId) return;
+      // Retake, a Bank refresh), or the desktop it belonged to has been
+      // torn down (#64/#66): the late resolution must not paint into an
+      // evicted view — and never re-arrives a window for a dead run.
+      if (_planLiveReport !== report || _planRenderId !== renderId) return;
       renderPlanContent(wrap, plan.narrative, plan.actions);
       // Content settled → the window arrives. The Deterministic Fallback
       // lands here on its microtask too, and that is the SAME rule with
@@ -1339,6 +1340,18 @@
     _planRestoreQueued = null;
     if (queued) queued();
     return !!queued;
+  };
+
+  /* #64/#66 handshake — js/desktop-store.js calls this whenever the
+     Record is discarded (Quit, Retake, quiet invalidation): the desktop
+     is gone, so every live Action Plan render is evicted — a resolution
+     that lands late caches nothing, paints nothing, and never re-arrives
+     the Action Plan window over the teardown's resetPrograms(). The next
+     desktop renders fresh ids of its own. */
+  app.actionPlanRecordGone = function() {
+    _planLiveReport = null;
+    _planRestoreQueued = null;
+    _planRenderId++;
   };
 
   /* Test seam (tests/js/test-results-retro.js, fakeEl pattern): the pure
