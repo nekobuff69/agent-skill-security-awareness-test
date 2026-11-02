@@ -1217,8 +1217,9 @@
    * The Action Plan window arrives when its content settles — the same
    * rule on the LLM Path and on the Deterministic Fallback, and the same
    * rule when the fallback settles inside the current render. The window
-   * manager owns the consequence: cascaded from the focused window, below
-   * it in the stacking order, no focus and no raise.
+   * manager owns the consequence: the Action Plan's own right-anchored
+   * arrival slot (#76), below the focused window in the stacking order,
+   * no focus and no raise.
    */
   function actionPlanSettled() {
     var win = desktop();

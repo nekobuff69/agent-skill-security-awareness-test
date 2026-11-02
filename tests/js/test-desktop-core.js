@@ -203,7 +203,6 @@ exports.run = function() {
   /* ── Ticket #61: three programs on one desktop ─────────────────────── */
 
   var D = Desktop.DESIGN_DEFAULTS;
-  var STEP = Desktop.CASCADE;
 
   function planCore() {
     var p = Desktop.createCore();
@@ -246,15 +245,21 @@ exports.run = function() {
       quiz: aBelow.windowSnapshot('quiz').z
     }));
 
-  /* Cascade arithmetic: designed default, or 24px down-right from the
-     window the Participant is reading. */
+  /* Arrival placement (ticket #76): the cascade is retired. An Arrival
+     lands in the Program's own slot — the caller's supplied Geometry when
+     the Window Manager computes one, the Designed Default otherwise —
+     whatever was focused. */
   var b = planCore();
-  check('a window born while another is focused cascades 24px down-right',
-    b.open('action-plan', { below: true }) === true &&
-    geoEqual(b.windowSnapshot('action-plan').geometry, {
-      x: D.quiz.x + STEP, y: D.quiz.y + STEP,
-      w: D['action-plan'].w, h: D['action-plan'].h
-    }), JSON.stringify(b.windowSnapshot('action-plan').geometry));
+  var slot = { x: 640, y: 48, w: 320, h: 240 };
+  check('arrival takes the supplied Geometry, not an offset off the focused window',
+    b.open('action-plan', { below: true, geometry: slot }) === true &&
+    geoEqual(b.windowSnapshot('action-plan').geometry, slot),
+    JSON.stringify(b.windowSnapshot('action-plan').geometry));
+  var b2 = planCore();
+  check('a window born while another is focused lands on its designed default — no cascade',
+    b2.open('action-plan', { below: true }) === true &&
+    geoEqual(b2.windowSnapshot('action-plan').geometry, D['action-plan']),
+    JSON.stringify(b2.windowSnapshot('action-plan').geometry));
   var c2 = planCore();
   c2.minimize();                       // nothing focused on the desktop now
   check('with no window focused a program keeps its designed geometry',
@@ -262,9 +267,9 @@ exports.run = function() {
     geoEqual(c2.windowSnapshot('action-plan').geometry, D['action-plan']),
     JSON.stringify(c2.windowSnapshot('action-plan').geometry));
   check('the designed Quiz default still fits 1024×768 without internal scrolling',
-    geoEqual(D.quiz, { x: 120, y: 16, w: 888, h: 704 }) &&
+    geoEqual(D.quiz, { x: 24, y: 16, w: 888, h: 704 }) &&
     D.quiz.x + D.quiz.w <= 1024 &&
-    D.quiz.x > 104 &&   // clear of the desktop shortcut column
+    D.quiz.x <= 24 &&   // #76: it starts near the desktop's left edge
     D.quiz.y + D.quiz.h <= 768 - 36,
     JSON.stringify(D.quiz));
 
@@ -279,11 +284,10 @@ exports.run = function() {
     geoEqual(d2.windowSnapshot('deep-dive').lastGeometry,
       d2.windowSnapshot('deep-dive').geometry) &&
     d2.windowSnapshot('deep-dive').lastMode === 'normal');
-  check('restoring the Deep-Dive Prompt lands on its designed geometry',
+  check('restoring the Deep-Dive Prompt lands on its arrival slot',
     d2.restore('deep-dive') === true &&
     d2.windowSnapshot('deep-dive').mode === 'normal' &&
-    geoEqual(d2.windowSnapshot('deep-dive').geometry,
-      { x: D.quiz.x + STEP, y: D.quiz.y + STEP, w: D['deep-dive'].w, h: D['deep-dive'].h }) &&
+    geoEqual(d2.windowSnapshot('deep-dive').geometry, D['deep-dive']) &&
     d2.activeId() === 'quiz', JSON.stringify(d2.windowSnapshot('deep-dive').geometry));
   check('a minimized window can be minimized no further',
     d2.minimize('quiz') === true && d2.minimize('quiz') === false);
@@ -321,12 +325,13 @@ exports.run = function() {
     f.hasWindow('action-plan') === true && f.restore('action-plan') === true &&
     f.inTaskbar('action-plan') === true);
   var fQuiz = f.windowSnapshot('quiz').geometry;
-  check('a settled re-arrival re-presents a put-away program with fresh geometry',
+  check('a settled re-arrival re-presents a put-away program in its own slot — not offset off the focused window',
     f.hide('action-plan') === true && f.open('action-plan', { below: true }) === true &&
     f.windowSnapshot('action-plan').mode === 'normal' &&
-    geoEqual(f.windowSnapshot('action-plan').geometry, {
-      x: fQuiz.x + STEP, y: fQuiz.y + STEP, w: D['action-plan'].w, h: D['action-plan'].h
-    }), JSON.stringify(f.windowSnapshot('action-plan').geometry));
+    geoEqual(f.windowSnapshot('action-plan').geometry, D['action-plan']) &&
+    f.windowSnapshot('action-plan').geometry.x !== fQuiz.x + 24 &&
+    f.windowSnapshot('action-plan').geometry.y !== fQuiz.y + 24,
+    JSON.stringify(f.windowSnapshot('action-plan').geometry));
   check('the dialog gate owns every window on the desktop',
     f.requestClose('quiz') === true &&
     f.minimize('action-plan') === false && f.raise('action-plan') === false &&

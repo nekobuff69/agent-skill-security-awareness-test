@@ -613,12 +613,12 @@ exports.run = function() {
     prefs.windowEl.classList.contains('is-active'));
   while (ppending.length) ppending.shift()();
   ddRefs.taskbarBtn.click();
-  check('its taskbar button restores it to the cascaded geometry and focuses it',
+  check('its taskbar button restores it to its right-anchored slot and focuses it',
     pctl.getState('deep-dive').mode === 'normal' &&
     pctl.snapshot().active === 'deep-dive' &&
     ddRefs.windowEl.classList.contains('is-windowed') &&
-    ddRefs.windowEl.style.left === (quizG0.x + 24) + 'px' &&
-    ddRefs.windowEl.style.top === (quizG0.y + 24) + 'px' &&
+    ddRefs.windowEl.style.left === (VP61.width - 470 - 16) + 'px' &&
+    ddRefs.windowEl.style.top === (VP61.height - VP61.taskbar - 380 - 16) + 'px' &&
     ddRefs.taskbarBtn.getAttribute('aria-pressed') === 'true' &&
     prefs.windowEl.classList.contains('is-active') === false);
   while (ppending.length) ppending.shift()();
@@ -635,9 +635,11 @@ exports.run = function() {
     planRefs.taskbarBtn.hidden === true);
   check('the settle opens the Action Plan window',
     pctl.actionPlanArrived() === true && pctl.inTaskbar('action-plan') === true);
-  check('the Action Plan arrives cascaded from the focused window',
-    planRefs.windowEl.style.left === (quizGBefore.x + 24) + 'px' &&
-    planRefs.windowEl.style.top === (quizGBefore.y + 24) + 'px',
+  check('the Action Plan arrives in its upper-right slot, never offset off the focused window',
+    planRefs.windowEl.style.left === (VP61.width - 520 - 16) + 'px' &&
+    planRefs.windowEl.style.top === 16 + 'px' &&
+    planRefs.windowEl.style.left !== (quizGBefore.x + 24) + 'px' &&
+    planRefs.windowEl.style.top !== (quizGBefore.y + 24) + 'px',
     planRefs.windowEl.style.left + ',' + planRefs.windowEl.style.top);
   check('it lands BELOW the active window, which stays active and unmoved',
     pctl.snapshot().active === 'quiz' &&
@@ -649,6 +651,75 @@ exports.run = function() {
     planRefs.taskbarBtn.getAttribute('aria-pressed') === 'false');
   check('the taskbar now lists all three programs in order',
     pctl.runningPrograms().join(',') === 'quiz,action-plan,deep-dive');
+
+  /* ── Ticket #76: right-anchored arrival slots at any desktop width ───
+     Placement is driven directly with an injected viewport: one desktop
+     per width, the same arrivals, the same constant margin from the
+     right edge. */
+  function arrivalDesktop(vp) {
+    var sdoc = fakeDoc();
+    var sc = Windows.create({
+      doc: sdoc,
+      schedule: function(fn) { fn(); },
+      viewport: function() { return vp; }
+    });
+    sc.attach({
+      windowEl: fakeEl('div'), titleBar: fakeEl('div'), resizeGrip: fakeEl('div'),
+      programBtn: fakeEl('button'),
+      buttons: { minimize: fakeEl('button'), maximize: fakeEl('button'), close: fakeEl('button') }
+    });
+    sc.attachProgram('action-plan', programFrame());
+    sc.attachProgram('deep-dive', programFrame());
+    sc.setView('results-view');
+    return sc;
+  }
+  var MARGIN76 = 16;
+  var WIDTHS76 = [
+    { width: 1024, height: 768, taskbar: 36 },
+    { width: 1440, height: 900, taskbar: 36 }
+  ];
+  WIDTHS76.forEach(function(vp) {
+    var actl = arrivalDesktop(vp);
+    check('the Quiz starts near the left edge at ' + vp.width + ' and is never shrunk',
+      actl.geometry('quiz').x === 24 &&
+      actl.geometry('quiz').y === 16 &&
+      actl.geometry('quiz').w === 888 && actl.geometry('quiz').h === 704,
+      JSON.stringify(actl.geometry('quiz')));
+    actl.actionPlanArrived();
+    actl.deepDiveArrived();
+    var plan76 = actl.geometry('action-plan');
+    var dive76 = actl.geometry('deep-dive');
+    check('the Action Plan holds the constant right margin at ' + vp.width +
+      ' and arrives unfocused below the active Window',
+      vp.width - (plan76.x + plan76.w) === MARGIN76 &&
+      plan76.y === MARGIN76 && plan76.w === 520 && plan76.h === 420 &&
+      actl.snapshot().active === 'quiz' &&
+      actl.getState('action-plan').mode === 'normal' &&
+      actl.snapshot().windows['action-plan'].z < actl.snapshot().windows.quiz.z,
+      JSON.stringify(plan76));
+    check('the Deep-Dive Prompt holds the same right margin and the bottom margin at ' +
+      vp.width + ' and arrives Minimized',
+      vp.width - (dive76.x + dive76.w) === MARGIN76 &&
+      dive76.y + dive76.h === vp.height - vp.taskbar - MARGIN76 &&
+      dive76.w === 470 && dive76.h === 380 &&
+      actl.getState('deep-dive').mode === 'minimized' &&
+      actl.isVisible('deep-dive') === false && actl.inTaskbar('deep-dive') === true,
+      JSON.stringify(dive76));
+    check('the two secondary slots stay distinct at ' + vp.width +
+      ' — different origin and different size',
+      plan76.x !== dive76.x && plan76.y !== dive76.y &&
+      (plan76.w !== dive76.w || plan76.h !== dive76.h));
+    // Focusing another window must not shift the next arrival by 24px.
+    actl.focusWindow('action-plan');
+    actl.closeProgram('action-plan');                   // put it away...
+    actl.actionPlanArrived();                            // ...and let it re-arrive
+    check('re-arrival lands back in the same slot after another Window was focused — no cascade',
+      actl.geometry('action-plan').x === plan76.x &&
+      actl.geometry('action-plan').y === plan76.y &&
+      actl.geometry('action-plan').x !== dive76.x + 24 &&
+      actl.geometry('action-plan').y !== dive76.y + 24,
+      JSON.stringify(actl.geometry('action-plan')));
+  });
 
   // A pointer interaction inside a frame raises it and makes it active.
   planRefs.windowEl.handlers.pointerdown({
@@ -1539,17 +1610,16 @@ exports.run = function() {
     movedQuiz.x === 300 &&
     JSON.stringify(tctl.geometry('quiz')) ===
       JSON.stringify(globalThis.App.DesktopCore.DESIGN_DEFAULTS.quiz));
-  check('the torn-down desktop hosts the next run: a program arrives fresh',
+  check('the torn-down desktop hosts the next run: a program arrives fresh in its slot',
     tctl.deepDiveArrived() === true &&
     tctl.hasWindow('deep-dive') === true &&
     (function() {
-      var born = globalThis.App.DesktopCore.DESIGN_DEFAULTS;
       var g = tctl.geometry('deep-dive');
-      // A newcomer cascades off the born Quiz window, exactly as it did
-      // on the desktop's first Finish Commit.
-      return g.x === born.quiz.x + globalThis.App.DesktopCore.CASCADE &&
-        g.y === born.quiz.y + globalThis.App.DesktopCore.CASCADE &&
-        g.w === born['deep-dive'].w && g.h === born['deep-dive'].h;
+      // #76: the newcomer lands in its own right-anchored slot — the
+      // Window Manager computes it from the desktop width; there is no
+      // cascade off the born Quiz window any more.
+      return g.x === VP61.width - g.w - 16 && g.w === 470 && g.h === 380 &&
+        g.y === VP61.height - VP61.taskbar - g.h - 16;
     })(),
     JSON.stringify(tctl.geometry('deep-dive')));
   check('endRun is quiet about a desktop with nothing to remove',

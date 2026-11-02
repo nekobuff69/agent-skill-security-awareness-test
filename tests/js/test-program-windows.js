@@ -316,10 +316,25 @@ exports.run = function() {
         ctl.snapshot().active === 'quiz' &&
         ctl.getState('quiz').mode === 'normal' &&
         ctl.snapshot().windows['action-plan'].z < ctl.snapshot().windows.quiz.z);
-      check('the Action Plan arrived cascaded 24px from the Quiz window',
-        ctl.geometry('action-plan').x === ctl.geometry('quiz').x + 24 &&
-        ctl.geometry('action-plan').y === ctl.geometry('quiz').y + 24,
+      check('the Action Plan arrives in its right-anchored upper slot — margin held, no cascade',
+        ctl.geometry('action-plan').x === VP.width - 520 - 16 &&
+        ctl.geometry('action-plan').y === 16 &&
+        ctl.geometry('action-plan').w === 520 &&
+        ctl.geometry('action-plan').h === 420 &&
+        ctl.geometry('action-plan').x !== ctl.geometry('quiz').x + 24 &&
+        ctl.geometry('action-plan').y !== ctl.geometry('quiz').y + 24,
         JSON.stringify(ctl.geometry('action-plan')));
+      check('the two secondary slots are distinct, share the right margin, and the Quiz keeps its size',
+        (function() {
+          var p = ctl.geometry('action-plan');
+          var d = ctl.geometry('deep-dive');
+          var q = ctl.geometry('quiz');
+          return p.x !== d.x && p.y !== d.y && (p.w !== d.w || p.h !== d.h) &&
+            VP.width - (p.x + p.w) === 16 && VP.width - (d.x + d.w) === 16 &&
+            d.y + d.h === VP.height - VP.taskbar - 16 &&   // the lower slot holds its bottom margin
+            q.x === 24 && q.w === 888 && q.h === 704;      // near the left edge, never shrunk
+        })(), JSON.stringify([ctl.geometry('action-plan'), ctl.geometry('deep-dive'),
+          ctl.geometry('quiz')]));
       check('the taskbar lists the three running programs in order',
         ctl.runningPrograms().join(',') === 'quiz,action-plan,deep-dive');
       check('exactly one host exists for each section',

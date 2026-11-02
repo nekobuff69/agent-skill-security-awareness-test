@@ -85,11 +85,13 @@
    * that program (#68). Flow stages keep the dialog
    * exactly as ticket #43 built it.
    *
-   * Arrival (ticket #61, spec #58): a program window is BORN when its
-   * content settles, never before — the Action Plan opens cascaded from the
-   * focused window and lands BELOW it in the stacking order, without a
-   * focus call, a raise or a scroll; the Deep-Dive Prompt opens minimized
-   * at the Finish Commit and shows as a taskbar button only.
+   * Arrival (ticket #61, spec #58; slots #76): a program window is BORN
+   * when its content settles, never before — the Action Plan opens in its
+   * fixed right-anchored upper slot and lands BELOW the focused window in
+   * the stacking order, without a focus call, a raise or a scroll; the
+   * Deep-Dive Prompt opens minimized in its lower-right slot at the Finish
+   * Commit and shows as a taskbar button only. The 24px cascade off the
+   * focused window is retired: an Opening always lands in its own slot.
    *
    * Keyboard floor (ticket #67): only the FOCUSED window answers the
    * keyboard. paintFrame puts the inert attribute on everything inside
@@ -804,11 +806,56 @@
       return hide(id) ? 'hidden' : false;
     }
 
-    // ── Arrival (ticket #61) ───────────────────────────────────────────
+    // ── Arrival (tickets #61, #76) ─────────────────────────────────────
 
     /**
-     * The program arrives: its Record is born from the core (designed
-     * Geometry, 24px cascade when another window is focused). opts:
+     * The right-anchored arrival slots (ticket #76). Each secondary
+     * Program holds one fixed, distinct slot against the desktop's right
+     * edge: the Action Plan UPPER-right, the Deep-Dive Prompt LOWER-right.
+     * The margin from the right edge is constant at any desktop width —
+     * the Window Manager, not the viewport-blind core, owns this maths.
+     * `along` is the edge the slot is anchored to: 'top' pins it to the
+     * desktop's top edge, 'bottom' to the edge above the taskbar.
+     */
+    var ARRIVAL_SLOTS = {
+      'action-plan': { w: 520, h: 420, along: 'top' },
+      'deep-dive': { w: 470, h: 380, along: 'bottom' }
+    };
+
+    /** The constant margin every arrival slot keeps from the desktop's
+     *  right edge (and from the edge it is anchored to). */
+    var ARRIVAL_MARGIN = 16;
+
+    /**
+     * The Geometry a Program arrives with at this desktop's width: null
+     * for the Quiz, which keeps its Designed Default Geometry near the
+     * left edge, and the computed right-anchored slot for the secondary
+     * programs. The slot is never resized — only its origin moves — so
+     * the two secondary slots stay distinct (different x, y, w and h) at
+     * every width; partial overlap with the Quiz at 1024 is intended,
+     * and the pair may overlap each other on a short desktop.
+     */
+    function arrivalGeometry(id) {
+      var slot = ARRIVAL_SLOTS[id];
+      if (!slot) return null;
+      var vp = viewport();
+      var desktopH = vp.height - vp.taskbar;
+      return {
+        x: Math.max(0, vp.width - slot.w - ARRIVAL_MARGIN),
+        y: slot.along === 'bottom'
+          ? Math.max(0, desktopH - slot.h - ARRIVAL_MARGIN)
+          : ARRIVAL_MARGIN,
+        w: slot.w,
+        h: slot.h
+      };
+    }
+
+    /**
+     * The program arrives: its Record is born from the core at its
+     * Arrival Geometry — the Quiz's Designed Default, or the computed
+     * right-anchored slot (ticket #76; the cascade is retired, so
+     * Opening always lands in the Program's own slot whatever was
+     * focused). opts:
      *   minimized  the window is born in the taskbar only (Deep-Dive
      *              Prompt at the Finish Commit)
      *   belowActive  it lands BELOW the active window in the stacking
@@ -825,8 +872,7 @@
       if (!machine.open(id, {
         minimized: !!opts.minimized,
         below: opts.below !== false,
-        noCascade: !!opts.noCascade,
-        geometry: opts.geometry
+        geometry: opts.geometry || arrivalGeometry(id)
       })) return false;
       render();
       return true;

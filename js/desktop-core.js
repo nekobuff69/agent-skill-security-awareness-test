@@ -48,8 +48,9 @@
  * Ticket #59 wired exactly ONE window (the Quiz window); ticket #61 (spec
  * #58) runs the desktop as THREE programs — Quiz, Action Plan, Deep-Dive
  * Prompt — all on this one Record map, keyed by Id: per-window transitions,
- * per-program designed defaults, a 24px down-right cascade on arrival, and
- * a taskbar that lists exactly the running windows in program order. An
+ * per-program designed defaults, arrival at the Geometry the caller supplies
+ * or the designed default (the 24px down-right cascade is retired by #76),
+ * and a taskbar that lists exactly the running windows in program order. An
  * absent Record is NOT a mode: the Action Plan does not exist at all until
  * its content settles, and open() is the only way a Record comes to be.
  * The mobile rule (ticket #46: [□] disabled at ≤768px) stays a
@@ -80,23 +81,21 @@
   var PROGRAM_IDS = [QUIZ_ID, ACTION_PLAN_ID, DEEP_DIVE_ID];
 
   /** Designed default geometry per program (desktop coordinates, taskbar
-   *  excluded). The Quiz default is the ticket #60 arrangement: at
-   *  1024×768 the score header, Risk Radar and Blind-Spot Bars stay
-   *  readable without internal scrolling (768 − 36 taskbar = 732 desktop
-   *  height; 16 + 704 = 720 clears it) and clear of the 104px desktop
-   *  shortcut column (120 > 104) so its labels never sit on window
-   *  content. The two adjunct programs are tuned to sit inside the same
-   *  desktop when they arrive beside it. Nothing in the core renders
-   *  these. */
+   *  excluded). The Quiz default starts near the desktop's left edge
+   *  (ticket #76 — it no longer clears the shortcut column) and keeps the
+   *  ticket #60 arrangement: at 1024×768 the score header, Risk Radar
+   *  and Blind-Spot Bars stay readable without internal scrolling
+   *  (768 − 36 taskbar = 732 desktop height; 16 + 704 = 720 clears it).
+   *  The two secondary defaults are the reference-1024 fallbacks of their
+   *  fixed right-anchored slots; on a live desktop the Window Manager
+   *  computes the slot from the viewport and supplies it at Arrival
+   *  (ticket #76), so the core never learns about the viewport. Nothing
+   *  in the core renders these. */
   var DESIGN_DEFAULTS = {
-    'quiz': { x: 120, y: 16, w: 888, h: 704 },
-    'action-plan': { x: 152, y: 64, w: 640, h: 480 },
-    'deep-dive': { x: 152, y: 88, w: 620, h: 440 }
+    'quiz': { x: 24, y: 16, w: 888, h: 704 },
+    'action-plan': { x: 488, y: 16, w: 520, h: 420 },
+    'deep-dive': { x: 538, y: 336, w: 470, h: 380 }
   };
-
-  /** The cascade step: a window born (or re-opened) while another window
-   *  is focused shifts 24px down and right off its designed default. */
-  var CASCADE = 24;
 
   /** Fresh copy — a Record never aliases a caller's object, and a
    *  snapshot never aliases the Record. */
@@ -252,26 +251,20 @@
 
     // ── Arrival (ticket #61) ───────────────────────────────────────────
 
-    /** The geometry a program is designed to open with. */
+    /** The geometry a program is designed to open with — the
+     *  reference-desktop fallback of the Window Manager's arrival slot. */
     function designedGeometry(id) {
       return DESIGN_DEFAULTS[id] ? copyGeometry(DESIGN_DEFAULTS[id]) : null;
-    }
-
-    /** A focused window to cascade from: the active Record, when it is a
-     *  different program and it is on the desktop (normal/maximized). */
-    function focusedGeometry(exceptId) {
-      var w = desktop.windows[desktop.active];
-      if (!w || desktop.active === exceptId || !isDeskMode(w.mode)) return null;
-      return w.geometry;
     }
 
     /**
      * open(id, opts) — the ONLY way a Record comes into existence.
      * opts:
-     *   geometry  caller-supplied designed geometry (validated)
+     *   geometry  caller-supplied arrival geometry (validated) — the
+     *           Window Manager computes the program's slot from the
+     *           desktop and supplies it here (ticket #76)
      *   minimized birth mode: the window arrives in the taskbar only
      *           (the Deep-Dive Prompt at the Finish Commit)
-     *   noCascade skip the 24px cascade even though a window is focused
      *   below     stack the newcomer directly BELOW the active window
      *           instead of on top (the Action Plan arrival: it must never
      *           cover the window the Participant is reading)
@@ -297,11 +290,6 @@
 
       var geometry = hasValidGeometry(opts.geometry)
         ? copyGeometry(opts.geometry) : designedGeometry(id);
-      var cascade = focusedGeometry(id);
-      if (cascade && !opts.noCascade) {
-        geometry.x = cascade.x + CASCADE;
-        geometry.y = cascade.y + CASCADE;
-      }
       var mode = opts.minimized ? MODE_MINIMIZED : MODE_NORMAL;
       var rec = existing || (desktop.windows[id] = {});
       rec.mode = mode;
@@ -646,7 +634,6 @@
   app.DesktopCore.ACTION_PLAN_ID = ACTION_PLAN_ID;
   app.DesktopCore.DEEP_DIVE_ID = DEEP_DIVE_ID;
   app.DesktopCore.DESIGN_DEFAULTS = DESIGN_DEFAULTS;
-  app.DesktopCore.CASCADE = CASCADE;
 
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = app;
