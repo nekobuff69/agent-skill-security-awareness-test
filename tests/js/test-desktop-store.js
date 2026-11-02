@@ -21,8 +21,8 @@ exports.run = function() {
     Windows: App.Windows,
     DesktopStore: App.DesktopStore,
     renderResults: App.renderResults,
-    holdActionPlanRequest: App.holdActionPlanRequest,
-    actionPlanRequestHeld: App.actionPlanRequestHeld
+    beginPlanRestore: App.beginPlanRestore,
+    finishPlanRestore: App.finishPlanRestore
   };
   var prevGlobal = {
     Analytics: globalThis.Analytics,
@@ -93,18 +93,25 @@ exports.run = function() {
   };
 
   var renders = [];
-  var renderSeesHold = [];
-  var holdLog = [];
-  var held = false;
+  var restoreLog = [];   // ['begin', plans] / ['render', armed] / ['finish']
+  var inBracket = false;
   App.renderResults = function(b, report) {
     renders.push({ bank: b, report: report });
-    // The hold is what tells results.js NOT to start the Action Plan request
-    // for this render: it must read armed inside the restore's render and
-    // released again the moment the render is over.
-    renderSeesHold.push(held);
+    // The bracket is what tells results.js to render this desktop's
+    // Action Plan from the Record's plan cache (ticket #64): it must read
+    // open inside the restore's render and closed again the moment the
+    // render is over.
+    restoreLog.push(['render', inBracket]);
   };
-  App.holdActionPlanRequest = function(on) { held = !!on; holdLog.push(!!on); };
-  App.actionPlanRequestHeld = function() { return held; };
+  App.beginPlanRestore = function(plans) {
+    inBracket = true;
+    restoreLog.push(['begin', plans]);
+  };
+  App.finishPlanRestore = function() {
+    inBracket = false;
+    restoreLog.push(['finish']);
+    return false;
+  };
 
   var tracked = [];
   globalThis.Analytics = { track: function(ev) { tracked.push(ev); } };
@@ -176,9 +183,9 @@ exports.run = function() {
   function resetScenario(initial) {
     globalThis.sessionStorage = fakeStorage(initial);
     globalThis.localStorage = fakeStorage();   // must NEVER be written here
-    renders.length = 0; renderSeesHold.length = 0; holdLog.length = 0;
+    renders.length = 0; restoreLog.length = 0;
     tracked.length = 0; computeCalls.length = 0; i18nLog.length = 0;
-    held = false;
+    inBracket = false;
     Store = freshStore();
     return Store;
   }
@@ -244,11 +251,13 @@ exports.run = function() {
       renders.length === 1 && renders[0].report === REPORT && renders[0].bank === bank);
     check('restore is a re-render, not a completion: no quiz_completed',
       tracked.length === 0, JSON.stringify(tracked));
-    check('restore fires NO Action Plan request (the hold covers the render)',
-      renderSeesHold.length === 1 && renderSeesHold[0] === true &&
-      App.actionPlanRequestHeld() === false &&
-      holdLog.length === 2 && holdLog[0] === true && holdLog[1] === false,
-      'during=' + renderSeesHold + ' after=' + App.actionPlanRequestHeld());
+    check('restore brackets the plan-cache hand-off around exactly one render (#64)',
+      restoreLog.length === 3 &&
+      restoreLog[0][0] === 'begin' &&
+      JSON.stringify(restoreLog[0][1]) === '{}' &&
+      restoreLog[1][0] === 'render' && restoreLog[1][1] === true &&
+      restoreLog[2][0] === 'finish' && inBracket === false,
+      JSON.stringify(restoreLog));
     check('the window Records go back before the render',
       appliedFor() && appliedFor().windows.quiz.mode === 'normal' &&
       appliedFor().active === 'quiz' && appliedFor().zCounter === 3 &&
@@ -408,6 +417,88 @@ exports.run = function() {
     check('the committed stage comes back as the desktop, not the landing',
       committedSnap.view === 'results-view' && arrivedSnap.view === 'results-view',
       arrivedSnap.view);
+
+    /* ── the Action Plan cache: one settled payload per language (#64) ── */
+
+    resetScenario();
+    seedDesktop('quiz', windows);
+    Store.captureAtCommit(bank, fullAnswers);
+    var PLAN_ZH = {
+      narrative: 'Narrative zh.',
+      actions: [{ priority: '1', title: 'T', description: 'D.', ast_source: 'AST001' }],
+      path: 'llm'
+    };
+    var setCallsBeforeSave = globalThis.sessionStorage.setCalls;
+    check('savePlan merges one language payload into the Record',
+      Store.savePlan('zh', PLAN_ZH) === true &&
+      globalThis.sessionStorage.setCalls === setCallsBeforeSave + 1 &&
+      JSON.stringify(JSON.parse(globalThis.sessionStorage.getItem(Store.KEY)).plans.zh) ===
+        JSON.stringify({ narrative: 'Narrative zh.', actions: PLAN_ZH.actions }),
+      globalThis.sessionStorage.getItem(Store.KEY));
+    var savedRec = JSON.parse(globalThis.sessionStorage.getItem(Store.KEY));
+    check('savePlan keeps every other Record field intact',
+      savedRec.hash === rec.hash && savedRec.lang === App.I18n.locale &&
+      JSON.stringify(savedRec.answers) === JSON.stringify(fullAnswers) &&
+      savedRec.windows.quiz.mode === 'normal',
+      JSON.stringify({ h: savedRec.hash, a: savedRec.answers }));
+
+    Store.savePlan('en', { narrative: 'Narrative en.', actions: [] });
+    var plansBack = Store.cachedPlans();
+    check('cachedPlans reads back each language separately',
+      plansBack.en.narrative === 'Narrative en.' &&
+      plansBack.zh.narrative === 'Narrative zh.' &&
+      Object.keys(plansBack).length === 2,
+      JSON.stringify(Object.keys(plansBack)));
+    var setCallsAfterSaves = globalThis.sessionStorage.setCalls;
+    Store.restore(bank);
+    var beginRows = restoreLog.filter(function(r) { return r[0] === 'begin'; });
+    check('restore hands the Record plan cache to the bracket, read-only',
+      beginRows.length === 1 &&
+      beginRows[0][1].en.narrative === 'Narrative en.' &&
+      beginRows[0][1].zh.actions.length === 1 &&
+      globalThis.sessionStorage.setCalls === setCallsAfterSaves,
+      JSON.stringify(beginRows[0] && beginRows[0][1]));
+
+    check('a malformed payload or language key never touches the Record',
+      Store.savePlan('en', { narrative: 42, actions: [] }) === false &&
+      Store.savePlan('en', { narrative: 'x', actions: 'nope' }) === false &&
+      Store.savePlan('en', null) === false &&
+      Store.savePlan('', { narrative: 'x', actions: [] }) === false &&
+      Store.savePlan('__proto__', { narrative: 'x', actions: [] }) === false &&
+      Store.cachedPlans().en.narrative === 'Narrative en.');
+
+    Store.clear();
+    check('savePlan no-ops and never resurrects a cleared Record (#66 wins)',
+      Store.savePlan('en', { narrative: 'Late.', actions: [] }) === false &&
+      globalThis.sessionStorage.getItem(Store.KEY) === null &&
+      Object.keys(Store.cachedPlans()).length === 0);
+
+    resetScenario();
+    seedDesktop('quiz', windows);
+    putRaw(recordOf({
+      plans: {
+        en: { narrative: 'EN plan.', actions: [] },
+        zh: 'junk',
+        bad: { actions: [] }
+      }
+    }));
+    var junkRestored = Store.restore(bank);
+    var junkBegin = restoreLog.filter(function(r) { return r[0] === 'begin'; });
+    check('a malformed entry is dropped and the trusted one handed over',
+      junkRestored === true && junkBegin.length === 1 &&
+      junkBegin[0][1].en.narrative === 'EN plan.' &&
+      Object.keys(junkBegin[0][1]).length === 1,
+      JSON.stringify(junkBegin[0] && junkBegin[0][1]));
+
+    resetScenario();
+    seedDesktop('quiz', windows);
+    putRaw(recordOf({ plans: 'garbage' }));
+    var garbageRestored = Store.restore(bank);
+    var garbageBegin = restoreLog.filter(function(r) { return r[0] === 'begin'; });
+    check('a malformed plan cache is the empty cache, not an invalid desktop',
+      garbageRestored === true && garbageBegin.length === 1 &&
+      JSON.stringify(garbageBegin[0][1]) === '{}',
+      JSON.stringify({ ok: garbageRestored, b: garbageBegin[0] && garbageBegin[0][1] }));
 
     /* ── Retake drops the Record with the Session ──────────────────────── */
 

@@ -14,23 +14,33 @@
    * Participant's: a second page (or a swap to another language's URL within
    * the tab) restores the same desktop, a new tab starts clean.
    *
-   * One write, one event. The Record is written ONLY at the Finish Commit
-   * (js/quiz.js, the single Completion path) — never on load, never for an
-   * uncommitted Session. It captures the structural bank hash, the answers,
-   * the language, and each program window's mode/geometry/lastGeometry/z
-   * plus the active program, exactly the state the desktop core's snapshot()
-   * holds at that moment.
+   * One write, one event — plus the plan cache. The Record is written at the
+   * Finish Commit (js/quiz.js, the single Completion path) — never on load,
+   * never for an uncommitted Session. It captures the structural bank hash,
+   * the answers, the language, each program window's mode/geometry/
+   * lastGeometry/z plus the active program — exactly the state the desktop
+   * core's snapshot() holds at that moment — and an empty Action Plan cache.
+   * savePlan() is the one later touch: it merges a settled plan into the
+   * EXISTING Record and quietly refuses when there is none.
    *
    * On load, js/main.js asks restore(bank): a Record whose hash matches the
    * current bank and whose answers are complete restores the desktop before
    * first paint — the report is recomputed from the stored answers through
    * App.Scoring under the page's Bank Variant, and the results view renders
    * directly (the landing never flashes). restore() re-renders; it fires no
-   * quiz_completed event and starts NO Action Plan request: on a restored
-   * render the plan assembles on the Deterministic Fallback locally (no
-   * fetch, no Analytics) through the results.js hold seam, and the persisted
-   * plan content itself belongs to a later ticket — the hold around
-   * renderResults inside restore() is the documented hook to replace.
+   * quiz_completed event and starts no Action Plan request of its own.
+   *
+   * Ticket #64: the Record also carries the Completion's assembled Action
+   * Plan cache, `plans` — one settled payload per language ({narrative,
+   * actions}), so it is keyed per (report, language) by the Record itself.
+   * captureAtCommit starts it empty — a fresh desktop owns no cached plan;
+   * a plan that settles later is merged in by savePlan, which no-ops when
+   * the Record is gone (a Retake or a quit cleared it: a payload must never
+   * resurrect a dead desktop). restore() brackets its single render with
+   * app.beginPlanRestore(plans) / app.finishPlanRestore(): a cached payload
+   * for the restored language re-renders with NO request at all, and a miss
+   * queues exactly one request, fired by finishPlanRestore when the restore
+   * has completed. The #63 hold seam is gone.
    *
    * Invalidation: a stale hash, incomplete answers, or an unparsable payload
    * is discarded quietly — no notice, no throw; the page boots exactly as
@@ -118,6 +128,69 @@
     }
   }
 
+  /* ── Action Plan cache (ticket #64) ─────────────────────────────── */
+
+  /** A cacheable payload is exactly what the presenter renders: the
+   *  Narrative string plus the Actions array of plain objects. Anything
+   *  else is dropped quietly — a junk entry never paints a window. */
+  function validPlanPayload(entry) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+    if (typeof entry.narrative !== 'string') return null;
+    if (!Array.isArray(entry.actions)) return null;
+    for (var i = 0; i < entry.actions.length; i++) {
+      var a = entry.actions[i];
+      if (!a || typeof a !== 'object' || Array.isArray(a)) return null;
+    }
+    return entry;
+  }
+
+  /** The Record's language → payload map, shape-checked one entry at a
+   *  time. An unusable Record, a missing or malformed map, or a bad
+   *  language key yields the empty map, never a throw — the cache is an
+   *  optimization, and the desktop must not hinge on it. */
+  function plansOf(record) {
+    var out = {};
+    var plans = record && record.plans;
+    if (!plans || typeof plans !== 'object' || Array.isArray(plans)) return out;
+    var langs = Object.keys(plans);
+    for (var i = 0; i < langs.length; i++) {
+      var lang = langs[i];
+      if (lang === '__proto__' || lang === 'constructor' || lang === 'prototype') continue;
+      var payload = validPlanPayload(plans[lang]);
+      if (payload) out[lang] = { narrative: payload.narrative, actions: payload.actions };
+    }
+    return out;
+  }
+
+  /** Merge one settled Action Plan into the Record under its language
+   *  (ticket #64). With no Record at all — Retake or a quit already cleared
+   *  it (#66) — this is a quiet no-op: the cache never resurrects a
+   *  discarded desktop. */
+  function savePlan(lang, plan) {
+    try {
+      if (typeof lang !== 'string' || !lang ||
+          lang === '__proto__' || lang === 'constructor' || lang === 'prototype') {
+        return false;
+      }
+      var payload = validPlanPayload(plan);
+      if (!payload) return false;
+      var record = load();
+      if (!record) return false;
+      if (!record.plans || typeof record.plans !== 'object' || Array.isArray(record.plans)) {
+        record.plans = {};
+      }
+      record.plans[lang] = { narrative: payload.narrative, actions: payload.actions };
+      return save(record);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /** The live Record's trusted language → payload map, or the empty map. */
+  function cachedPlans() {
+    return plansOf(load());
+  }
+
   /* ── Validation against the bank ────────────────────────────────────── */
 
   /**
@@ -178,7 +251,10 @@
       active: snap ? snap.active : null,
       zCounter: snap ? snap.zCounter : 0,
       view: RESTORED_VIEW,
-      windows: snap ? snap.windows : {}
+      windows: snap ? snap.windows : {},
+      // #64: a fresh Completion owns no cached plan yet; plans fill in
+      // through savePlan as each language's generation settles.
+      plans: {}
     });
   }
 
@@ -191,8 +267,9 @@
    * the window Records are written back into the running Windows controller
    * before any render, the report is recomputed through App.Scoring, and
    * renderResults() draws the desktop directly. quiz_completed is NOT
-   * tracked and Action Plan generation runs on the Deterministic Fallback
-   * for exactly this one render (the later-ticket hook, see the header).
+   * tracked; the Action Plan comes from the Record's plan cache when the
+   * restored language has one, and otherwise the restore fires exactly one
+   * request when it completes (ticket #64, see the header).
    *
    * On any invalid Record, missing bank match, or runtime hole, the Record
    * is discarded quietly and false is returned — never a throw, never a
@@ -263,21 +340,23 @@
         return false;
       }
 
-      // The restore render issues NO Action Plan request (the persisted
-      // plan content belongs to a later ticket): the hold scopes the
-      // Deterministic-Fallback-only assembly to this one renderResults
-      // call and is released right after, whatever it decides.
-      if (typeof app.holdActionPlanRequest === 'function') {
-        app.holdActionPlanRequest(true);
-        try {
-          if (typeof app.renderResults === 'function') {
-            app.renderResults(bank, result.report);
-          }
-        } finally {
-          app.holdActionPlanRequest(false);
+      // Ticket #64: the restore render consumes the Record's plan cache.
+      // The bracket hands the trusted language → payload map to the
+      // presenter for exactly this one renderResults call and closes it
+      // right after, whatever the render decided: a cached payload for the
+      // restored language re-renders with no request at all, and a miss
+      // queues the restore's single Action Plan request, which
+      // finishPlanRestore() fires now that the restore has completed.
+      var plans = plansOf(rec);
+      var bracket = typeof app.beginPlanRestore === 'function' &&
+                    typeof app.finishPlanRestore === 'function';
+      if (bracket) app.beginPlanRestore(plans);
+      try {
+        if (typeof app.renderResults === 'function') {
+          app.renderResults(bank, result.report);
         }
-      } else if (typeof app.renderResults === 'function') {
-        app.renderResults(bank, result.report);
+      } finally {
+        if (bracket) app.finishPlanRestore();
       }
 
       return true;
@@ -295,7 +374,9 @@
     save: save,
     clear: clear,
     captureAtCommit: captureAtCommit,
-    restore: restore
+    restore: restore,
+    savePlan: savePlan,
+    cachedPlans: cachedPlans
   };
 
   if (typeof module !== 'undefined' && module.exports) {

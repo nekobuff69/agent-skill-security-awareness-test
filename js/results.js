@@ -428,23 +428,37 @@
      The LLM Path prompt embeds the current dictionary, so one Completion
      needs at most one Action Plan generation per locale, never one per
      render. A completed slot re-renders instantly and locally on every
-     later visit or language switch; an in-flight slot keeps the
-     localized `results.planLoading` shown until its own resolution
-     lands. Late resolutions from superseded renders are dropped by the
-     render id — a language switch can neither paint the old language's
-     Narrative into the new view nor duplicate the generation. */
+     later visit or language switch; #64 makes "every later visit" span a
+     reload too: a settled plan is mirrored into the desktop Record's
+     language → payload cache, and the restore render refills the slot from
+     it without a request. An in-flight slot keeps the localized
+     `results.planLoading` shown until its own resolution lands. Late
+     resolutions from superseded renders are dropped by the render id — a
+     language switch can neither paint the old language's Narrative into
+     the new view nor duplicate the generation. */
   var _planSlots = {};        // locale → { report, promise, narrative, actions }
   var _planRenderId = 0;      // the live Action Plan render; 0 = none
 
-  /* Ticket #63 hook — the desktop restore render. js/desktop-store.js arms
-     this for exactly one renderResults() call: a restored desktop re-renders
-     its sections, but the Action Plan request belongs to a later ticket.
-     While the hold is armed the slot assembles on the Deterministic Fallback
-     only (no proxy config → no LLM request, no fetch, no Analytics), and the
-     store releases it in a finally block, so a render that never reaches the
-     assembly can never strand it. This is the documented hook: the later
-     ticket replaces the hold with the persisted Narrative's restore path. */
-  var _planHoldNext = false;
+  /* Ticket #64 — the desktop restore bracket. js/desktop-store.js opens it
+     with the Record's trusted language → payload map (beginPlanRestore),
+     draws the restored desktop inside it, and closes it (finishPlanRestore)
+     the moment the restore has completed. Inside the bracket a cached
+     payload for the render's language seeds the slot and renders at once —
+     no request, no loading state — while a language without a payload
+     queues the restore's ONE request, fired by the close, so a reloaded
+     desktop never carries an Action Plan window stuck on loading and never
+     renders a payload cached for another language. Outside the bracket —
+     a live Finish or a language switch — the presenter behaves as before:
+     exactly one request per (report, locale), and the only regeneration
+     trigger is the switch itself. This replaces #63's hold seam. */
+  var _planRestoreCache = null;   // language → payload, or null outside a restore
+  var _planRestoreQueued = null;  // the restore render's deferred first request
+
+  /* The Completion the last Action Plan render showed: a settling request
+     caches into the Record only while its report is still the live one
+     (#64) — a late resolution of a dead Completion, outlasted by a Retake
+     or a quit, must never paint its payload into a new desktop's cache. */
+  var _planLiveReport = null;
 
   function planSlot(locale) {
     var slot = _planSlots[locale];
@@ -457,12 +471,8 @@
 
   function buildActionPlan(report, bank, scoringBank) {
     var wrap = el('div', { className: 'results-action-plan' });
-    var proxyUrl = window.APP_CONFIG && window.APP_CONFIG.proxyUrl;
     var corpus = window.Corpus;
-
-    // Loading indicator; on the fallback path assemble resolves in a
-    // microtask so this never visibly paints.
-    wrap.appendChild(el('p', { className: 'results-action-narrative results-loading', textContent: t('results.planLoading') }));
+    _planLiveReport = report;
 
     var locale = app.I18n.locale;
     var slot = planSlot(locale);
@@ -478,26 +488,82 @@
       return wrap;
     }
 
+    // #64 restore: the Record carries this language's settled plan. The
+    // cached payload seeds the slot and renders inside this very render —
+    // no request, no loading state, no flicker — and the settle is the
+    // same arrival. A payload cached for ANOTHER language is never looked
+    // at: the lookup is keyed by the locale the desktop renders in.
+    if (_planRestoreCache &&
+        Object.prototype.hasOwnProperty.call(_planRestoreCache, locale)) {
+      var cached = _planRestoreCache[locale];
+      if (cached && typeof cached.narrative === 'string' &&
+          Array.isArray(cached.actions)) {
+        slot.report = report;
+        slot.promise = null;
+        slot.narrative = cached.narrative;
+        slot.actions = cached.actions;
+        renderPlanContent(wrap, slot.narrative, slot.actions);
+        actionPlanSettled();
+        return wrap;
+      }
+    }
+
+    // #64 restore with no cached payload for this language: the desktop
+    // comes back with NO Action Plan window — the window is an arrival,
+    // and an arrival waits for content. finishPlanRestore() fires the
+    // restore's one queued request when the restore has completed; from
+    // there the LLM Path and the Deterministic Fallback follow the exact
+    // rule every other render already uses.
+    if (_planRestoreCache) {
+      _planRestoreQueued = function() {
+        _planRestoreQueued = null;
+        requestPlanRender(slot, locale, report, bank, scoringBank, corpus,
+          wrap, renderId);
+      };
+      return wrap;
+    }
+
+    requestPlanRender(slot, locale, report, bank, scoringBank, corpus,
+      wrap, renderId);
+    return wrap;
+  }
+
+  /** Issue (or reuse) this slot's single generation and paint it into the
+   *  render when it settles — the one request path for a live Finish, a
+   *  language switch and a restore's queued request alike (#64). */
+  function requestPlanRender(slot, locale, report, bank, scoringBank,
+    corpus, wrap, renderId) {
     if (slot.report !== report || !slot.promise) {
-      // A new Completion, or this locale's first request for it.
+      // A new Completion, or this locale's first request for it. The
+      // Action Plan module owns the path decision and the retry policy:
+      // the LLM Path and the Deterministic Fallback settle through one
+      // promise, cache through one rule and arrive through one gesture.
       slot.report = report;
       slot.promise = null;
       slot.narrative = null;
       slot.actions = null;
-      // The Action Plan module owns the path decision and retry policy.
-      // #63: on a desktop restore render the hold is armed, and the config
-      // that reaches assemble is null — the Deterministic Fallback, with no
-      // Action Plan request fired merely because a Record exists.
-      var held = _planHoldNext;
-      _planHoldNext = false;
-      slot.promise = App.ActionPlan.assemble(localizedReport(report, bank, scoringBank), bank, corpus, held ? null : window.APP_CONFIG);
+      slot.promise = App.ActionPlan.assemble(
+        localizedReport(report, bank, scoringBank), bank, corpus,
+        window.APP_CONFIG);
     }
+
+    // Loading indicator, owned by the in-flight request only: a render
+    // that already has settled content never builds it, and on the
+    // fallback path assemble resolves in a microtask so this never
+    // visibly paints.
+    wrap.appendChild(el('p', { className: 'results-action-narrative results-loading', textContent: t('results.planLoading') }));
 
     var mine = slot.promise;
     mine.then(function(plan) {
       if (slot.promise !== mine) return;  // a newer Completion took the slot
       slot.narrative = plan.narrative;
       slot.actions = plan.actions;
+      // #64: mirror the settled payload into the desktop Record, keyed by
+      // this request's own language — the language captured when the
+      // request was issued, not whatever dictionary is active when it
+      // lands. A Record a Retake or quit has already cleared is never
+      // rewritten (the store's savePlan no-ops without one).
+      persistPlan(locale, report, plan);
       // A newer render superseded this one (another language switch, a
       // Retake, a Bank refresh): the late resolution must not paint into
       // an evicted view.
@@ -509,7 +575,21 @@
       // arrival paths (ticket #61).
       actionPlanSettled();
     });
-    return wrap;
+  }
+
+  /** Persist one settled plan into the desktop Record under the language
+   *  that generated it — while its Completion is still the live desktop.
+   *  Guarded end to end: no desktop store, superseded report, or a store
+   *  that refuses, and the render never notices. */
+  function persistPlan(locale, report, plan) {
+    if (_planLiveReport !== report) return false;
+    var store = app.DesktopStore;
+    if (!store || typeof store.savePlan !== 'function') return false;
+    try {
+      return store.savePlan(locale, plan) === true;
+    } catch (e) {
+      return false;
+    }
   }
 
   function renderPlanContent(wrap, narrative, actions) {
@@ -1242,14 +1322,29 @@
   app.resultsMount     = resultsMount;
   app.resultsMountIds  = MOUNT_IDS;
 
-  /* Ticket #63 seam — js/desktop-store.js arms the hold for the one restore
-     render; buildActionPlan consumes it (Deterministic Fallback, no Action
-     Plan request) and the store's finally releases it. */
-  app.holdActionPlanRequest = function(on) { _planHoldNext = !!on; };
-  app.actionPlanRequestHeld = function() { return _planHoldNext; };
+  /* Ticket #64 seam — js/desktop-store.js brackets the one restore render:
+     beginPlanRestore(plans) arms the Record's language → payload map for
+     exactly the render inside the bracket, and finishPlanRestore() closes
+     it, firing the restore's ONE queued request (if the bracketed render
+     found no cached payload for the language it rendered in). Returns true
+     when a request was fired — the page never reads that; the tests do. */
+  app.beginPlanRestore = function(plans) {
+    _planRestoreQueued = null;
+    _planRestoreCache = (plans && typeof plans === 'object' &&
+      !Array.isArray(plans)) ? plans : {};
+  };
+  app.finishPlanRestore = function() {
+    _planRestoreCache = null;
+    var queued = _planRestoreQueued;
+    _planRestoreQueued = null;
+    if (queued) queued();
+    return !!queued;
+  };
 
   /* Test seam (tests/js/test-results-retro.js, fakeEl pattern): the pure
-     DOM builders plus the two palette helpers. Not used by the page. */
+     DOM builders plus the two palette helpers, and #64's Action Plan
+     builder — its request/cache behaviour is asserted through it. Not
+     used by the page. */
   app.resultsInternals = {
     scoreColor: scoreColor,
     scoreClass: scoreClass,
@@ -1263,7 +1358,8 @@
     buildMenuBar: buildMenuBar,
     buildExportSvg: buildExportSvg,
     exportMetrics: exportMetrics,
-    localizedReport: localizedReport
+    localizedReport: localizedReport,
+    buildActionPlan: buildActionPlan
   };
 
   if (typeof module !== 'undefined') module.exports = app;

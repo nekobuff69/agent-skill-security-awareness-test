@@ -434,6 +434,24 @@ exports.run = function() {
         ctl.getState('quiz').mode === quizModeBefore &&
         ctl.getState('action-plan').mode === 'normal');
 
+      // ── #64: one request per language, answered from cache ever after ──
+      // The switch above (en → zh) regenerated — that is the ONLY trigger.
+      // Back to English the plan for this Completion is already settled,
+      // so the re-render must come from cache: no third request, content
+      // painted in the same frame, windows unmoved.
+      check('the Completion cost one request and the language switch exactly one more (#64)',
+        planAssembles === 2, 'calls=' + planAssembles);
+      var planWinBeforeCache = ctl.geometry('action-plan');
+      var callsBeforeCache = planAssembles;
+      App.rerenderResults();   // the dictionary is back to en
+      await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+      check('switching back to a language with a settled plan re-renders from cache: no new request (#64)',
+        planAssembles === callsBeforeCache &&
+        textOf(planFrame.bodyEl).join(' ').indexOf(PLAN_HEAD) >= 0 &&
+        ctl.geometry('action-plan').x === planWinBeforeCache.x &&
+        ctl.getState('action-plan').mode === 'normal',
+        'calls=' + planAssembles);
+
       // ── A second Completion: the deterministic fallback settles on its
       //    own microtask and the arrival rule is the same one.
       App.SessionStore = { clear: function() {}, load: function() { return { ok: true, answers: [] }; } };
