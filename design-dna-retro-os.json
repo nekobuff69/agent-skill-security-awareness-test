@@ -107,7 +107,7 @@
       "levels": {
         "low": "--bevel-sunken: inset -1px -1px #FFFFFF, inset 1px 1px #000000, inset -2px -2px #DFDFDF, inset 2px 2px #808080 (fields, tracks, pressed buttons)",
         "medium": "--bevel-raised: inset -1px -1px #000000, inset 1px 1px #FFFFFF, inset -2px -2px #808080, inset 2px 2px #DFDFDF (buttons, window frames, dialog faces)",
-        "high": "desktop z-ladder: os-window 0 < taskbar 1000 < start menu 1100 < about/dialog 1200, over dims rgba(0,0,0,0.25)"
+        "high": "desktop z-ladder: .os-shortcuts 100 (the icon column on the desktop's BASE surface — icons are surface, not chrome) < .os-window 200 (the Window stack's rung: every Window paints WINDOW_Z_BASE + its stack number, so a Window always covers the column) < taskbar 1000 < start menu 1100 < about/dialog 1200, over dims rgba(0,0,0,0.25)"
       },
       "depth_cues": "flat layering: background never eases; pressed state flips raised → sunken; taskbar state flips program button sunken/raised"
     },
