@@ -443,6 +443,33 @@
       return true;
     }
 
+    /**
+     * resetPrograms() — the additive teardown hook (ticket #66). The
+     * destructive paths (the Start-menu quit and the Quiz menu bar's
+     * Retake) END the run, so the desktop they leave behind is the one
+     * the page was BORN with: the sole Quiz Record at its designed
+     * arrangement, no program arrivals, the active Id back on the Quiz,
+     * the z-counter rewound, and no dialog gate. Records are destroyed,
+     * never hidden — a put-away window is still a running program, and
+     * an ended run has nothing that may come back. The view is not
+     * touched: the caller shows the landing page first, and the
+     * controller re-syncs the stage from the DOM on its next render.
+     */
+    function resetPrograms() {
+      desktop.windows = {};
+      desktop.windows[soleId] = {
+        mode: MODE_NORMAL,
+        geometry: copyGeometry(start),
+        lastGeometry: copyGeometry(start),
+        lastMode: MODE_NORMAL,
+        z: 0
+      };
+      desktop.active = soleId;
+      desktop.zCounter = 0;
+      desktop.confirmOpen = false;
+      return true;
+    }
+
     // ── Geometry ───────────────────────────────────────────────────────
 
     /** The drag/resize write point. Refused while maximized (a maximized
@@ -599,6 +626,7 @@
       requestClose: requestClose,
       confirmClose: confirmClose,
       cancelClose: cancelClose,
+      resetPrograms: resetPrograms,
       applyGeometry: applyGeometry,
       setView: setView,
       setActive: setActive,

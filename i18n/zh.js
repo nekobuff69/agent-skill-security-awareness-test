@@ -95,6 +95,7 @@
     'shell.close': '关闭',
     'shell.start': '开始',
     'shell.menuAbout': '关于……',
+    'shell.menuQuit': '结束程序',
     'shell.aboutTitle': '关于智能体安全意识测评',
     'shell.aboutBody': '面向构建和运营智能体人群的安全意识测评，' +
       '情境取材于 OWASP Top 10。',
@@ -116,6 +117,8 @@
        通过 I18n.t() 解析这些 id；#44 与 #47 复用该原语时传入各自的 id。 */
     'windows.endProgramTitle': '结束程序 - 智能体安全意识测评',
     'windows.endProgramMessage': '确定要结束这个程序吗？',
+    'windows.retakeTitle': '重新开始 - 智能体安全意识测评',
+    'windows.retakeMessage': '确定要放弃这次测评、重新开始吗？所有作答都会被清除。',
     'windows.yes': '是',
     'windows.no': '否',
 

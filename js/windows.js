@@ -34,7 +34,10 @@
    *   Closing from any non-landing view opens the End Program dialog.
    *   confirmClose() returns to the landing view; the Session (localStorage
    *   `quiz-session`) is untouched — js/session-store.js owns persistence
-   *   and is never called from here, so answers always survive the gesture.
+   *   and the close gesture never calls it, so answers always survive the
+   *   gesture. The ONE exception is the destructive tail endRun() (ticket
+   *   #66): Quit and Retake clear the Session and the desktop Record on
+   *   purpose, and only after the Participant confirmed.
    *
    * Mobile rule (ticket #46): at viewport widths ≤ 768px the stylesheet
    * (css/shell.css media block) presents the window maximized by DEFAULT —
@@ -195,6 +198,7 @@
       windowSnapshot: core.windowSnapshot,
       snapshot: core.snapshot,
       loadSnapshot: core.loadSnapshot,
+      resetPrograms: core.resetPrograms,
       /** Put every program window except the Quiz away when the desktop
        *  goes off stage: flow views have no desktop to draw them on. */
       hidePrograms: function(exceptId) {
@@ -698,6 +702,22 @@
     }
 
     /**
+     * Tear the whole desktop down (ticket #66): the destructive paths —
+     * the Start-menu quit and the Quiz menu bar's Retake — end the run,
+     * so every program Record goes with it. The core rewinds to the born
+     * desktop (the Quiz Record alone); render paints the absence — the
+     * program frames go unpositioned and out of the taskbar, exactly as
+     * they were before the Finish Commit ever arrived. This is NOT hide():
+     * a put-away window is still a running program a shortcut can bring
+     * back, and an ended run must leave nothing to bring back.
+     */
+    function resetPrograms() {
+      if (!machine.resetPrograms()) return false;
+      render();
+      return true;
+    }
+
+    /**
      * The Quiz window's [×] decision, in ONE place (ticket #60): 'hidden'
      * when the windowed stage put the window away, 'dialog' when a flow
      * stage asked for the End Program confirmation, false when the gesture
@@ -1042,6 +1062,7 @@
       requestClose: requestClose,
       confirmClose: confirmClose,
       cancelClose: cancelClose,
+      resetPrograms: resetPrograms,
       hide: hide,
       close: close,
       closeProgram: closeProgram,
@@ -1155,6 +1176,45 @@
   }
 
   // ── System dialog primitive ──────────────────────────────────────────
+
+  /**
+   * End the run — the ONE destructive tail ticket #66 added: the Start-menu
+   * Quit and the Quiz menu bar's Retake both answer to it after their
+   * confirmation. It is the declared opposite of the window [×] above: the
+   * [×]/End Program flow NEVER touches persistence (js/session-store.js
+   * owns the answers, and story #37 keeps a mid-quiz close free of cost),
+   * while endRun() discards the run on purpose — the Session, the per-tab
+   * desktop Record (cached plan included: the Record goes whole), and the
+   * desktop itself, every program Record torn down so nothing remains to
+   * restore. The landing page is shown FIRST: the controller re-syncs the
+   * stage from the DOM on render, so the landing rules must already be on
+   * screen when the desktop comes apart. Every step is guarded — a page
+   * without one of the modules simply skips it, and nothing throws.
+   *
+   * Returns what went away, so a caller (or a test) can observe each part
+   * of the tail without reading the stores.
+   */
+  function endRun() {
+    var gone = { session: false, record: false, desktop: false, landing: false };
+    if (app.SessionStore && typeof app.SessionStore.clear === 'function') {
+      app.SessionStore.clear();
+      gone.session = true;
+    }
+    if (app.DesktopStore && typeof app.DesktopStore.clear === 'function') {
+      app.DesktopStore.clear();
+      gone.record = true;
+    }
+    if (typeof app.showView === 'function') {
+      app.showView(VIEW_LANDING);
+      gone.landing = true;
+    }
+    var ctl = app.Windows ? app.Windows.controller : null;
+    if (ctl && typeof ctl.resetPrograms === 'function') {
+      ctl.resetPrograms();
+      gone.desktop = true;
+    }
+    return gone;
+  }
 
   /** One system dialog at a time (a modal owns the desktop). */
   var activeDialog = null;
@@ -1311,6 +1371,7 @@
   app.Windows = {
     create: create,
     createMachine: createMachine,
+    endRun: endRun,
     openSystemDialog: openSystemDialog,
     isDialogOpen: function() { return activeDialog !== null; },
     VIEW_LANDING: VIEW_LANDING,

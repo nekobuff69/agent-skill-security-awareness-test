@@ -295,6 +295,16 @@
     aboutItem.setAttribute('role', 'menuitem');
     menu.appendChild(aboutItem);
 
+    // The destructive exit (ticket #66): Quit sits under About — the era
+    // kept the shutdown command at the bottom of the Start menu — and
+    // opens the SAME End Program confirmation the Quiz window's [×] uses.
+    // Nothing is destroyed until the Participant answers Yes.
+    var quitItem = createEl(doc, 'button', 'os-start-menu-item', strings['shell.menuQuit']);
+    quitItem.type = 'button';
+    quitItem.setAttribute('role', 'menuitem');
+    quitItem.setAttribute('data-os-menu', 'quit');
+    menu.appendChild(quitItem);
+
     // ── Tray language toggle (tickets #50, #55) ──────────────────────────
     // Two segments name both languages: the active language renders
     // pressed (aria-pressed=true), the other flat. Both segments run one
@@ -475,6 +485,7 @@
       taskbar: taskbar,
       startBtn: startBtn,
       menu: menu,
+      quitItem: quitItem,
       programBtn: programBtn,
       programLabel: programLabel,
       programsBar: programsBar,
@@ -510,6 +521,7 @@
         programLabel.textContent = I18n.t('shell.windowTitle');
         startLabel.textContent = I18n.t('shell.start');
         aboutItem.textContent = I18n.t('shell.menuAbout');
+        quitItem.textContent = I18n.t('shell.menuQuit');
         aboutTitle.textContent = I18n.t('shell.aboutTitle');
         aboutApp.textContent = I18n.t('shell.windowTitle');
         aboutDesc.textContent = I18n.t('shell.aboutBody');
@@ -651,6 +663,10 @@
       controller.closeMenu(false);
       controller.openAbout();
     });
+    on(quitItem, 'click', function() {
+      controller.closeMenu(false);
+      if (typeof deps.onQuit === 'function') deps.onQuit(quitItem);
+    });
     on(okBtn, 'click', function() { controller.closeAbout(); });
 
     // Desktop shortcut launch (ticket #62): the era's icon gestures —
@@ -776,7 +792,7 @@
 
   var STRING_IDS = [
     'shell.windowTitle', 'shell.minimize', 'shell.maximize', 'shell.close',
-    'shell.start', 'shell.menuAbout',
+    'shell.start', 'shell.menuAbout', 'shell.menuQuit',
     'shell.aboutTitle', 'shell.aboutBody', 'shell.aboutLink',
     'shell.aboutCredits', 'shell.ok',
     // The three-program desktop (ticket #61).
@@ -811,6 +827,31 @@
       onCancel: function() {
         win.cancelClose();
       }
+    });
+  }
+
+  /**
+   * The Start-menu Quit (ticket #66): the destructive exit. It opens the
+   * SAME End Program confirmation the window [×] uses, but it answers to
+   * App.Windows.endRun() — the Session, the per-tab desktop Record (the
+   * cached plan rides along: the Record goes whole) and the whole desktop
+   * go, and the landing page returns with nothing left to restore. No /
+   * Escape changes NOTHING: windows, report, Session and Record stay
+   * exactly as they were (the dialog primitive closes itself; endRun only
+   * ever runs from the Yes branch). Unlike openEndProgram there is no
+   * requestClose behind it: Quit is offered on every view, including the
+   * landing page the core would refuse to close from.
+   */
+  function openQuit(opener) {
+    if (!app.Windows || !app.Windows.openSystemDialog ||
+        typeof app.Windows.endRun !== 'function') return null;
+    return app.Windows.openSystemDialog({
+      icon: 'warn',
+      titleId: 'windows.endProgramTitle',
+      messageId: 'windows.endProgramMessage',
+      dangerous: true,
+      opener: opener,
+      onOk: function() { app.Windows.endRun(); }
     });
   }
 
@@ -914,6 +955,10 @@
           openEndProgram(win, controller.titleButtons.close);
         }
       } : null,
+      // The Start-menu Quit (ticket #66): the destructive exit. The item
+      // closes the menu, then asks the End Program confirmation; Yes ends
+      // the run through App.Windows.endRun().
+      onQuit: function(opener) { return openQuit(opener); },
       // The Action Plan and the Deep-Dive Prompt frames (ticket #61): the
       // same three controls, bound to that program's Id. Their [×] is
       // always the core's hide() — these windows never own the Session, so
@@ -1009,6 +1054,7 @@
   shell.attachSoundEntry = attachSoundEntry;
   shell.withSoundModule = withSoundModule;
   shell.openEndProgram = openEndProgram;
+  shell.openQuit = openQuit;
   shell.toggleMenu = toggleMenu;
   shell.closeMenu = closeMenu;
   shell.closeAbout = closeAbout;

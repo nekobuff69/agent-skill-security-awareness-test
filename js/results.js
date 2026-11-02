@@ -877,7 +877,7 @@
     return btn;
   }
 
-  /* ── Retake Button ── */
+  /* ── Retake Button (ticket #66: a confirmed destructive path) ── */
   function buildRetake() {
     var btn = el('button', {
       className: 'results-retake-btn results-menu-item',
@@ -885,16 +885,65 @@
       role: 'menuitem'
     });
     btn.addEventListener('click', function() {
-      App.SessionStore.clear();
-      // Ticket #63: the desktop Record describes the run this Retake ends —
-      // a reload after it must land on the fresh run, not on the old
-      // desktop. Guarded so a page without js/desktop-store.js is unchanged.
-      if (app.DesktopStore && typeof app.DesktopStore.clear === 'function') {
-        app.DesktopStore.clear();
+      // Ticket #66: Retake ends the run, so it asks first. The
+      // confirmation is a shell system dialog — the tier that owns
+      // Escape before About, the Start menu and the windows — and it
+      // opens wherever the page carries a surface to ask on. Yes runs
+      // the tail below; No / Escape changes nothing at all. A page with
+      // no dialog surface (a presenter rendered without the OS chrome)
+      // has nothing to ask through: there the click itself is the whole
+      // gesture and the run ends directly, exactly as before #66. While
+      // another system dialog owns the page the ask fails closed — no
+      // gesture is confirmed twice, and nothing is destroyed.
+      if (canAsk()) {
+        app.Windows.openSystemDialog({
+          icon: 'warn',
+          titleId: 'windows.retakeTitle',
+          messageId: 'windows.retakeMessage',
+          dangerous: true,
+          opener: btn,
+          onOk: endTheRun
+        });
+        return;
       }
-      App.showView('landing-view');
+      endTheRun();
     });
     return btn;
+  }
+
+  /** Can this page host the Retake confirmation? The dialog primitive
+   *  needs a document with a body, a dictionary to resolve through and
+   *  the Windows module to build on — without all three there is no
+   *  system dialog tier, and no confirmation can be asked. */
+  function canAsk() {
+    if (!app.Windows || typeof app.Windows.openSystemDialog !== 'function') return false;
+    if (!app.I18n) return false;
+    var doc = typeof document !== 'undefined' ? document : null;
+    return !!(doc && doc.body && typeof doc.createElement === 'function');
+  }
+
+  /**
+   * The Retake tail — the destructive path, behind the confirmation.
+   * App.Windows.endRun() is the ONE implementation (ticket #66): Session
+   * cleared, per-tab desktop Record cleared whole (the cached plan of
+   * ticket #63 rides along — a reload after this finds nothing to
+   * restore), the desktop taken down (every program Record destroyed, not
+   * put away), landing shown. Without the Windows module the guarded
+   * fallback keeps the pre-#66 behavior for the stores it can reach.
+   */
+  function endTheRun() {
+    if (app.Windows && typeof app.Windows.endRun === 'function') {
+      app.Windows.endRun();
+      return;
+    }
+    App.SessionStore.clear();
+    // Ticket #63: the desktop Record describes the run this Retake ends —
+    // a reload after it must land on the fresh run, not on the old
+    // desktop. Guarded so a page without js/desktop-store.js is unchanged.
+    if (app.DesktopStore && typeof app.DesktopStore.clear === 'function') {
+      app.DesktopStore.clear();
+    }
+    App.showView('landing-view');
   }
 
   /* ══════════════════════════════════════════

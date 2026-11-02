@@ -479,6 +479,18 @@ exports.run = function() {
       };
       var finalCommands = byRole([views['results-view']], 'menuitem');
       finalCommands[finalCommands.length - 1].click();
+      // Ticket #66: Retake is a destructive path — it asks first. The
+      // confirmation is a system dialog on the page, and only its Yes
+      // releases the tail; the click alone must have destroyed nothing.
+      var retakeAsk = byRole([body], 'dialog')[0];
+      var retakeYes = retakeAsk ? buttonsUnder(retakeAsk).filter(function(b) {
+        return b.textContent === App.I18n.t('windows.yes');
+      })[0] : null;
+      check('Retake asks for confirmation before it ends the run',
+        !!retakeYes && retakeClears === 0 &&
+        views['landing-view'].hidden === true,
+        'clears=' + retakeClears + ' ask=' + !!retakeAsk);
+      retakeYes.click();
       check('Retake still clears the Session and hands the page back to the opening view',
         retakeClears === 1 &&
         views['landing-view'].hidden === false &&
