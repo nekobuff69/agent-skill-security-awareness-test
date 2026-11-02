@@ -52,7 +52,7 @@ For every object in `questions[]`:
 | Score distribution | At least one option has `score == 3`. If `test.canonical_answer_index` is `null`, no option has score 3 (highest is 2); otherwise exactly one option has score 3 |
 | ast_risks values | Every element matches `AST0[1-9]` or `AST10` |
 | severity_weight | One of `"critical"`, `"high"`, `"medium"` |
-| ast_source_url format | Starts with `https://owasp.org/www-project-agentic-skills-top-10/ast` and ends with `.html` |
+| ast_source_url format | Starts with `https://owasp.github.io/www-project-agentic-skills-top-10/ast` and ends with `.html` |
 | best_practice | Non-empty string, ≥ 20 characters |
 | scenario | Non-empty string |
 | question | Non-empty string |
@@ -291,7 +291,7 @@ Any tool name not in the allowlist → FAIL. Use case-insensitive matching.
 Extract all URLs from the output (regex: `https?://[^\s\)"'>]+`). Each must satisfy at least one:
 
 - Matches an `ast_source_url` from `questions.json`
-- Domain is in: `owasp.org`, `github.com`
+- Domain is in: `owasp.org`, `owasp.github.io`, `github.com`
 - Is a fragment/anchor of a valid OWASP URL
 
 Any URL not meeting these criteria → FAIL.

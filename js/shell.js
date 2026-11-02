@@ -425,7 +425,7 @@
     var aboutDesc = createEl(doc, 'p', 'os-about-desc', strings['shell.aboutBody']);
     aboutBody.appendChild(aboutDesc);
     var aboutLink = createEl(doc, 'a', 'os-about-link', strings['shell.aboutLink']);
-    aboutLink.href = 'https://owasp.org/projects/agentic-skills-top-10';
+    aboutLink.href = 'https://owasp.github.io/www-project-agentic-skills-top-10/top10';
     aboutLink.setAttribute('target', '_blank');
     aboutLink.setAttribute('rel', 'noopener noreferrer');
     aboutBody.appendChild(aboutLink);

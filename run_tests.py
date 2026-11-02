@@ -347,7 +347,7 @@ def validate_schema(bank, label):
         url = q.get("ast_source_url", "")
         results.append((
             f"Q {qid}: ast_source_url format",
-            url.startswith("https://owasp.org/www-project-agentic-skills-top-10/ast")
+            url.startswith("https://owasp.github.io/www-project-agentic-skills-top-10/ast")
             and url.endswith(".html"),
         ))
 
@@ -675,7 +675,7 @@ def validate_llm_grounding(bank, llm_output, label, grounding_text):
         url_clean = url.rstrip(".,;:)")
         if url_clean in ast_urls:
             continue
-        if "owasp.org" in url_clean or "github.com" in url_clean:
+        if "owasp.org" in url_clean or "owasp.github.io" in url_clean or "github.com" in url_clean:
             continue
         valid_urls = False
     results.append((

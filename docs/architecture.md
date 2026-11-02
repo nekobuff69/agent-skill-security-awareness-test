@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-A no-build web app delivering a self-assessment quiz on AI agent skill security, grounded in the [OWASP Agentic Skills Top 10](https://owasp.org/www-project-agentic-skills-top-10/top10). Two-pass UX: answer all questions → see your profile → review with explanations. One codebase serves both shipped languages — an English page and a Simplified Chinese page — each declaring its own Question Bank and its own locale dictionary at the page level (ADR 0015). The taskbar's **Language Toggle** moves a Participant between the two without a page load: it swaps the Chrome String dictionary and the Bank Variant in place and re-renders the live view (ADR 0019).
+A no-build web app delivering a self-assessment quiz on AI agent skill security, grounded in the [OWASP Agentic Skills Top 10](https://owasp.github.io/www-project-agentic-skills-top-10/top10). Two-pass UX: answer all questions → see your profile → review with explanations. One codebase serves both shipped languages — an English page and a Simplified Chinese page — each declaring its own Question Bank and its own locale dictionary at the page level (ADR 0015). The taskbar's **Language Toggle** moves a Participant between the two without a page load: it swaps the Chrome String dictionary and the Bank Variant in place and re-renders the live view (ADR 0019).
 
 **Design philosophy:** Self-assessment, not knowledge test. Every option reflects a real behavioral choice. Scoring reveals blind spots, not trivia gaps. There are no letter grades — results render as a shareable risk radar and a progression title ("Sentinel", "Newcomer", …), because a mirror shows where you haven't looked yet, not what you failed.
 
