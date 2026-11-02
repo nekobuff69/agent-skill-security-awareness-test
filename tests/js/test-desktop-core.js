@@ -68,8 +68,11 @@ exports.run = function() {
   check('landing: minimize stays live and restores to normal',
     c.canMinimize() === true && c.minimize() === true &&
     c.snapshot().windows.quiz.mode === 'minimized' &&
-    c.isVisible() === false && c.inTaskbar() === true &&
-    c.restore() === true && c.snapshot().windows.quiz.mode === 'normal');
+    // #75: the Put Away Quiz was the active Window, and nothing else is
+    // visible — the desktop has NO active Window, so an unaddressed query
+    // now addresses nothing and the window below is named.
+    c.isVisible('quiz') === false && c.inTaskbar('quiz') === true &&
+    c.restore('quiz') === true && c.snapshot().windows.quiz.mode === 'normal');
   check('restore is refused when the window is not minimized or hidden',
     c.restore() === false && c.snapshot().windows.quiz.mode === 'normal');
   check('setView ignores an empty or non-string view id',
@@ -104,17 +107,22 @@ exports.run = function() {
     m.applyGeometry({ x: 5, y: 5, w: 5, h: 5 }) === false &&
     geoEqual(m.windowSnapshot().geometry, moved));
   check('minimizing a maximized window keeps its arrangement',
-    m.minimize() === true && m.windowSnapshot().lastMode === 'maximized' &&
-    geoEqual(m.windowSnapshot().lastGeometry, moved) &&
-    m.isVisible() === false && m.inTaskbar() === true);
+    m.minimize() === true && m.windowSnapshot('quiz').lastMode === 'maximized' &&
+    geoEqual(m.windowSnapshot('quiz').lastGeometry, moved) &&
+    // #75: the minimized window was active, so activation has nowhere to
+    // go — no active Window, and the Put Away window is named below.
+    m.activeId() === null &&
+    m.isVisible('quiz') === false && m.inTaskbar('quiz') === true);
   check('maximize is refused from minimized',
-    m.canMaximize() === true && m.toggleMaximize() === false &&
+    m.canMaximize('quiz') === true && m.toggleMaximize('quiz') === false &&
     m.snapshot().windows.quiz.mode === 'minimized');
   check('minimize is refused from minimized',
-    m.canMinimize() === false && m.minimize() === false);
+    m.canMinimize('quiz') === false && m.minimize('quiz') === false);
   check('restore returns to the pre-minimize mode and geometry together',
-    m.restore() === true && m.snapshot().windows.quiz.mode === 'maximized' &&
-    geoEqual(m.windowSnapshot().geometry, moved));
+    m.restore('quiz') === true && m.snapshot().windows.quiz.mode === 'maximized' &&
+    geoEqual(m.windowSnapshot('quiz').geometry, moved));
+  check('a restore retakes activation when the desktop had no active Window',
+    m.activeId() === 'quiz' && m.canFocus('quiz') === true);
   check('un-maximizing lands back on normal',
     m.toggleMaximize() === true && m.snapshot().windows.quiz.mode === 'normal');
 
@@ -173,13 +181,13 @@ exports.run = function() {
     h.restore() === true && h.snapshot().windows.quiz.mode === 'normal' &&
     geoEqual(h.windowSnapshot().geometry, arrangement) &&
     h.isVisible() === true && h.inTaskbar() === true && h.canFocus() === true);
-  h.minimize();
+  h.minimize('quiz');
   check('hiding a minimized window still restores the pre-minimize mode',
-    h.hide() === true && h.windowSnapshot().lastMode === 'normal' &&
-    h.isVisible() === false && h.inTaskbar() === false);
+    h.hide('quiz') === true && h.windowSnapshot('quiz').lastMode === 'normal' &&
+    h.isVisible('quiz') === false && h.inTaskbar('quiz') === false);
   check('one restore brings it all the way back',
-    h.restore() === true && h.snapshot().windows.quiz.mode === 'normal' &&
-    h.isVisible() === true);
+    h.restore('quiz') === true && h.snapshot().windows.quiz.mode === 'normal' &&
+    h.isVisible('quiz') === true);
 
   /* ── Stacking and activation ────────────────────────────────────────── */
 
@@ -194,8 +202,9 @@ exports.run = function() {
     z.raise() === true && z.raise() === true &&
     z.windowSnapshot().z === 3 && z.snapshot().zCounter === 3);
   check('raise is refused from minimized',
-    z.minimize() === true && z.raise() === false && z.snapshot().zCounter === 3);
-  z.restore();
+    z.minimize() === true && z.raise('quiz') === false &&
+    z.snapshot().zCounter === 3 && z.activeId() === null);
+  z.restore('quiz');
   check('setActive addresses a record that exists; an unknown one is refused',
     z.setActive('quiz') === true && z.setActive('plan') === false &&
     z.activeId() === 'quiz');
@@ -288,16 +297,21 @@ exports.run = function() {
   check('a minimized window can be minimized no further',
     d2.minimize('quiz') === true && d2.minimize('quiz') === false);
 
-  /* Per-window transitions: one window's move is never another's. */
+  /* Per-window transitions: one window's move is never another's. The
+     #75 hand-off travels with the ACTIVE window's move only — minimizing
+     a background window leaves every other Record, and the activation,
+     exactly where they were. */
   var e = planCore();
   e.open('action-plan', {});
   e.open('deep-dive', { minimized: true });
   var quizBefore = e.windowSnapshot('quiz');
+  var activeBefore = e.activeId();
   e.minimize('action-plan');
   e.toggleMaximize('deep-dive');       // refused: maximized from minimized
-  check('minimizing one program leaves the others alone',
+  check('minimizing a background window leaves the others alone',
     e.windowSnapshot('action-plan').mode === 'minimized' &&
     e.windowSnapshot('deep-dive').mode === 'minimized' &&
+    e.activeId() === activeBefore &&
     JSON.stringify(e.windowSnapshot('quiz')) === JSON.stringify(quizBefore));
   check('geometry writes address one window only',
     e.applyGeometry({ x: 10, y: 10, w: 400, h: 400 }, 'quiz') === true &&
@@ -345,6 +359,43 @@ exports.run = function() {
   check('an active window that is not on top still owns the focus',
     g2.canFocus('quiz') === true && g2.canFocus('action-plan') === false);
 
+  /* ── Ticket #75: the minimize hand-off of activation ─────────────────── */
+
+  var k75 = planCore();
+  k75.open('action-plan', {});          // arrives on top of the Quiz
+  k75.raise('action-plan');             // and becomes the window being read
+  check('minimizing the ACTIVE window hands activation to the topmost visible one',
+    k75.minimize('action-plan') === true &&
+    k75.activeId() === 'quiz' && k75.canFocus('quiz') === true &&
+    k75.canFocus('action-plan') === false &&
+    k75.isVisible('action-plan') === false &&
+    k75.inTaskbar('action-plan') === true);
+  check('the hand-off never disturbs the arrangement it hands to',
+    k75.windowSnapshot('quiz').z === 0 && k75.snapshot().zCounter === 2);
+
+  var n75 = planCore();
+  n75.open('action-plan', {});
+  n75.open('deep-dive', { minimized: true });   // born in the taskbar only
+  n75.minimize('action-plan');                  // the Quiz is still active
+  check('minimizing the active window skips the Put Away ones',
+    n75.minimize('quiz') === true &&
+    n75.activeId() === null &&
+    n75.isVisible('quiz') === false && n75.isVisible('action-plan') === false &&
+    n75.isVisible('deep-dive') === false);
+  check('with no active Window nothing participates in focus',
+    n75.canFocus('quiz') === false && n75.canFocus('action-plan') === false &&
+    n75.canFocus('deep-dive') === false &&
+    n75.taskbarList().join(',') === 'quiz,action-plan,deep-dive');
+  check('the desktop with no active Window round-trips a snapshot',
+    (function() {
+      var snap = n75.snapshot();
+      var other = planCore();
+      return other.loadSnapshot(snap) === true && other.activeId() === null;
+    })());
+  check('a restore onto an all-Put-Away desktop takes activation back',
+    n75.restore('deep-dive') === true &&
+    n75.activeId() === 'deep-dive' && n75.canFocus('deep-dive') === true);
+
   /* ── js/windows.js keeps no parallel copy of the state ─────────────── */
 
   var Windows = require('../../js/windows.js');
@@ -359,18 +410,22 @@ exports.run = function() {
   wm.setView('quiz-view');
   wm.applyGeometry({ x: 70, y: 60, w: 500, h: 400 });
   wm.toggleMaximize();
+  // #75: the minimize hand-off leaves this single-window desktop with no
+  // active Window, so the transitions below name the Quiz Record — exactly
+  // how the controller addresses every frame.
   wm.minimize();
   check('a machine transition is a core transition (one state model)',
     wm.snapshot().windows.quiz.mode === 'minimized' &&
     wm.snapshot().windows.quiz.lastMode === 'maximized' &&
-    wm.getState().mode === 'minimized' && wm.isVisible() === false);
-  wm.restore();
+    wm.getState().mode === 'minimized' && wm.isVisible('quiz') === false &&
+    wm.activeId() === null);
+  wm.restore('quiz');
   check('machine restore reads back the core record — mode and geometry',
     wm.getState().mode === 'maximized' &&
     wm.snapshot().windows.quiz.geometry.x === 70 &&
     geoEqual(wm.snapshot().windows.quiz.geometry,
       wm.snapshot().windows.quiz.lastGeometry));
-  wm.toggleMaximize();
+  wm.toggleMaximize('quiz');
   wm.requestClose();
   check('the End Program gate reaches the machine through the core',
     wm.getState().confirmOpen === true && wm.canMinimize() === false &&

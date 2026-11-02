@@ -86,10 +86,13 @@ exports.run = function() {
   check('landing: toggleMaximize is refused',
     m.toggleMaximize() === false && m.getState().mode === 'normal');
   check('landing: minimize works and restore returns to normal',
-    m.minimize() === true && m.getState().mode === 'minimized' &&
-    m.restore() === true && m.getState().mode === 'normal');
+    // #75: putting the only Window away leaves no active Window, so the
+    // transition names the Quiz Record exactly as the controller does.
+    m.minimize('quiz') === true && m.getState().mode === 'minimized' &&
+    m.activeId() === null &&
+    m.restore('quiz') === true && m.getState().mode === 'normal');
   check('restore is refused when not minimized',
-    m.restore() === false && m.getState().mode === 'normal');
+    m.restore('quiz') === false && m.getState().mode === 'normal');
 
   // ── Quiz/results/review: all three controls live ──────────────────────
 
@@ -111,10 +114,10 @@ exports.run = function() {
   // ── Minimize/restore keeps the maximized mode ─────────────────────────
 
   mx.toggleMaximize();                       // maximized
-  check('minimize from maximized', mx.minimize() === true &&
-    mx.getState().mode === 'minimized');
+  check('minimize from maximized', mx.minimize('quiz') === true &&
+    mx.getState().mode === 'minimized' && mx.activeId() === null);
   check('restore from maximized-minimized returns to maximized (Win95 rule)',
-    mx.restore() === true && mx.getState().mode === 'maximized');
+    mx.restore('quiz') === true && mx.getState().mode === 'maximized');
 
   // ── requestClose / confirmClose / cancelClose ─────────────────────────
 
@@ -796,6 +799,109 @@ exports.run = function() {
     Object.keys(pctl.snapshot().windows).length === recordsBefore);
   while (ppending.length) ppending.shift()();
 
+  // ── Ticket #75: the activation hand-off and the layering floor ────────
+  // Minimize hands activation to the topmost Window still visible; with
+  // none left there is NO active Window and focus returns to the Program
+  // Switch. The consequences are the painted ones — the navy/grey title
+  // bar, the keyboard floor (Tab/Enter) and the pressed switch all follow
+  // the core's active Id — and every Window paints above the Desktop
+  // Shortcut column's rung, before and after any renumbering.
+  function frame75(id) {
+    return id === 'quiz' ? prefs :
+      (id === 'action-plan' ? planRefs : ddRefs);
+  }
+  check('every Window paints its stack number above the shortcut column',
+    (function() {
+      return ['quiz', 'action-plan', 'deep-dive'].every(function(id) {
+        var painted = Number(frame75(id).windowEl.style.zIndex);
+        return painted >= Windows.WINDOW_Z_BASE && painted < 1000 &&
+          painted === Windows.WINDOW_Z_BASE + pctl.snapshot().windows[id].z;
+      });
+    })(),
+    [prefs, planRefs, ddRefs].map(function(f) {
+      return f.windowEl.style.zIndex;
+    }).join(','));
+
+  // The Action Plan is active and on top; the Quiz and the Deep-Dive
+  // Prompt are the windows under it, in that order.
+  pctl.minimize('action-plan');
+  while (ppending.length) ppending.shift()();
+  check('minimizing the ACTIVE Window hands activation to the topmost visible one',
+    pctl.getState('action-plan').mode === 'minimized' &&
+    pctl.snapshot().active === 'quiz' &&
+    pctl.canFocus('quiz') === true && pctl.canFocus('action-plan') === false);
+  check('the newly active title bar is the live navy, the Put Away one is grey',
+    prefs.windowEl.classList.contains('is-active') === true &&
+    prefs.titleBar.getAttribute('data-active') === 'true' &&
+    planRefs.windowEl.classList.contains('is-active') === false &&
+    planRefs.titleBar.getAttribute('data-active') === 'false');
+  check('the keyboard floor follows the hand-off: Tab reaches only the active frame',
+    planRefs.buttons.minimize.getAttribute('inert') === '' &&
+    planRefs.buttons.close.getAttribute('inert') === '' &&
+    planRefs.bodyEl.getAttribute('inert') === '' &&
+    prefs.buttons.minimize.getAttribute('inert') === null &&
+    prefs.titleBar.getAttribute('inert') === null);
+  check('the pressed Program Switch follows the hand-off',
+    prefs.programBtn.getAttribute('aria-pressed') === 'true' &&
+    planRefs.taskbarBtn.getAttribute('aria-pressed') === 'false' &&
+    ddRefs.taskbarBtn.getAttribute('aria-pressed') === 'false');
+
+  // The Deep-Dive Prompt was born minimized in the taskbar: pressing its
+  // Program Switch brings it back, and it takes the activation the Quiz was
+  // holding — from here the walk-down puts every Window away in turn.
+  ddRefs.taskbarBtn.click();
+  while (ppending.length) ppending.shift()();
+  check('pressing a Program Switch restores its Window and takes activation',
+    pctl.getState('deep-dive').mode === 'normal' &&
+    pctl.snapshot().active === 'deep-dive' &&
+    ddRefs.windowEl.classList.contains('is-active') === true &&
+    ddRefs.taskbarBtn.getAttribute('aria-pressed') === 'true');
+  pctl.minimize('deep-dive');
+  while (ppending.length) ppending.shift()();
+  check('the hand-off walks down the stack to the Window still visible',
+    pctl.snapshot().active === 'quiz' &&
+    prefs.windowEl.classList.contains('is-active') === true &&
+    ddRefs.windowEl.classList.contains('is-active') === false);
+
+  // The Quiz Program Switch is the control the Participant presses; once
+  // its Window goes, nothing is visible and the desktop has no active
+  // Window at all.
+  prefs.programBtn.focused = false;
+  prefs.programBtn.click();
+  pctl.minimize('quiz');
+  while (ppending.length) ppending.shift()();
+  check('with no Window visible the desktop has no active Window',
+    pctl.snapshot().active === null &&
+    pctl.canFocus('action-plan') === false &&
+    pctl.canFocus('quiz') === false && pctl.canFocus('deep-dive') === false);
+  check('focus returns to the Program Switch that was pressed',
+    prefs.programBtn.focused === true &&
+    prefs.windowEl.classList.contains('is-minimized') === true);
+  check('with no active Window no switch is pressed and no frame answers Tab',
+    ['quiz', 'action-plan', 'deep-dive'].every(function(id) {
+      var f = frame75(id);
+      var btn = id === 'quiz' ? f.programBtn : f.taskbarBtn;
+      return btn.getAttribute('aria-pressed') === 'false' &&
+        f.buttons.minimize.getAttribute('inert') === '' &&
+        f.buttons.close.getAttribute('inert') === '';
+    }));
+
+  // Leaving the desktop and settling the content again renumbers the whole
+  // stack bottom → top: no Window may fall behind the shortcut column.
+  pctl.setView('quiz-view');
+  pctl.setView('results-view');
+  pctl.actionPlanArrived();
+  pctl.deepDiveArrived();
+  while (ppending.length) ppending.shift()();
+  check('renumbering after the Put Away never drops a Window behind the column',
+    ['quiz', 'action-plan', 'deep-dive'].every(function(id) {
+      var painted = Number(frame75(id).windowEl.style.zIndex);
+      return painted >= Windows.WINDOW_Z_BASE && painted < 1000 &&
+        painted === Windows.WINDOW_Z_BASE + pctl.snapshot().windows[id].z;
+    }) && pctl.getState('action-plan').mode === 'normal',
+    [prefs, planRefs, ddRefs].map(function(f) {
+      return f.windowEl.style.zIndex;
+    }).join(','));
   // A minimized program is running: it keeps its button, and the shortcut
   // restores it (the same launch gesture, the core's restore).
   pctl.minimize('deep-dive');

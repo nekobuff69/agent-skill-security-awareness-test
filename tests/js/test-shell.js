@@ -636,18 +636,28 @@ exports.run = function() {
     /\.os-shortcuts\s*\{[^}]*flex-direction:\s*column/.test(shellCss) &&
     /\.os-shortcuts\s*\{[^}]*left:\s*var\(--space-2\)/.test(shellCss) &&
     /\.os-shortcuts\s*\{[^}]*top:\s*var\(--space-2\)/.test(shellCss));
-  check('css: the icons stay above the windows and below the bar (always visible)',
+  check('css: the shortcut column rides the desktop base layer under every Window (#75)',
     (function() {
+      var Windows = require('../../js/windows.js');
       var shortcutZ = Number(
         (shellCss.match(/\.os-shortcuts\s*\{[^}]*z-index:\s*(\d+)/) || [])[1]);
+      var windowBaseZ = Number(
+        (shellCss.match(/\.os-window\s*\{[^}]*z-index:\s*(\d+)/) || [])[1]);
       var taskbarZ = Number(
         (shellCss.match(/\.os-taskbar\s*\{[^}]*z-index:\s*(\d+)/) || [])[1]);
       var dialogZ = Number(
         (shellCss.match(/\.os-dialog-backdrop\s*\{[^}]*z-index:\s*(\d+)/) || [])[1]);
-      return shortcutZ > 0 && shortcutZ < taskbarZ && shortcutZ < dialogZ &&
-        taskbarZ === 1000;
+      // The column sits on the desktop's base rung; the Window stack's
+      // BASE (css + the floor js/windows.js paints from) is above it, so
+      // every Window covers the icons and the ladder above the windows is
+      // untouched: taskbar 1000, then the dialog rungs.
+      return shortcutZ > 0 && shortcutZ < windowBaseZ &&
+        windowBaseZ === Windows.WINDOW_Z_BASE &&
+        windowBaseZ < taskbarZ && taskbarZ === 1000 && shortcutZ < dialogZ;
     })(),
-    'shortcuts above the window rung, under 1000');
+    'the shortcut rung under the window base, the bar over both');
+  check('css: the column stays off the stages where a Window is the whole screen (#75)',
+    /body:has\(#landing-view:not\(\[hidden\]\)\) \.os-shortcuts,\s*body:has\(#quiz-view:not\(\[hidden\]\)\) \.os-shortcuts\s*\{[^}]*display:\s*none/.test(shellCss));
   // Reduced motion covers every window transition on this viewport: the
   // gate is a top-level block, so the ≤768px layout inherits it, and it
   // parks BOTH traces the switcher can paint.
