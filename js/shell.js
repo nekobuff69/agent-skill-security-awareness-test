@@ -14,7 +14,11 @@
    * the desktop's own icons on the screen: a top-left SHORTCUT COLUMN —
    * Quiz, Action Plan, Deep-Dive Prompt — always present (running or not),
    * launched by double-click or Enter/Space, and absent on the ≤768px
-   * layout where the taskbar is the only switcher.
+   * layout where the taskbar is the only switcher. Ticket #68 makes that
+   * sentence the mobile model: at ≤768px the desktop is single-program —
+   * one frame fills the screen above the slim taskbar, whose THREE program
+   * entries are painted permanently (running, put away or not arrived) as
+   * the switches between them — and the window chrome reduces to [×].
    *
    * Layering: the shell WRAPS the existing `#app` node at runtime (no HTML
    * edits) — a `div.os-window` with a navy title bar takes `#app` as its
@@ -942,11 +946,12 @@
         minimize: function() { win.minimize(); },
         maximize: function() { win.toggleMaximize(); },
         close: function() {
-          // One decision (js/windows.js): on the DESKTOP layout the window
-          // is PUT AWAY (core hide(), no dialog — the program keeps its
-          // results and its desktop shortcut brings the window back,
-          // ticket #62); a flow stage — and the ≤768px layout, where no
-          // shortcut column exists — asks the End Program confirmation.
+          // One decision (js/windows.js): on the windowed desktop stage the
+          // window is PUT AWAY (core hide(), no dialog — the program keeps
+          // its results; on the desktop layout its shortcut brings it back,
+          // ticket #62, and on the ≤768px layout its permanent taskbar
+          // switch does, ticket #68). A flow stage has no desktop in play
+          // and asks the End Program confirmation.
           var decision = win.close();
           if (decision !== 'dialog') return;
           // The opener explicitly: requestClose() renders all three
@@ -1000,10 +1005,13 @@
     });
     appEl.setAttribute('data-shell-mounted', 'true');
     if (win) {
-      // Landing rules first: [×][□] gray, [—] live; the program-button
-      // click handler (which restores a MINIMIZED window and focuses a
-      // visible one — a hidden window has no button, ticket #62) and the
-      // title-bar drag / corner-grip resize handles are wired in there too.
+      // Landing rules first: [×][□] gray while no Session exists, [—] live
+      // on the desktop layout (dead too at ≤768px, where the chrome reduces
+      // to close — ticket #68). The program-button click handler — the
+      // desktop layout restores a MINIMIZED window and focuses a visible
+      // one, while the ≤768px switch entry runs the one launch gesture and
+      // is a hidden window's route back (#68) — and the title-bar drag /
+      // corner-grip resize handles are wired in there too.
       win.attach({
         windowEl: controller.windowEl,
         titleBar: controller.titleBar,
