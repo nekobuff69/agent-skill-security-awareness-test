@@ -379,13 +379,12 @@ exports.run = function() {
         viewText('landing-view').slice(0, 80));
       check('boot sets the document title from the dictionary',
         fakeDoc.title === 'Agent Security Awareness Quiz', fakeDoc.title);
-      check('the shell built the two-segment tray control',
-        !!(ctl && ctl.langSegments && ctl.langSegments.self && ctl.langSegments.other));
-      check('the tray shows EN pressed and the alternate flat at boot',
-        ctl.langSegments.self.textContent === 'EN' &&
-        ctl.langSegments.self.getAttribute('aria-pressed') === 'true' &&
-        ctl.langSegments.other.textContent === '中文',
-        ctl.langSegments.self.textContent + '/' + ctl.langSegments.other.textContent);
+      check('the shell built the one-label tray control',
+        !!(ctl && ctl.langToggle && ctl.langButton));
+      check('the tray names the language the page is not in (中文, not EN)',
+        ctl.langButton.textContent === '中文' &&
+        ctl.langButton.getAttribute('aria-pressed') === null,
+        ctl.langButton.textContent);
 
       /* ── Idle prefetch: nothing fetched until the browser is idle ───── */
       check('the alternate is not fetched before the idle callback',
@@ -404,7 +403,7 @@ exports.run = function() {
         LangSwitch.state().prefetch === 'ready', LangSwitch.state().prefetch);
 
       /* ── Toggle #1: splash, en → zh, via the tray control ───────────── */
-      ctl.langSegments.other.click();
+      ctl.langButton.click();
       await settle();
 
       check('tray toggle swaps the splash in place (no navigation)',
@@ -432,12 +431,11 @@ exports.run = function() {
       check('the first toggle costs no extra fetch (prefetch cache hit)',
         fetchCount('questions.zh.json') === 1 && fetchCount('questions.json') === 1,
         fetchLog.join(','));
-      check('the tray re-labels itself after the switch',
-        ctl.langSegments.self.textContent === '中文' &&
-        ctl.langSegments.self.getAttribute('aria-pressed') === 'true' &&
-        ctl.langSegments.other.textContent === 'EN' &&
+      check('the tray re-labels itself after the switch (now EN)',
+        ctl.langButton.textContent === 'EN' &&
+        ctl.langButton.getAttribute('title') === I18n.t('lang.switchLabel') &&
         ctl.programLabel.textContent === I18n.t('shell.windowTitle'),
-        ctl.langSegments.self.textContent + '/' + ctl.langSegments.other.textContent);
+        ctl.langButton.textContent);
 
       /* ── Start the quiz in zh, record an answer, move to Question 2 ──── */
       var startBtn = findButton(byIdMap['landing-view'], function(b) { return b.id === 'start-btn'; });
@@ -463,7 +461,7 @@ exports.run = function() {
       quizBody().scrollTop = 42;
 
       /* ── Toggle #2: mid-quiz, zh → en — state survives ──────────────── */
-      ctl.langSegments.other.click();
+      ctl.langButton.click();
       await settle();
 
       st = App.quizState();
@@ -490,7 +488,7 @@ exports.run = function() {
         fetchLog.join(','));
 
       /* ── Toggle #3: back to zh — repeated switches stay stable ──────── */
-      ctl.langSegments.other.click();
+      ctl.langButton.click();
       await settle();
       st = App.quizState();
       check('a third switch keeps the same Question and answers',
@@ -605,7 +603,7 @@ exports.run = function() {
       var fetchesAtSectionStart = fetchLog.length;
       var enFetchesAtStart = fetchCount('questions.json');
       var zhFetchesAtStart = fetchCount('questions.zh.json');
-      ctl.langSegments.other.click();
+      ctl.langButton.click();
       await settle();
       check('the tray returns to English before the Completion',
         I18n.locale === 'en' &&
@@ -720,7 +718,7 @@ exports.run = function() {
         'pct=' + enPct + ' caption=' + enCaption + ' bars=' + enBars.length);
 
       /* — the tray toggle on the results screen — */
-      ctl.langSegments.other.click();   // en → zh, in place
+      ctl.langButton.click();   // en → zh, in place
       await settle();
       var planLoadingZh = I18n.t('results.planLoading');
 
@@ -800,7 +798,7 @@ exports.run = function() {
         viewText('results-view').indexOf(planLoadingZh) < 0);
 
       /* — switch back: original language, all data intact — */
-      ctl.langSegments.other.click();
+      ctl.langButton.click();
       await settle();
 
       check('switching back returns the original language with all report data intact',
@@ -821,7 +819,7 @@ exports.run = function() {
         planCalls.length === 2, String(planCalls.length));
 
       /* — a repeated switch re-renders both Narratives from their slots — */
-      ctl.langSegments.other.click();   // en → zh again
+      ctl.langButton.click();   // en → zh again
       await settle();
       check('a repeated switch re-renders from the slots, values identical',
         I18n.locale === 'zh' &&
@@ -879,7 +877,7 @@ exports.run = function() {
         viewText('review-view').slice(0, 160));
 
       var entriesBeforeReviewSwitch = historyEntries.length;
-      ctl.langSegments.other.click();   // zh → en, on the review screen
+      ctl.langButton.click();   // zh → en, on the review screen
       await settle();
 
       check('the Review translates question, chosen option, feedback and best practice in place',
@@ -900,7 +898,7 @@ exports.run = function() {
         'view=' + App.currentView() + ' locale=' + I18n.locale +
         ' entries=' + historyEntries.length);
 
-      ctl.langSegments.other.click();   // en → zh again, on the review screen
+      ctl.langButton.click();   // en → zh again, on the review screen
       await settle();
       check('switching back returns the Chinese Review with every pick intact',
         App.currentView() === 'review-view' &&
@@ -931,7 +929,7 @@ exports.run = function() {
         fetchLog.join(','));
 
       /* — the Deterministic Fallback: one assembly per locale — */
-      ctl.langSegments.other.click();   // → English for a second Completion
+      ctl.langButton.click();   // → English for a second Completion
       await settle();
       check('back on the English results view, Narrative still from the slot',
         I18n.locale === 'en' &&
@@ -977,7 +975,7 @@ exports.run = function() {
         viewText('results-view').indexOf(planLoadingEn) < 0,
         'calls=' + assembleCalls + ' narrative=' + enNarrative2.slice(0, 80));
 
-      ctl.langSegments.other.click();   // en → zh on results
+      ctl.langButton.click();   // en → zh on results
       await settle();
       var zhNarrative2 = narrativeText('results-view');
       check('the swap re-renders the Action Plan in Chinese with identical numbers',
@@ -990,7 +988,7 @@ exports.run = function() {
         assembleCalls === 2,
         'calls=' + assembleCalls + ' same=' + (zhNarrative2 === enNarrative2));
 
-      ctl.langSegments.other.click();   // zh → en: back to the original language
+      ctl.langButton.click();   // zh → en: back to the original language
       await settle();
       check('switching back restores the English Narrative without re-assembling',
         I18n.locale === 'en' &&
@@ -1000,7 +998,7 @@ exports.run = function() {
         assembleCalls === 2,
         'calls=' + assembleCalls);
 
-      ctl.langSegments.other.click();   // en → zh again: the slot re-renders
+      ctl.langButton.click();   // en → zh again: the slot re-renders
       await settle();
       check('the Chinese Narrative is re-rendered from its slot on a repeat switch',
         I18n.locale === 'zh' &&

@@ -1,6 +1,6 @@
 exports.name = 'Results (retro data-viz contract, tickets #45, #56)';
 
-exports.run = function() {
+exports.run = async function() {
   var results = [];
 
   function check(desc, pass, extra) {
@@ -709,7 +709,9 @@ exports.run = function() {
     });
   };
   var canvasCtx = {
-    fillStyle: '', fillRect: function() { captured.calls.push(['fillRect'].concat([].slice.call(arguments))); },
+    fillStyle: '',
+    fillRect: function() { captured.calls.push(['fillRect'].concat([].slice.call(arguments))); },
+    setTransform: function() { captured.calls.push(['setTransform'].concat([].slice.call(arguments))); },
     drawImage: function() { captured.calls.push(['drawImage'].concat([].slice.call(arguments))); }
   };
   var fakeCanvas = fakeEl('canvas');
@@ -727,64 +729,157 @@ exports.run = function() {
     return origCreate(tag);
   };
 
-  // ── The composed body sheet (ticket #65): what the export renders ────
-  // The window chrome is never snapshotted; the sheet is re-drawn from the
-  // report, so the assertions run on that tree, not on the stubbed
-  // serializer's output.
-  var sheet = internals.buildExportSvg(report);
-  var sheetText = allText(sheet).join(' ');
-  var metrics = internals.exportMetrics(report);
-  check('the export sheet is 800 wide, one row pitch per ranked AST',
-    metrics.w === 800 && metrics.h === 658 + 9 * 24 + 12 + 24 &&
-      sheet.attrs.width === '800' && sheet.attrs.height === String(metrics.h) &&
-      sheet.attrs.viewBox === '0 0 800 ' + metrics.h,
-    JSON.stringify(metrics));
-  check('the sheet carries the score header, the radar and the bars',
-    sheetText.indexOf('X Sentinel') >= 0 &&
-      sheetText.indexOf('Overall') >= 0 &&
-      sheetText.indexOf('62%') >= 0 &&
-      walk(sheet, 'svg').length === 1 &&
-      String(walk(sheet, 'svg')[0].attrs['class']).indexOf('results-radar-svg') >= 0 &&
-      walk(sheet, 'polygon').length === 1 &&
-      sheetText.indexOf(I18n.astName(astRanked[0].id)) >= 0 &&
-      sheetText.indexOf(I18n.astName(astRanked[9].id)) >= 0,
-    sheetText.slice(0, 80));
-  check('the sheet carries no window chrome and no commands',
-    ['results.downloadPng', 'results.share', 'results.reviewBtn', 'results.retake',
-      'results.menuBar'].every(function(id) {
-        return sheetText.indexOf(I18n.t(id)) < 0;
-      }) &&
-      walk(sheet, 'button').length === 0 &&
-      classOf(sheet).indexOf('menu') < 0,
-    sheetText.slice(0, 80));
+  // ── The exported window (ADR 0023): a capture, not a re-draw ─────────
+  // The pipeline is exercised at its seams — the stylesheet reader with its
+  // font-url rewrite, the clone's layout overrides, the SVG the rasteriser
+  // receives, and the save. Nothing here rasterises: the fake DOM has no
+  // layout engine, so the browser-level proof lives in the device check.
+  check('the sheet carries the page\'s own rules with the font urls rewritten',
+    (function () {
+      var sheet = { cssRules: [
+        { cssText: '.os-window{color:red}' },
+        { cssText: '@font-face{font-family:W95FA;src:url("../fonts/w95fa.woff2") format("woff2"),url("../fonts/w95fa.woff") format("woff")}' }
+      ] };
+      var out = internals.collectCssText([sheet],
+        { 'w95fa.woff2': 'data:font/woff2;base64,AAA' });
+      return out.indexOf('.os-window{color:red}') >= 0 &&
+        out.indexOf('@font-face') >= 0 &&
+        out.indexOf('url(data:font/woff2;base64,AAA)') >= 0 &&
+        out.indexOf('w95fa.woff2') < 0 &&
+        out.indexOf('w95fa.woff"') >= 0;   // the .woff fallback is left alone
+    })());
+  check('html-scoped rules are re-scoped so they still match in the SVG doc',
+    (function () {
+      var sheet = { cssRules: [
+        { cssText: 'html[lang^="zh"] h1{font-family:X}' },
+        { cssText: 'html{background:red}' }
+      ] };
+      var out = internals.collectCssText([sheet], {});
+      return out.indexOf('[lang^="zh"] h1{font-family:X}') >= 0 &&
+        out.indexOf('html[lang') < 0;
+    })());
+  check('a stylesheet the page cannot read is skipped, not fatal',
+    internals.collectCssText(
+      [{ get cssRules() { throw new Error('cross-origin'); } },
+       { cssRules: [{ cssText: '.kept{}' }] }], {}) === '.kept{}');
+  check('the font files are discovered from the rules, once each',
+    JSON.stringify(internals.fontFilesIn(
+      "@font-face{src:url('a/fonts/w95fa.woff2')}@font-face{src:url('fonts/silk.woff2')}@font-face{src:url('fonts/w95fa.woff2')}")) ===
+      '["w95fa.woff2","silk.woff2"]');
+
+  var removedBar = null;
+  var innerBoxes = [{ style: {} }, { style: {} }];
+  var clone = {
+    style: {},
+    querySelector: function (sel) {
+      return sel === '.results-menu-bar'
+        ? { parentNode: { removeChild: function (c) { removedBar = c; } } }
+        : null;
+    },
+    querySelectorAll: function () { return innerBoxes; }
+  };
+  internals.prepareClone(clone, 411);
+  check('the clone is laid out at this device\'s width with its scrolling unclipped',
+    clone.style.width === '411px' &&
+    clone.style.height === 'auto' &&
+    clone.style.position === 'static' &&
+    clone.style.overflow === 'visible' &&
+    innerBoxes.every(function (b) {
+      return b.style.overflow === 'visible' && b.style.height === 'auto';
+    }), JSON.stringify(clone.style));
+  check('the menu bar is cut out of the capture',
+    removedBar !== null && removedBar.parentNode !== undefined);
+
+  var shotSvg = internals.buildForeignSvg(clone, '.x{}', 411, 1200);
+  var shotCss = String(walk(shotSvg, 'style')[0].textContent);
+  check('the capture wraps the clone in ONE foreignObject sized in CSS pixels',
+    shotSvg.attrs.width === '411' && shotSvg.attrs.height === '1200' &&
+    shotSvg.attrs.viewBox === '0 0 411 1200' &&
+    walk(shotSvg, 'foreignObject').length === 1 &&
+    walk(shotSvg, 'foreignObject')[0].attrs['width'] === '411' &&
+    shotCss.indexOf('.x{}') === 0 &&
+    walk(shotSvg, 'foreignObject')[0].children.indexOf(clone) >= 0);
+
+  /* The clone is a FRESH element, so the view's entrance animation restarts
+     — and `os-view-pop` begins at opacity 0. Without this reset the sheet
+     came out as a correct title bar over an empty silver body: the exact
+     failure a phone reported. The rules must land AFTER the page's own. */
+  check('the sheet resets the entrance animation the clone would restart',
+    shotCss.indexOf('animation:none!important') > shotCss.indexOf('.x{}') &&
+    shotCss.indexOf('transition:none!important') >= 0 &&
+    /#app > section\{opacity:1!important\}/.test(shotCss),
+    shotCss.slice(-160));
+
+  /* A rasterised SVG lays out in the SVG document's viewport, a few dozen
+     pixels shorter than the live measurement, so the sheet carries slack and
+     the canvas is cropped to its last painted row instead of shipping a band
+     of white under the window. */
+  check('the canvas is cropped to the last painted row', (function () {
+    var calls = [];
+    var big = {
+      width: 4, height: 6,
+      getContext: function () {
+        return {
+          getImageData: function () {
+            var px = new Uint8ClampedArray(4 * 6 * 4).fill(255);
+            // paint rows 0..2 silver; the rest stays white
+            for (var y = 0; y < 3; y++) {
+              for (var x = 0; x < 4; x++) {
+                var i = (y * 4 + x) * 4;
+                px[i] = 192; px[i + 1] = 192; px[i + 2] = 192;
+              }
+            }
+            return { data: px };
+          }
+        };
+      }
+    };
+    var trimmed = internals.cropToInk(big);
+    return trimmed.height === 3 && trimmed.width === 4 && trimmed !== big;
+  })());
+  check('a canvas with no readable pixels is returned untouched',
+    (function () {
+      var stub = { width: 2, height: 2, getContext: function () { return {}; } };
+      return internals.cropToInk(stub) === stub;
+    })());
 
   var exportBar = internals.buildMenuBar(report);
   var dlBtn = walk(exportBar, 'button')[0];
-  dlBtn.click();
-  fakeDoc.createElement = origCreate;
-
   check('the Download PNG command is the menu bar\'s own',
     dlBtn.textContent === I18n.t('results.downloadPng') &&
       dlBtn.attrs.role === 'menuitem');
-  check('export snapshots a freshly composed body sheet, never the live radar',
-    captured.passedSvg !== svg &&
-      captured.passedSvg.attrs.width === '800' &&
-      captured.passedSvg.attrs.height === String(metrics.h) &&
-      walk(captured.passedSvg, 'polygon').length === 1);
-  check('export canvas is the sheet size, filled #ffffff then drawn 1:1',
-    fakeCanvas.width === metrics.w && fakeCanvas.height === metrics.h &&
-    canvasCtx.fillStyle === '#ffffff' &&
-    captured.calls[0] && captured.calls[0].join(',') === 'fillRect,0,0,800,' + metrics.h &&
+
+  /* The one detail that made the first ship look like it worked: a `blob:`
+     URL for the capture SVG TAINTS the canvas in Chrome, so toBlob throws
+     SecurityError and the export silently degrades to the .svg fallback. A
+     `data:` URL keeps it origin-clean. */
+  check('the rasteriser is handed a data: url, never a blob: one',
+    (function () {
+      var url = internals.svgDataUrl('<svg xmlns="http://www.w3.org/2000/svg"><text>中文</text></svg>');
+      var bytes = Uint8Array.from(atob(String(url).split(',')[1]),
+        function (c) { return c.charCodeAt(0); });
+      var decoded = new TextDecoder().decode(bytes);   // Han must survive
+      return String(url).indexOf('data:image/svg+xml;base64,') === 0 &&
+        decoded.indexOf('<svg') === 0 && decoded.indexOf('中文') >= 0;
+    })());
+
+  var savedAnchor = internals.saveBlob({ type: 'image/png' }, 'agent-security-quiz-window.png');
+  check('the save hands the blob to an anchor named for the export',
+    captured.a === savedAnchor &&
+    savedAnchor.download === 'agent-security-quiz-window.png' &&
+    savedAnchor.href === 'blob:fake-url');
+
+  captured.calls.length = 0;      // the crop checks above share the stub
+  var rasterised = await internals.rasteriseWindow(
+    { markup: '<svg/>', w: 411, h: 1200 });
+  check('the rasteriser paints the capture at the screen density',
+    rasterised.width === 411 && rasterised.height === 1200 &&
+    captured.calls[0] && captured.calls[0].join(',') === 'fillRect,0,0,411,1200' &&
     captured.calls[1] && captured.calls[1][0] === 'drawImage' &&
-    typeof captured.calls[1][1] === 'object' &&
-    captured.calls[1].slice(2).join(',') === '0,0,800,' + metrics.h,
+    captured.calls[1].slice(2).join(',') === '0,0,411,1200',
     JSON.stringify(captured.calls));
-  check('export downloads ast-risk-radar.png as a non-zero image/png blob',
-    captured.a && captured.a.download === 'ast-risk-radar.png' &&
-    captured.pngBlob && captured.pngBlob.type === 'image/png' &&
-    captured.pngBlob.size > 0 &&
-    captured.blob && captured.blob.type.indexOf('image/svg+xml') === 0 &&
-    captured.blob.parts[0] === '<svg data-retro-radar/>');
+
+  fakeDoc.createElement = origCreate;
 
   // ══ Action Plan: requested once per (report, language), cached (#64) ═══
   // The presenter is exercised through the buildActionPlan seam with the
@@ -837,7 +932,7 @@ exports.run = function() {
   var bankPlan = { questions: [] };
   function settlePlan() { return new Promise(function(res) { setTimeout(res, 0); }); }
 
-  return (async function() {
+  return await (async function() {
     try {
       I18n.use('en');
       var loadingEn = I18n.t('results.planLoading');

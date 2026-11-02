@@ -632,17 +632,15 @@
     }
   }
 
-  /* ── Deep-Dive Prompt (ticket #74) ────────────────────────────────────
+  /* ── Deep-Dive Prompt ─────────────────────────────────────────────────
 
-     The fold is gone: the Prompt window's body is the one-line guidance
-     above a sunken field the prompt itself fills and scrolls. The title
-     bar already names the program, so no heading stands in the body.
-
-     The body has ONE command, in a bar at the head of the section — the
-     Quiz window's menu strip surface with a single flat command in it:
-     no menu role, no dropdown, no keyboard chords. One activation copies
-     and the existing results.copy / results.copied / results.copyFailed
-     feedback answers. */
+     The body reads top to bottom: the one-line guidance, the prompt in its
+     sunken scrolling field, and the Copy command UNDER that field — a
+     plain button closing the section, not a command strip. No fold (#74
+     retired the <details>/<summary>) and no bar: the prompt is visible on
+     arrival, and the only thing below it is the one control that acts on
+     it. One activation copies and the existing results.copy /
+     results.copied / results.copyFailed feedback answers. */
   function buildDeepDive(promptText) {
     var wrap = el('div', { className: 'results-deep-dive' });
 
@@ -653,32 +651,14 @@
     // field — never the page.
     wrap.appendChild(el('pre', { className: 'results-prompt-pre', textContent: promptText }));
 
+    var btn = el('button', { className: 'results-copy-btn', textContent: t('results.copy') });
+    btn.setAttribute('type', 'button');
+    btn.addEventListener('click', function() {
+      copyPrompt(promptText, btn);
+    });
+    wrap.appendChild(btn);
+
     return wrap;
-  }
-
-  /** The Deep-Dive window's bar: the Quiz strip surface, one flat command. */
-  function buildDeepDiveBar(promptText) {
-    var bar = el('div', { className: 'results-menu-bar results-deep-dive-bar' });
-    bar.appendChild(buildCopyPromptCmd(promptText));
-    return bar;
-  }
-
-  /**
-   * The Copy Prompt command: one press, no confirmation step. It rides the
-   * same clipboard path and the same feedback the body control used before
-   * the fold went away (#74), and the same `results-menu-item` sizing the
-   * Quiz bar commands get, so the strip reads as one surface family.
-   */
-  function buildCopyPromptCmd(promptText) {
-    var cmd = el('button', {
-      className: 'results-copy-btn results-menu-item',
-      textContent: t('results.copy')
-    });
-    cmd.setAttribute('type', 'button');
-    cmd.addEventListener('click', function() {
-      copyPrompt(promptText, cmd);
-    });
-    return cmd;
   }
 
   function copyPrompt(text, btn) {
@@ -810,158 +790,350 @@
     return wrap;
   }
 
-  /* ── PNG export composition (ticket #65) ──────────────────────────────
+  /* ── PNG export: the window as it stands (ADR 0023) ──────────────────
 
-     The export sheet shows the Quiz window's BODY only: the score header,
-     the Risk Radar and the Blind-Spot Bars. The window chrome (title bar
-     and menu bar) and the taskbar are never part of it — no snapshot of
-     the window is taken; the body content is RE-DRAWN from the report
-     through the same pure builders the window itself uses (buildRadar,
-     scoreColor, the localized AST names, the heading token stack), so the
-     exported sheet and the window cannot drift apart. SVG graphics inside
-     an <img>-decoded export render through their palette constants and the
-     font-family attribute, the same rule the radar already follows. */
+     The sheet is a CAPTURE, not a composition. The live Quiz window node is
+     cloned, its internal scrolling unclipped so the whole report fits at
+     this device's width, every same-origin style rule the page is using is
+     inlined with the self-hosted font files rewritten to data URIs, and the
+     result is rasterised through an <svg><foreignObject>. What comes out is
+     what the Participant is looking at — a phone's portrait column or the
+     window they dragged — with its dithered fills, its bevels, its
+     segmented bars and its pixel face.
 
-  /* The sheet is one layout, and the numbers ARE the design: an 800-wide
-     column, the radar centred at its natural 400×400, the Blind-Spot rows
-     ruled on a fixed pitch under it. */
-  var EXPORT_W = 800;
-  var EXPORT_X = 20;               // text column
-  var EXPORT_NAME_Y = 56;          // Progression Title
-  var EXPORT_OVERALL_Y = 82;       // Overall caption
-  var EXPORT_PCT_Y = 122;          // Overall Percentage
-  var EXPORT_RADAR_TITLE_Y = 164;
-  var EXPORT_RADAR_Y = 184;        // the 400×400 chart, centred
-  var EXPORT_BARS_TITLE_Y = 626;
-  var EXPORT_ROW_FIRST = 658;      // first Blind-Spot row's text baseline
-  var EXPORT_ROW_PITCH = 24;       // one Blind-Spot row's height
-  var EXPORT_ROW_BOX = 12;         // one Blind-Spot track's height
-  var EXPORT_TRACK_X = 330;
-  var EXPORT_TRACK_W = 370;
-  var EXPORT_BOTTOM = 24;          // pad under the last row
+     Two things stay out. The menu bar is dropped from the clone (its
+     commands would be dead controls in a file someone else opens), and the
+     desktop taskbar is not part of the window at all.
 
-  /** The sheet's raster size for a report: 800 wide, one row pitch per
-   *  ranked AST below the header and radar blocks. */
-  function exportMetrics(report) {
-    var rows = ((report && report.astRanked) || []).length;
-    return {
-      w: EXPORT_W,
-      h: EXPORT_ROW_FIRST + Math.max(rows - 1, 0) * EXPORT_ROW_PITCH +
-         EXPORT_ROW_BOX + EXPORT_BOTTOM
-    };
+     No library and no build step (ADR 0001). A rasteriser that refuses the
+     document gets the same SVG as a download instead of a PNG. */
+
+  var CAPTURE_NAME = 'agent-security-quiz-window.png';
+  var CAPTURE_MAX_DPR = 2;
+  var CAPTURE_MENU_BAR = '.results-menu-bar';
+  var CAPTURE_FRAME_PAD = 3;              // .os-window's bevel thickness
+
+  /* A clone is a FRESH element, so every CSS animation on it restarts — and
+     the view's entrance (`os-view-pop`) starts at `opacity: 0`. Rasterised
+     immediately, the sheet would come out with a correct title bar over an
+     empty silver body: the wireframe trace's first frame is the whole
+     content hidden. The reset lands AFTER the page's rules and collapses
+     the entrance to its finished state, which is exactly what the
+     reduced-motion contract in the skin already specifies. */
+  var CAPTURE_RESET_CSS =
+    '*,*::before,*::after{animation:none!important;transition:none!important}' +
+    '.os-window #app > section{opacity:1!important}' +
+    '.os-window #app > section:not([hidden])::after{content:none!important}';
+
+  /* The self-hosted faces, as data URIs. The paths are page-relative and the
+     site has two depths (`/` and `/zh/`), so each candidate is tried in
+     turn; a total failure resolves to null and that family falls back to its
+     system stack inside the image, exactly as the page does. */
+  function faceUrls(name) {
+    return ['fonts/' + name, '../fonts/' + name];
   }
 
-  /** The full body sheet as one SVG document: score header, Risk Radar,
-   *  Blind-Spot Bars — body content only, no chrome. */
-  function buildExportSvg(report) {
+  function fontDataUrl(urls) {
+    var i = 0;
+    function attempt() {
+      if (i >= urls.length || typeof fetch !== 'function') {
+        return Promise.reject(new Error('capture: no font'));
+      }
+      return fetch(urls[i++]).then(function (res) {
+        if (!res.ok) throw new Error('capture: font ' + res.status);
+        return res.arrayBuffer();
+      }).then(function (buf) {
+        var bytes = new Uint8Array(buf);
+        var bin = '';
+        var CHUNK = 0x8000;             // keep apply() under the arg limit
+        for (var b = 0; b < bytes.length; b += CHUNK) {
+          bin += String.fromCharCode.apply(null, bytes.subarray(b, b + CHUNK));
+        }
+        return 'data:font/woff2;base64,' + btoa(bin);
+      }).catch(attempt);
+    }
+    return attempt();
+  }
+
+  /* `@font-face` blocks are KEPT and their urls REWRITTEN, never re-declared
+     by hand: the rewrite preserves the family names, the weights and the
+     unicode-range pins that split Latin from Han, and a hand-written block
+     would have to restate all three. The `.woff` fallback beside each woff2
+     is left alone — the browser takes the first source it supports, and the
+     woff2 is already a data URI by then. */
+  function swapFontUrls(text, fontMap) {
+    return String(text).replace(/url\((["']?)([^")']*fonts\/[^")']+)\1\)/g,
+      function (whole, quote, path) {
+        var name = path.split('/').pop();
+        return fontMap && fontMap[name] ? 'url(' + fontMap[name] + ')' : whole;
+      });
+  }
+
+  /** Every same-origin rule the page is using, fonts substituted. */
+  function collectCssText(sheets, fontMap) {
+    var out = [];
+    for (var i = 0; i < sheets.length; i++) {
+      var rules = null;
+      try { rules = sheets[i].cssRules; } catch (e) { rules = null; }
+      if (!rules) continue;
+      for (var r = 0; r < rules.length; r++) {
+        var text = rules[r] && rules[r].cssText;
+        if (!text) continue;
+        // The clone lives in an SVG document that has no <html>, so a rule
+        // scoped to `html[lang^="zh"]` would silently do nothing there — the
+        // Chinese sheet would lose its Han typography. Scoping on the
+        // attribute alone keeps it, because the clone carries the lang.
+        out.push(swapFontUrls(text, fontMap).replace(/\bhtml\[lang/g, '[lang'));
+      }
+    }
+    return out.join('\n');
+  }
+
+  /** The woff2 files a stylesheet refers to, by basename, first seen first. */
+  function fontFilesIn(css) {
+    var seen = {};
+    var files = [];
+    String(css).replace(/fonts\/([^"')]+?\.woff2)/g, function (whole, name) {
+      if (!seen[name]) { seen[name] = true; files.push(name); }
+      return whole;
+    });
+    return files;
+  }
+
+  /* Faces are fetched once per page and cached; a failed fetch is silent
+     (that family falls back to its system stack inside the image, which is
+     the same thing the page does when a font is missing). */
+  var captureFontCache = null;
+  function captureFonts(css) {
+    if (captureFontCache) return Promise.resolve(captureFontCache);
+    var files = fontFilesIn(css);
+    return Promise.all(files.map(function (name) {
+      return fontDataUrl(faceUrls(name)).catch(function () { return null; });
+    })).then(function (urls) {
+      var map = {};
+      for (var i = 0; i < files.length; i++) {
+        if (urls[i]) map[files[i]] = urls[i];
+      }
+      captureFontCache = map;
+      return map;
+    });
+  }
+
+  /** The Quiz frame: the `.os-window` that is not a program window. */
+  function quizWindowEl(doc) {
+    var nodes = (doc && doc.querySelectorAll)
+      ? doc.querySelectorAll('.os-window') : [];
+    for (var i = 0; i < nodes.length; i++) {
+      if (!nodes[i].getAttribute('data-os-program')) return nodes[i];
+    }
+    return null;
+  }
+
+  /** The clone laid out as the sheet will be: this device's width, no
+   *  internal scrolling, no menu bar. */
+  function prepareClone(clone, width) {
+    var lang = document.documentElement && document.documentElement.getAttribute('lang');
+    if (lang) clone.setAttribute('lang', lang);
+    clone.style.position = 'static';
+    clone.style.margin = '0';
+    clone.style.width = width + 'px';
+    clone.style.maxWidth = 'none';
+    clone.style.height = 'auto';
+    clone.style.maxHeight = 'none';
+    clone.style.overflow = 'visible';
+    var bar = clone.querySelector ? clone.querySelector(CAPTURE_MENU_BAR) : null;
+    if (bar && bar.parentNode) bar.parentNode.removeChild(bar);
+    var boxes = clone.querySelectorAll
+      ? clone.querySelectorAll('#app, .os-window-body, #app > section')
+      : [];
+    for (var i = 0; i < boxes.length; i++) {
+      boxes[i].style.overflow = 'visible';
+      boxes[i].style.height = 'auto';
+      boxes[i].style.maxHeight = 'none';
+    }
+    return clone;
+  }
+
+  /** The window as one SVG document, sized in CSS pixels. */
+  function buildForeignSvg(clone, css, w, h) {
     var ns = 'http://www.w3.org/2000/svg';
-    var m = exportMetrics(report);
     var svg = document.createElementNS(ns, 'svg');
-    svg.setAttribute('width', String(m.w));
-    svg.setAttribute('height', String(m.h));
-    svg.setAttribute('viewBox', '0 0 ' + m.w + ' ' + m.h);
-
-    var bg = document.createElementNS(ns, 'rect');
-    bg.setAttribute('x', '0');
-    bg.setAttribute('y', '0');
-    bg.setAttribute('width', String(m.w));
-    bg.setAttribute('height', String(m.h));
-    bg.setAttribute('fill', '#FFFFFF');
-    svg.appendChild(bg);
-
-    var font = headingFont();
-
-    function text(x, y, size, content, fill) {
-      var n = document.createElementNS(ns, 'text');
-      n.setAttribute('x', String(x));
-      n.setAttribute('y', String(y));
-      n.setAttribute('font-size', String(size));
-      n.setAttribute('font-family', font);
-      n.setAttribute('font-weight', '400');
-      n.setAttribute('fill', fill);
-      n.textContent = content;
-      svg.appendChild(n);
-      return n;
-    }
-
-    function rect(x, y, w, h, fill, stroke) {
-      var r = document.createElementNS(ns, 'rect');
-      r.setAttribute('x', String(x));
-      r.setAttribute('y', String(y));
-      r.setAttribute('width', String(w));
-      r.setAttribute('height', String(h));
-      r.setAttribute('fill', fill);
-      if (stroke) r.setAttribute('stroke', stroke);
-      return r;
-    }
-
-    // Score header — the tier name, the Overall caption, the band-coloured
-    // percentage: the same three fields .results-title-card shows.
-    text(EXPORT_X, EXPORT_NAME_Y, 20, report.title.emoji + ' ' + report.title.name, '#000000');
-    text(EXPORT_X, EXPORT_OVERALL_Y, 14, t('results.overall'), '#000000');
-    text(EXPORT_X, EXPORT_PCT_Y, 38, report.percentage + '%', scoreColor(report.percentage));
-
-    // Risk Radar — a fresh data-viz snapshot, embedded 1:1 at 400×400.
-    text(EXPORT_X, EXPORT_RADAR_TITLE_Y, 16, t('results.radarTitle'), '#000000');
-    var radar = buildRadar(report);
-    radar.setAttribute('x', String((EXPORT_W - 400) / 2));
-    radar.setAttribute('y', String(EXPORT_RADAR_Y));
-    radar.setAttribute('width', '400');
-    radar.setAttribute('height', '400');
-    svg.appendChild(radar);
-
-    // Blind-Spot Bars — weakest first, the localized full names, the same
-    // band colours: the sheet's mirror of .results-bars.
-    text(EXPORT_X, EXPORT_BARS_TITLE_Y, 16, t('results.barsTitle'), '#000000');
-    var ranked = ((report && report.astRanked) || []);
-    for (var i = 0; i < ranked.length; i++) {
-      var pct = ranked[i].percentage || 0;
-      var rowY = EXPORT_ROW_FIRST + i * EXPORT_ROW_PITCH;
-      text(EXPORT_X, rowY, 11, app.I18n.astName(ranked[i].id), '#000000');
-      svg.appendChild(rect(EXPORT_TRACK_X, rowY - 11, EXPORT_TRACK_W,
-        EXPORT_ROW_BOX, '#FFFFFF', '#808080'));
-      svg.appendChild(rect(EXPORT_TRACK_X, rowY - 11, EXPORT_TRACK_W * pct / 100,
-        EXPORT_ROW_BOX, scoreColor(pct)));
-      text(EXPORT_TRACK_X + EXPORT_TRACK_W + 8, rowY, 11, pct + '%', scoreColor(pct));
-    }
-
+    svg.setAttribute('xmlns', ns);
+    svg.setAttribute('width', String(w));
+    svg.setAttribute('height', String(h));
+    svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+    var fo = document.createElementNS(ns, 'foreignObject');
+    fo.setAttribute('x', '0');
+    fo.setAttribute('y', '0');
+    fo.setAttribute('width', String(w));
+    fo.setAttribute('height', String(h));
+    var style = document.createElementNS(ns, 'style');
+    style.textContent = css + '\n' + CAPTURE_RESET_CSS;
+    fo.appendChild(style);
+    fo.appendChild(clone);
+    svg.appendChild(fo);
     return svg;
   }
 
+  /* The sheet is the window's OWN box, at this device's width — which is
+     also the width its media queries answer to, exactly as on a phone,
+     where the frame is the full viewport. (A desktop window dragged
+     narrower than 768px is the one case where the image lays out in the
+     branch that width belongs to rather than the one on screen.) */
+  /* The sheet ends where the CONTENT ends, not where the frame's box does:
+     with `height: auto` the frame still reserves its own bottom padding and
+     any trailing margin, which shipped as a band of empty silver under the
+     last Blind-Spot row. The body's own box is the honest measurement. */
+  function captureHeight(clone) {
+    var box = clone.getBoundingClientRect ? clone.getBoundingClientRect() : null;
+    var body = clone.querySelector ? clone.querySelector('.os-window-body') : null;
+    var bodyBox = (body && body.getBoundingClientRect) ? body.getBoundingClientRect() : null;
+    if (box && bodyBox && bodyBox.height > 0) {
+      return Math.max(1, Math.round(bodyBox.bottom - box.top) + CAPTURE_FRAME_PAD);
+    }
+    return Math.max(1, Math.round((box && box.height) || 0));
+  }
+
+  function captureWindow() {
+    var doc = document;
+    var win = quizWindowEl(doc);
+    if (!win) return Promise.reject(new Error('capture: no window'));
+    var rect = win.getBoundingClientRect ? win.getBoundingClientRect() : null;
+    var width = Math.round((rect && rect.width) || win.offsetWidth || 0);
+    if (!width) return Promise.reject(new Error('capture: no width'));
+
+    var holder = doc.createElement('div');
+    holder.setAttribute('aria-hidden', 'true');
+    holder.style.position = 'fixed';
+    holder.style.left = '-100000px';
+    holder.style.top = '0';
+    holder.style.width = width + 'px';
+    var clone = prepareClone(win.cloneNode(true), width);
+    holder.appendChild(clone);
+    doc.body.appendChild(holder);
+
+    function cleanup() { if (holder.parentNode) holder.parentNode.removeChild(holder); }
+
+    var raw = collectCssText(doc.styleSheets, {});
+    return captureFonts(raw).then(function (fontMap) {
+      var css = collectCssText(doc.styleSheets, fontMap);
+      var height = captureHeight(clone) + CAPTURE_SLACK;
+      var markup = new XMLSerializer().serializeToString(
+        buildForeignSvg(clone, css, width, height));
+      cleanup();
+      return { markup: markup, w: width, h: height };
+    }).catch(function (err) { cleanup(); throw err; });
+  }
+
+  /** Rasterise the capture at the screen's density (capped: a 3× phone
+   *  would otherwise hand out a 6 MB PNG). */
+  /* A capture must reach the rasteriser through a `data:` URL, never a
+     `blob:` one: Chrome marks a canvas TAINTED when the SVG it drew came
+     from a blob URL and carries a foreignObject, and `toBlob` then throws
+     SecurityError — which is how the export silently degraded to a
+     downloaded .svg. The same markup as a data URI stays origin-clean. */
+  function svgDataUrl(markup) {
+    if (typeof TextEncoder === 'function') {
+      var bytes = new TextEncoder().encode(markup);
+      var bin = '';
+      var CHUNK = 0x8000;
+      for (var i = 0; i < bytes.length; i += CHUNK) {
+        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+      }
+      return 'data:image/svg+xml;base64,' + btoa(bin);
+    }
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(markup);
+  }
+
+  /* An SVG rasterised through an <img> lays its content out in the SVG
+     document's own viewport, which is not the page's: the same tree can end
+     up a few dozen pixels shorter there than it measured in the live
+     document. So the sheet carries a little slack and the canvas is then
+     cropped to its last painted row — the image ends where the window's
+     bottom bevel does, never at a band of white. */
+  var CAPTURE_SLACK = 32;
+
+  function cropToInk(canvas) {
+    var ctx = canvas.getContext ? canvas.getContext('2d') : null;
+    if (!ctx || typeof ctx.getImageData !== 'function') return canvas;
+    var data;
+    try {
+      data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    } catch (e) {
+      return canvas;                       // tainted or unreadable: keep it
+    }
+    var last = -1;
+    for (var y = canvas.height - 1; y >= 0 && last < 0; y--) {
+      var row = y * canvas.width * 4;
+      for (var x = 0; x < canvas.width; x++) {
+        var i = row + x * 4;
+        if (data[i] !== 255 || data[i + 1] !== 255 || data[i + 2] !== 255) {
+          last = y;
+          break;
+        }
+      }
+    }
+    if (last < 0 || last >= canvas.height - 1) return canvas;
+    var out = document.createElement('canvas');
+    out.width = canvas.width;
+    out.height = last + 1;
+    out.getContext('2d').drawImage(canvas, 0, 0);
+    return out;
+  }
+
+  function rasteriseWindow(shot) {
+    return new Promise(function (resolve, reject) {
+      var url = svgDataUrl(shot.markup);
+      var img = new Image();
+      img.onload = function () {
+        var raw = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+        var dpr = Math.min(raw, CAPTURE_MAX_DPR);
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.round(shot.w * dpr);
+        canvas.height = Math.round(shot.h * dpr);
+        var ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(cropToInk(canvas));
+      };
+      img.onerror = function () {
+        reject(new Error('capture: raster'));
+      };
+      img.src = url;
+    });
+  }
+
+  /** The download itself — its own seam so the suites can watch a save
+   *  without a rasteriser in the loop. */
+  function saveBlob(blob, name) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.click();
+    setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+    return a;
+  }
+
   /* ── PNG Download ── */
-  function buildDownloadPng(report) {
+  function buildDownloadPng() {
     var btn = el('button', {
       className: 'results-download-btn results-menu-item',
       textContent: t('results.downloadPng'),
       role: 'menuitem'
     });
     btn.addEventListener('click', function() {
-      var svg = buildExportSvg(report);
-      var svgStr = new XMLSerializer().serializeToString(svg);
-      var blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
-      var url = URL.createObjectURL(blob);
-      var img = new Image();
-      img.onload = function() {
-        var m = exportMetrics(report);
-        var canvas = document.createElement('canvas');
-        canvas.width = m.w;
-        canvas.height = m.h;
-        var ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, m.w, m.h);
-        ctx.drawImage(img, 0, 0, m.w, m.h);
-        canvas.toBlob(function(pngBlob) {
-          URL.revokeObjectURL(url);
-          if (!pngBlob) return;
-          var pngUrl = URL.createObjectURL(pngBlob);
-          var a = document.createElement('a');
-          a.href = pngUrl;
-          a.download = 'ast-risk-radar.png';
-          a.click();
-          setTimeout(function() { URL.revokeObjectURL(pngUrl); }, 1000);
-        }, 'image/png');
-      };
-      img.src = url;
+      captureWindow().then(function (shot) {
+        rasteriseWindow(shot).then(function (canvas) {
+          canvas.toBlob(function (blob) {
+            if (blob) saveBlob(blob, CAPTURE_NAME);
+          }, 'image/png');
+        }).catch(function () {
+          saveBlob(new Blob([shot.markup], { type: 'image/svg+xml;charset=utf-8' }),
+                   CAPTURE_NAME.replace(/\.png$/, '.svg'));
+        });
+      }).catch(function () { /* nothing to capture */ });
     });
     return btn;
   }
@@ -1132,7 +1304,7 @@
      (`results.menuBar`), and it resolves in both dictionaries like every
      other id (ADR 0015). */
   function buildMenuBar(shown) {
-    var items = [buildDownloadPng(shown)];
+    var items = [buildDownloadPng()];
     var share = buildShareBtn(shown);
     if (share) items.push(share);
     items.push(buildReviewBtn());
@@ -1325,12 +1497,10 @@
     // Deep-Dive Prompt — mounted on its stable section host, which is the
     // Deep-Dive Prompt window's body on the desktop (#61). Its content is
     // built synchronously (the Deterministic Prompt Builder), so the Finish
-    // Commit below is also its arrival. The body is unfolded (#74): no fold
-    // remains, the window's one Copy Prompt command sits in the bar at the
-    // head of the body, then the guidance, then the prompt field.
+    // Commit below is also its arrival. The body is unfolded (#74) and
+    // carries no command strip: guidance, prompt field, Copy button.
     var ddPromptText = App.PromptBuilder.build(shown);
     var ddSection = el('div', { className: 'results-section' });
-    ddSection.appendChild(buildDeepDiveBar(ddPromptText));
     ddSection.appendChild(el('h2', { className: 'results-section-title', textContent: t('results.deepDiveTitle') }));
     ddSection.appendChild(buildDeepDive(ddPromptText));
     mountSection('deep-dive', ddSection, view);
@@ -1453,8 +1623,17 @@
     buildDeepDive: buildDeepDive,
     buildDownloadPng: buildDownloadPng,
     buildMenuBar: buildMenuBar,
-    buildExportSvg: buildExportSvg,
-    exportMetrics: exportMetrics,
+    captureWindow: captureWindow,
+    collectCssText: collectCssText,
+    swapFontUrls: swapFontUrls,
+    fontFilesIn: fontFilesIn,
+    prepareClone: prepareClone,
+    buildForeignSvg: buildForeignSvg,
+    captureHeight: captureHeight,
+    rasteriseWindow: rasteriseWindow,
+    cropToInk: cropToInk,
+    svgDataUrl: svgDataUrl,
+    saveBlob: saveBlob,
     localizedReport: localizedReport,
     buildActionPlan: buildActionPlan
   };

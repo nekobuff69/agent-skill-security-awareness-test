@@ -22,7 +22,6 @@
     'lang.otherShort': '中文',
     'lang.switchLabel': 'Switch to Chinese',
     'lang.offerTitle': 'Language',
-    'lang.selfName': 'EN',
     'lang.switchUnavailable': 'Switching to {language} isn\'t available right now.',
 
     /* ── Loading & errors ── */

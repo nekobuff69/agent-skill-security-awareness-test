@@ -132,7 +132,7 @@
     "components": [
       "os-window (raised frame on the teal desktop: the frame paints an opaque chrome face and its padding reserves the bevel, #app fills the client area inside that edge — tickets #60/#71; on the results and review views it is positioned by the window's Geometry and carries a corner size grip)",
       "title bar (navy→#1084D0 gradient, 14px W95FA label, [—][□][×] controls drawn as inline-SVG era glyphs — 6×2 bar, 9×9 square, 8×7 cross in currentColor, black live / gray disabled, #49; the ONE window chrome — the results header no longer fakes a window of its own)",
-      "taskbar (start button + program button + the two-segment EN/中文 Language Toggle that replaced the clock tray, #50; pressed-state flip on minimize)",
+      "taskbar (start button + program button + the single-label Language Toggle that replaced the clock tray, #50 - one sunken tray field whose one button names the language a press moves to; the bar's face reaches the screen edge over the system bottom inset while its controls stay above the gesture band, ADR 0022)",
       "start menu popup and about/system dialog primitive (js/windows.js App.Windows.openSystemDialog: backdrop dims desktop 25%, one dialog at a time, closes only by button/Escape)",
       "boot splash (sunken groove, segmented navy stepped fill, status line)",
       "welcome splash (the compact landing wizard card, #53: 64px inline eye glyph, two-line uppercase catchphrase on the Silkscreen display face — 32px, the Fusion Pixel subset carrying it on the Chinese page at 36px — the Bank's title as subtitle, a hairline rule, one body line + time estimate, a single default [Start] — the language affordance is the taskbar toggle, never a dialog)",
@@ -142,7 +142,7 @@
       "title card (results window: navy bar + sunken white client field, percentage in --color-score-*)",
       "risk radar (sunken white field, black-on-white vector chart)",
       "blind-spot bars (sunken dithered track — 1px repeating-conic dither, graphics-only; square dark fills)",
-      "action plan + expanders (action plan = ONE ranked list: the Actions are rows in a single sunken white field — sunken priority badge, title, AST chip, description, hairline separators, no navy head row and no raised card frame, #72; the Narrative Expander and the Review accordion share the Explorer disclosure idiom — a silver row led by the square [+]/[-] glyph, black on the face, never navy; the Deep-Dive Prompt keeps no expander at all, #74 — its window body is the one-line guidance above a sunken scrolling prompt field, and its single Copy Prompt command sits in the window's flat bar, the same strip surface as the Quiz menu bar with no menu in it)",
+      "action plan + expanders (action plan = ONE ranked list: the Actions are rows in a single sunken white field — sunken priority badge, title, AST chip, description, hairline separators, no navy head row and no raised card frame, #72; the Narrative Expander and the Review accordion share the Explorer disclosure idiom — a silver row led by the square [+]/[-] glyph, black on the face, never navy; the Deep-Dive Prompt keeps no expander at all, #74 — its window body is the one-line guidance, a sunken scrolling prompt field, then the full-width Copy Prompt button closing the section, with no command strip above it)",
       "system dialog warn/info icons (flat 32px circles)",
       "command buttons on every surface (raised bevel, dotted focus rectangle, sunken press)"
     ]

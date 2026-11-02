@@ -7,7 +7,9 @@
   /**
    * Desktop shell (ticket #38): window frame, taskbar, Start menu, About
    * window. Ticket #43 makes the title-bar controls live; ticket #50
-   * replaces the tray clock with the two-segment language toggle; ticket
+   * replaces the tray clock with the tray language control (one label
+   * since the tray was compacted: it names the language a press moves
+   * to); ticket
    * #61 adds the Action Plan and the Deep-Dive Prompt windows, so the
    * shell builds THREE program frames — one chrome, one control idiom, one
    * taskbar button each — instead of wrapping #app alone. Ticket #62 puts
@@ -309,30 +311,29 @@
     quitItem.setAttribute('data-os-menu', 'quit');
     menu.appendChild(quitItem);
 
-    // ── Tray language toggle (tickets #50, #55) ──────────────────────────
-    // Two segments name both languages: the active language renders
-    // pressed (aria-pressed=true), the other flat. Both segments run one
-    // action (deps.trayLang.onClick): js/lang-switch.js swaps the Chrome
-    // String dictionary and Bank Variant in place on the splash and
-    // answering screens, and keeps the record-and-navigate action for
-    // the views it does not swap. Built only when the page declares a
-    // data-lang-alt, so a page without an alternate shows no toggle.
+    // ── Tray language switch (tickets #50, #55) ──────────────────────────
+    // ONE field, ONE label: the tray names the language the Participant is
+    // NOT reading, so the control always says what a press will do ("中文"
+    // while the page reads English) instead of repeating the language
+    // already on screen. There is no pressed state left to paint — a
+    // one-option toggle would be lying — so the button carries the switch
+    // phrase as its accessible name and tooltip, and its visible text is
+    // the target language. The press runs deps.trayLang.onClick
+    // (js/lang-switch.js): swap dictionary and Bank Variant in place on the
+    // splash and answering screens, record-and-navigate on the views it
+    // does not swap. Built only when the page declares a data-lang-alt, so
+    // a page without an alternate shows no control.
     var langToggle = null;
-    var langSegments = null;
+    var langButton = null;
     if (deps.trayLang) {
       langToggle = createEl(doc, 'div', 'os-lang-toggle');
       langToggle.setAttribute('role', 'group');
       langToggle.setAttribute('aria-label', deps.trayLang.title);
-      langSegments = {};
-      [['self', deps.trayLang.self, 'true'],
-       ['other', deps.trayLang.other, 'false']].forEach(function(spec) {
-        var seg = createEl(doc, 'button', 'os-lang-seg', spec[1].label);
-        seg.type = 'button';
-        seg.setAttribute('aria-pressed', spec[2]);
-        if (spec[1].title) seg.setAttribute('title', spec[1].title);
-        langToggle.appendChild(seg);
-        langSegments[spec[0]] = seg;
-      });
+      langButton = createEl(doc, 'button', 'os-lang-seg', deps.trayLang.label);
+      langButton.type = 'button';
+      langButton.setAttribute('aria-label', deps.trayLang.labelTitle);
+      langButton.setAttribute('title', deps.trayLang.labelTitle);
+      langToggle.appendChild(langButton);
     }
 
     // ── Program button (pressed: this window is the running program) ─────
@@ -498,7 +499,7 @@
       programBtns: programBtns,
       programLabels: programLabels,
       langToggle: langToggle,
-      langSegments: langSegments,
+      langButton: langButton,
       // Desktop shortcuts (ticket #62): the column, its items and labels.
       shortcutBar: shortcutBar,
       shortcutEls: shortcutEls,
@@ -506,20 +507,21 @@
 
       /**
        * Re-resolve every Chrome String on the shell after an in-place
-       * language switch (#55): tray labels and pressed states, title bar,
+       * language switch (#55): tray label and switch phrase, title bar,
        * Start button, About window. Render-time resolution, exactly as
        * the quiz views rebuild theirs (ADR 0015).
        */
       refreshLang: function() {
         var I18n = app.I18n;
         if (!I18n || I18n.locale === null) return false;
-        if (langSegments) {
+        if (langButton) {
           langToggle.setAttribute('aria-label', I18n.t('lang.offerTitle'));
-          langSegments.self.textContent = I18n.t('lang.selfName');
-          langSegments.self.setAttribute('aria-pressed', 'true');
-          langSegments.other.textContent = I18n.t('lang.otherShort');
-          langSegments.other.setAttribute('aria-pressed', 'false');
-          langSegments.other.setAttribute('title', I18n.t('lang.switchLabel'));
+          // The label and the accessible name BOTH move: the visible
+          // text names the language the page is not in, the phrase names
+          // the move. A stale one would mislabel the other.
+          langButton.textContent = I18n.t('lang.otherShort');
+          langButton.setAttribute('aria-label', I18n.t('lang.switchLabel'));
+          langButton.setAttribute('title', I18n.t('lang.switchLabel'));
         }
         titleText.textContent = I18n.t('shell.windowTitle');
         windowEl.setAttribute('aria-label', I18n.t('shell.windowTitle'));
@@ -657,11 +659,9 @@
 
     // ── Wiring ───────────────────────────────────────────────────────────
     on(startBtn, 'click', function() { controller.toggleMenu(); });
-    if (langSegments) {
-      [langSegments.self, langSegments.other].forEach(function(seg) {
-        on(seg, 'click', function() {
-          if (typeof deps.trayLang.onClick === 'function') deps.trayLang.onClick();
-        });
+    if (langButton) {
+      on(langButton, 'click', function() {
+        if (typeof deps.trayLang.onClick === 'function') deps.trayLang.onClick();
       });
     }
     on(aboutItem, 'click', function() {
@@ -922,10 +922,10 @@
     // attach() afterwards gives the controller the DOM to render onto.
     var win = app.Windows ? app.Windows.create({ doc: doc }) : null;
 
-    // Language surfaces (ticket #50): the tray toggle shows the page's own
-    // language pressed (lang.selfName) and the declared alternate flat
-    // (lang.otherName); the group label reuses lang.offerTitle ("Language"),
-    // and both segments run the switch action above. Only pages declaring a
+    // Language surfaces (ticket #50): the tray control names the language
+    // a press moves TO (lang.otherShort) and carries the switch phrase as
+    // its accessible name (lang.switchLabel); the field's group label
+    // reuses lang.offerTitle ("Language"). Only pages declaring a
     // data-lang-alt get the tray control.
     var langAlt = doc.documentElement.getAttribute('data-lang-alt');
     var langAction = langAlt ? switchLanguage : null;
@@ -936,11 +936,8 @@
       strings: resolveStrings(I18n, STRING_IDS),
       trayLang: langAction ? {
         title: I18n.t('lang.offerTitle'),
-        self: { label: I18n.t('lang.selfName') },
-        other: {
-          label: I18n.t('lang.otherShort'),
-          title: I18n.t('lang.switchLabel')
-        },
+        label: I18n.t('lang.otherShort'),
+        labelTitle: I18n.t('lang.switchLabel'),
         onClick: langAction
       } : null,
       windows: win ? {

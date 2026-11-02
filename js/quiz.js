@@ -184,12 +184,13 @@
     // ── Pinned window footer (ticket #52): the wizard actions live in
     //    .quiz-footer, built once per run (buildView); only their state
     //    changes per card — Back disabled on the first Question, [Next]
-    //    hidden on the last, [Finish] enabled only when every Question
-    //    has an Option selected (the single path to Completion, ADR 0020).
+    //    hidden on the last, [Finish] enabled as soon as every Question
+    //    has an Option selected, wherever the Participant is standing (the
+    //    single path to Completion, ADR 0020 as amended: a complete run is
+    //    committable from Question 3, not only from the 20th).
     footerBack.disabled = (idx === 0);
     footerNext.hidden = app.WizardNav.isLast(questions.length, idx);
-    footerFinish.disabled = !(app.WizardNav.isLast(questions.length, idx) &&
-                              app.WizardNav.canFinish(answers));
+    footerFinish.disabled = !app.WizardNav.canFinish(answers);
 
     quizBody.appendChild(card);
     currentCard = card;

@@ -2,7 +2,12 @@
 <html lang="zh-Hans" data-bank="../questions.zh.json" data-corpus="../docs/owasp-ast-full.md" data-lang-alt="../" data-lang-alt-locale="en" data-lang-alt-lang="en" data-lang-alt-dict="../i18n/en.js" data-lang-alt-bank="../questions.json">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- viewport-fit=cover (ADR 0022): the desktop paints to the screen's
+       edge, and css/shell.css pays the system's insets back through
+       env(safe-area-inset-*) so the taskbar and the frame never sit under
+       the gesture band or the notch. Without cover the browser insets the
+       viewport itself and the bar floats above the screen's bottom edge. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>智能体安全意识测评</title>
 
   <!-- The same assessment in Simplified Chinese. Kept in step with the

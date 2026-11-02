@@ -17,17 +17,36 @@
    ─────────────────────────────────────────────────────────────────── */
 
 :root {
+  /* The bar's own height — its controls' row: 36px on the desktop layout,
+     44px at ≤768px (the touch minimum). The SYSTEM's bottom inset is added
+     on top of it, never inside it. */
   --os-taskbar-height: 36px;
   --os-titlebar-height: 30px;
+
+  /* Safe area (ADR 0022). Both pages opt into `viewport-fit=cover`, which
+     lets the desktop paint to the screen's edge; these two tokens report how
+     much of that edge the system already owns — the gesture band below, the
+     notch/status bar above. They are 0 on every browser that never opted in,
+     so nothing moves on a desktop. */
+  --os-safe-top: env(safe-area-inset-top, 0px);
+  --os-safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  /* The height the bar ACTUALLY occupies, and therefore the height every
+     derived measurement uses: the document's bottom reservation, the
+     frame's mobile inset, the Start-menu anchor. One token, so the chrome's
+     controls and the space it claims can never disagree. */
+  --os-taskbar-total: calc(var(--os-taskbar-height) + var(--os-safe-bottom));
 }
 
 /* ── Taskbar height reservation ────────────────────────────────────────
 
    The taskbar is position:fixed, so the document reserves its height at the
-   bottom; nothing — Retake button included — hides behind it. */
+   bottom; nothing — Retake button included — hides behind it. The top
+   reservation is the system's, kept off the frame for the same reason. */
 
 body {
-  padding-bottom: var(--os-taskbar-height);
+  padding-top: var(--os-safe-top);
+  padding-bottom: var(--os-taskbar-total);
   /* The window owns all scrolling (ticket #52): long views scroll inside
      the client area, never the page. */
   overflow: hidden;
@@ -49,7 +68,13 @@ body {
   display: flex;
   flex-direction: column;
   max-width: var(--max-width);
-  height: calc(100vh - var(--os-taskbar-height));
+  /* 100dvh, not 100vh (ADR 0022): on a phone `vh` is the LARGE viewport —
+     the height with the URL bar retracted — so a vh-sized frame is taller
+     than the visible area and its footer and status bar slide down behind
+     the taskbar. The dvh line is the one that ships; the vh line above it
+     is the fallback for browsers that never learned dvh. */
+  height: calc(100vh - var(--os-safe-top) - var(--os-taskbar-total));
+  height: calc(100dvh - var(--os-safe-top) - var(--os-taskbar-total));
   margin: 0 auto;
   /* Ticket #71: the face and the bevel are the frame's own paint. The
      padding reserves the bevel's thickness (98.css: face + 3px edge) and
@@ -121,8 +146,10 @@ body:has(#app > #landing-view:not([hidden])) {
   /* The taskbar is fixed at the bottom edge; body's normal reserved
      padding would push the centred window up by its own height, so the
      splash reserves nothing and the window centres in the viewport strip
-     above the bar. */
-  height: calc(100vh - var(--os-taskbar-height));
+     between the two system insets (ADR 0022). */
+  height: calc(100vh - var(--os-safe-top) - var(--os-taskbar-total));
+  height: calc(100dvh - var(--os-safe-top) - var(--os-taskbar-total));
+  padding-top: 0;
   padding-bottom: 0;
 }
 
@@ -253,7 +280,7 @@ body:has(#app > #landing-view:not([hidden])) .os-window {
    (ticket #68) are the only route between the programs. */
 .os-shortcuts {
   position: fixed;
-  top: var(--space-2);
+  top: calc(var(--os-safe-top) + var(--space-2));
   left: var(--space-2);
   display: flex;
   flex-direction: column;
@@ -382,8 +409,11 @@ body:has(#quiz-view:not([hidden])) .os-shortcuts {
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  height: var(--os-taskbar-height);
+  /* The bar's face reaches the screen's edge; its controls stay above the
+     system's gesture band, which it owns as bottom padding (ADR 0022). */
+  height: var(--os-taskbar-total);
   padding: 2px var(--space-2);
+  padding-bottom: var(--os-safe-bottom);
   background: var(--color-face);
   box-shadow: inset 0 1px #FFFFFF, inset 0 -1px #000000;
   font-family: var(--font-heading);
@@ -444,15 +474,18 @@ body:has(#quiz-view:not([hidden])) .os-shortcuts {
   text-align: left;
 }
 
-/* ── Tray language toggle (tickets #50, #55) ──────────────────────────
+/* ── Tray language switch (tickets #50, #55) ──────────────────────────
 
-   A two-segment sunken tray field naming both languages: the active
-   language pressed (white field, 1px inset), the other flat. Both
-   segments run one action (js/shell.js switchLanguage → js/lang-switch.js):
-   swap the dictionary and Bank Variant in place on the splash and
-   answering screens (#55), recording the Language Preference; other views
-   record it and navigate the declared alternate. Replaces the taskbar
-   clock. */
+   ONE label, naming the language the page is NOT in ("中文" while the page
+   reads English), so the field always says what a press will do rather
+   than what is already true. It keeps the two-segment control's sunken
+   tray shape — the field is chrome, not a fourth program switch — and its
+   one button wears the filled face the pressed segment used to wear, which
+   is what makes it read as a command. The switch itself is unchanged
+   (js/shell.js switchLanguage → js/lang-switch.js): swap the dictionary
+   and Bank Variant in place on the splash and answering screens (#55),
+   recording the Language Preference; other views record it and navigate
+   the declared alternate. Replaces the taskbar clock. */
 
 .os-lang-toggle {
   flex: none;
@@ -471,18 +504,9 @@ body:has(#quiz-view:not([hidden])) .os-shortcuts {
   padding: 0 var(--space-2);
   font-family: var(--font-heading);
   font-size: 14px;
-  background: transparent;
-  box-shadow: none;
-}
-
-.os-lang-seg[aria-pressed='true'] {
   background: var(--color-surface);
   box-shadow: inset 1px 1px var(--color-secondary),
               inset -1px -1px var(--color-surface);
-}
-
-.os-lang-seg[aria-pressed='false'] {
-  color: var(--color-text);
 }
 
 .os-lang-seg:focus-visible {
@@ -498,7 +522,7 @@ body:has(#quiz-view:not([hidden])) .os-shortcuts {
 .os-start-menu {
   display: none;
   position: fixed;
-  bottom: var(--os-taskbar-height);
+  bottom: var(--os-taskbar-total);
   left: var(--space-2);
   z-index: 1100;
   min-width: 180px;
@@ -791,13 +815,22 @@ body:has(#quiz-view:not([hidden])) .os-shortcuts {
        the 44px touch minimum edge to edge. A shorter bar would need
        invisible hit-area extensions, which lie about the visible chrome.
        Every derived measurement (body padding-bottom, Start-menu anchor,
-       window insets) follows this one var. */
+       window insets) reads --os-taskbar-total, which adds the system's
+       bottom inset to this var — never this var alone. */
     --os-taskbar-height: 44px;
   }
 
   .os-window {
     position: fixed;
-    inset: 0 0 var(--os-taskbar-height) 0;
+    /* The frame is the viewport minus the two system insets and the bar:
+       these four edges size it, which is why height must NOT be left at
+       the desktop rule's value — an over-constrained fixed box ignores
+       `bottom` and keeps its height (ADR 0022). `height: auto` is what
+       makes the inset authoritative; with a vh height here the frame
+       out-runs the visible area by the URL bar's height and the quiz
+       footer + status bar land behind the taskbar. */
+    inset: var(--os-safe-top) 0 var(--os-taskbar-total) 0;
+    height: auto;
     max-width: none;
     margin: 0;
     box-shadow: none;
@@ -809,7 +842,8 @@ body:has(#quiz-view:not([hidden])) .os-shortcuts {
      with it. Restated at mobile specificity so a class that outlives a
      viewport crossing can never leave a half-positioned frame. */
   .os-window.is-windowed {
-    inset: 0 0 var(--os-taskbar-height) 0;
+    inset: var(--os-safe-top) 0 var(--os-taskbar-total) 0;
+    height: auto;
     max-width: none;
   }
 
@@ -856,6 +890,11 @@ body:has(#quiz-view:not([hidden])) .os-shortcuts {
     flex: 0 1 auto;
     min-width: 0;
     margin-right: 0;   /* auto margins eat the switcher's slots */
+    /* The bar's full content height, because the program switches size
+       themselves with height:100% — and a percentage against an AUTO-height
+       parent resolves to auto, which collapsed these two buttons to their
+       15px line box while Start, the Quiz button and the tray sat at 44. */
+    height: 100%;
   }
 
   .os-taskbar-programs:has(.os-program-btn:not([hidden])) {
@@ -873,9 +912,10 @@ body:has(#quiz-view:not([hidden])) .os-shortcuts {
     margin: 0;
   }
 
-  /* Vertical padding would shrink the controls below the 44px bar. */
+  /* Vertical padding would shrink the controls below the 44px bar; the
+     system's bottom inset is the one padding this layout keeps. */
   .os-taskbar {
-    padding: 0 var(--space-2);
+    padding: 0 var(--space-2) var(--os-safe-bottom);
   }
 
   /* Taskbar controls fill the bar edge to edge: 44px tall hit targets. */

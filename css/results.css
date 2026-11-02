@@ -412,12 +412,12 @@
   padding-bottom: var(--space-3);
 }
 
-/* ── Deep-Dive Prompt (ticket #74) ──
+/* ── Deep-Dive Prompt ──
 
-   The fold is gone: the window body is the one-line guidance above the
-   prompt's sunken scrollable field, and the window's one Copy Prompt
-   command sits in the bar above it (the .results-menu-bar surface the
-   Quiz window shares). The navy expander row went with the <details>. */
+   The window body reads: the one-line guidance, the prompt's sunken
+   scrollable field, then the Copy command as a full-width button under it.
+   No fold (#74 retired the <details>) and no command strip: the button is
+   body content, sized to the column the guidance and the field share. */
 .results-deep-dive {
   display: flex;
   flex-direction: column;
@@ -455,6 +455,12 @@
   background: var(--color-bg);
   color: var(--color-accent);
   cursor: pointer;
+  /* The closing command: full-width under the field, on the same column the
+     guidance and the prompt share. `align-self: stretch` is what does it —
+     the pre-#74 rule reached for `width: calc(100% − 64px)` with 24px side
+     margins, which lands 16px off-centre inside this flex column. */
+  align-self: stretch;
+  margin: var(--space-2) 0 var(--space-3);
   transition: all var(--transition-fast);
 }
 

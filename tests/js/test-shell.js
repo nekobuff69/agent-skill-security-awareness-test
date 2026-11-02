@@ -295,11 +295,8 @@ exports.run = function() {
       strings: Shell.resolveStrings(I18n, Shell.STRING_IDS),
       trayLang: {
         title: I18n.t('lang.offerTitle'),
-        self: { label: I18n.t('lang.selfName') },
-        other: {
-          label: I18n.t('lang.otherShort'),
-          title: I18n.t('lang.switchLabel')
-        },
+        label: I18n.t('lang.otherShort'),
+        labelTitle: I18n.t('lang.switchLabel'),
         onClick: fakeSwitch
       }
     });
@@ -315,34 +312,27 @@ exports.run = function() {
     langZh.langToggle.getAttribute('aria-label') === '语言',
     langEn.langToggle.getAttribute('aria-label'));
 
-  check('both language names show: EN + 中文 on en, 中文 + EN on zh',
-    langEn.langSegments.self.textContent === 'EN' &&
-    langEn.langSegments.other.textContent === '中文' &&
-    langZh.langSegments.self.textContent === '中文' &&
-    langZh.langSegments.other.textContent === 'EN',
-    langEn.langSegments.self.textContent + '+' +
-    langEn.langSegments.other.textContent + '/' +
-    langZh.langSegments.self.textContent + '+' +
-    langZh.langSegments.other.textContent);
+  check('one label names the language a press moves TO (中文 on en, EN on zh)',
+    langEn.langButton.textContent === '中文' &&
+    langZh.langButton.textContent === 'EN',
+    langEn.langButton.textContent + '/' + langZh.langButton.textContent);
 
-  check('the page language is pressed, the alternate flat (aria-pressed)',
-    langEn.langSegments.self.getAttribute('aria-pressed') === 'true' &&
-    langEn.langSegments.other.getAttribute('aria-pressed') === 'false' &&
-    langZh.langSegments.self.getAttribute('aria-pressed') === 'true' &&
-    langZh.langSegments.other.getAttribute('aria-pressed') === 'false',
-    langEn.langSegments.self.getAttribute('aria-pressed') + '/' +
-    langEn.langSegments.other.getAttribute('aria-pressed'));
+  check('no pressed state survives a one-option control (aria-pressed gone)',
+    langEn.langButton.getAttribute('aria-pressed') === null &&
+    langZh.langButton.getAttribute('aria-pressed') === null,
+    String(langEn.langButton.getAttribute('aria-pressed')));
 
-  check('the alternate segment carries the switch tooltip',
-    langEn.langSegments.other.getAttribute('title') === 'Switch to Chinese' &&
-    langZh.langSegments.other.getAttribute('title') === '切换到英文',
-    langEn.langSegments.other.getAttribute('title'));
+  check('the button names the move it performs, for title and screen readers',
+    langEn.langButton.getAttribute('title') === 'Switch to Chinese' &&
+    langEn.langButton.getAttribute('aria-label') === 'Switch to Chinese' &&
+    langZh.langButton.getAttribute('title') === '切换到英文' &&
+    langZh.langButton.getAttribute('aria-label') === '切换到英文',
+    langEn.langButton.getAttribute('title'));
 
-  check('both segments are native buttons in one field (keyboard reachable)',
-    langEn.langToggle.children.length === 2 &&
-    langEn.langToggle.children.every(function(seg) {
-      return seg.tagName === 'BUTTON' && seg.type === 'button';
-    }));
+  check('the field holds one native button (keyboard reachable)',
+    langEn.langToggle.children.length === 1 &&
+    langEn.langToggle.children[0] === langEn.langButton &&
+    langEn.langButton.tagName === 'BUTTON' && langEn.langButton.type === 'button');
 
   check('the Start menu carries no language entry',
     langEn.langItem === undefined &&
@@ -350,27 +340,24 @@ exports.run = function() {
       return child.getAttribute('data-os-menu') !== 'language';
     }) &&
     langEn.menu.children.every(function(child) {
-      return child.textContent !== I18n.t('lang.selfName') &&
+      return child.textContent !== I18n.t('lang.name') &&
         child.textContent !== I18n.t('lang.otherShort');
     }),
     'items=' + langEn.menu.children.length);
 
   I18n.use('en');
-  langEn.langSegments.other.click();
-  check('clicking the alternate segment runs the switch action',
+  langEn.langButton.click();
+  check('clicking the one label runs the switch action',
     switchCalls === 1, 'calls=' + switchCalls);
-  langEn.langSegments.self.click();
-  check('clicking the pressed segment runs the same switch action',
+  langZh.langButton.click();
+  check('the zh field routes through the same action',
     switchCalls === 2, 'calls=' + switchCalls);
-  langZh.langSegments.other.click();
-  check('the zh toggle routes through the same action',
-    switchCalls === 3, 'calls=' + switchCalls);
 
   // A build without language deps (a page with no declared alternate)
-  // renders no toggle at all.
+  // renders no control at all.
   var noLang = mount('en');
-  check('a page without a declared alternate shows no language toggle',
-    noLang.ctl.langToggle === null && noLang.ctl.langSegments === null &&
+  check('a page without a declared alternate shows no language control',
+    noLang.ctl.langToggle === null && noLang.ctl.langButton === null &&
     noLang.ctl.langItem === undefined);
 
   // The switch action itself: records the Language Preference, then
@@ -616,8 +603,14 @@ exports.run = function() {
   check('css: the shortcut column disappears at ≤768px',
     /\.os-shortcuts\s*\{[^}]*display:\s*none/.test(mobileOnly));
   check('css: at ≤768px one program frame fills the screen above the slim taskbar',
-    /\.os-window\s*\{[^}]*position:\s*fixed[^}]*inset:\s*0 0 var\(--os-taskbar-height\) 0/.test(mobileOnly) &&
+    /\.os-window\s*\{[^}]*position:\s*fixed[^}]*inset:\s*var\(--os-safe-top\) 0 var\(--os-taskbar-total\) 0/.test(mobileOnly) &&
     /:root\s*\{[^}]*--os-taskbar-height:\s*44px/.test(mobileOnly));
+  // ADR 0022: the insets size the frame, so height must not be left at the
+  // desktop rule's vh value — that is what pushed the quiz footer behind
+  // the taskbar on a phone.
+  check('css: the mobile frame takes its height from the insets, not from vh',
+    /\.os-window\s*\{[^}]*inset:[^}]*height:\s*auto/.test(mobileOnly) &&
+    /\.os-window\.is-windowed\s*\{[^}]*inset:[^}]*height:\s*auto/.test(mobileOnly));
   check('css: the window body keeps its own scroll inside the full-screen frame',
     /\.os-window\s*\{[^}]*overflow:\s*hidden/.test(mobileOnly) &&
     /\.os-window #app\s*\{[^}]*height:\s*100%[^}]*overflow:\s*auto/.test(mobileOnly));
@@ -630,12 +623,17 @@ exports.run = function() {
   check('css: the three program switches share the slim bar',
     /\.os-taskbar \.os-program-btn\s*\{[^}]*flex:\s*1 1 0/.test(mobileOnly) &&
     /\.os-taskbar-programs:has\(\.os-program-btn:not\(\[hidden\]\)\)\s*\{[^}]*flex:\s*2 1 0/.test(mobileOnly) &&
-    /\.os-start-btn,\s*\.os-program-btn,\s*\.os-lang-toggle\s*\{[^}]*height:\s*100%/.test(mobileOnly));
+    /\.os-start-btn,\s*\.os-program-btn,\s*\.os-lang-toggle\s*\{[^}]*height:\s*100%/.test(mobileOnly) &&
+    // The switches size themselves with height:100%, and a percentage
+    // against an auto-height parent resolves to auto — which flattened the
+    // Action Plan and Deep-Dive buttons to their line box while Start, the
+    // Quiz button and the tray sat at the full 44px.
+    /\.os-taskbar-programs\s*\{[^}]*height:\s*100%/.test(mobileOnly));
   check('css: the desktop column is a top-left stack of icons',
     /\.os-shortcuts\s*\{[^}]*position:\s*fixed/.test(shellCss) &&
     /\.os-shortcuts\s*\{[^}]*flex-direction:\s*column/.test(shellCss) &&
     /\.os-shortcuts\s*\{[^}]*left:\s*var\(--space-2\)/.test(shellCss) &&
-    /\.os-shortcuts\s*\{[^}]*top:\s*var\(--space-2\)/.test(shellCss));
+    /\.os-shortcuts\s*\{[^}]*top:\s*calc\(var\(--os-safe-top\) \+ var\(--space-2\)\)/.test(shellCss));
   check('css: the shortcut column rides the desktop base layer under every Window (#75)',
     (function() {
       var Windows = require('../../js/windows.js');

@@ -462,6 +462,12 @@ exports.run = function() {
   while (back.disabled === false) back.click();      // walk back to Q1
   check('walking back reaches Question 1 (counter 1 / 3)',
     counter.textContent === '1 / 3', counter.textContent);
+  // ADR 0020 as amended: the commit gate reads the ANSWERS, not the
+  // position — a complete run is committable from any card, which is the
+  // point of walking back to change one Option without re-walking forward.
+  check('Finish stays enabled after walking back off the last card (1 / 3)',
+    finish.disabled === false && finish.hidden === false,
+    counter.textContent + '/' + finish.disabled);
   optionRow(2).click();               // re-mark Q1 with a different Option
   check('re-answer overwrites in place: card stays on Question 1',
     counter.textContent === '1 / 3', counter.textContent);
@@ -547,8 +553,11 @@ exports.run = function() {
     /\.quiz-status-track\s*\{[^}]*height:\s*14px/.test(quizCss) &&
     /\.quiz-status-fill\s*\{[^}]*height:\s*100%/.test(quizCss));
 
+  // ADR 0022: the frame is sized against the VISIBLE viewport (dvh), the two
+  // system insets and the bar's total height (its own height + the bottom
+  // inset), with the vh line kept as the fallback for browsers without dvh.
   check('shell.css: window is fixed height above the taskbar',
-    /\.os-window\s*\{[^}]*height:\s*calc\(100vh - var\(--os-taskbar-height\)\)/.test(shellCss));
+    /\.os-window\s*\{[^}]*height:\s*calc\(100vh - var\(--os-safe-top\) - var\(--os-taskbar-total\)\)[^}]*height:\s*calc\(100dvh - var\(--os-safe-top\) - var\(--os-taskbar-total\)\)/.test(shellCss));
   check('shell.css: the page itself never scrolls',
     /body\s*\{[^}]*overflow:\s*hidden/.test(shellCss));
   check('shell.css: every view scrolls internally except the quiz',
@@ -565,7 +574,7 @@ exports.run = function() {
   check('shell.css: splash window is ~560px content-sized, centred above the taskbar',
     /body:has\(#app > #landing-view:not\(\[hidden\]\)\)\s+\.os-window\s*\{[^}]*width:\s*min\(560px/.test(shellCss) &&
     /body:has\(#app > #landing-view:not\(\[hidden\]\)\)\s+\.os-window\s*\{[^}]*height:\s*auto/.test(shellCss) &&
-    /body:has\(#app > #landing-view:not\(\[hidden\]\)\)\s*\{[^}]*height:\s*calc\(100vh - var\(--os-taskbar-height\)\)/.test(shellCss));
+    /body:has\(#app > #landing-view:not\(\[hidden\]\)\)\s*\{[^}]*height:\s*calc\(100vh - var\(--os-safe-top\) - var\(--os-taskbar-total\)\)[^}]*height:\s*calc\(100dvh - var\(--os-safe-top\) - var\(--os-taskbar-total\)\)/.test(shellCss));
 
   check('styles.css: welcome card on the wizard classes, no editorial banner',
     /#landing-view\.wizard\s*\{/.test(stylesCss) &&

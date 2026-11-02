@@ -24,7 +24,6 @@
     'lang.otherShort': 'EN',
     'lang.switchLabel': '切换到英文',
     'lang.offerTitle': '语言',
-    'lang.selfName': '中文',
     'lang.switchUnavailable': '暂时无法切换到{language}。',
 
     /* ── 加载与错误 ── */

@@ -417,28 +417,29 @@ exports.run = function() {
         byRole([ddFrame.windowEl], 'menubar').length === 0 &&
         byRole([ddFrame.windowEl], 'menuitem').length === 0);
 
-      // ── Ticket #74: the Deep-Dive window is one prompt field and its bar ──
-      // The fold is gone. The body leads with the window's flat command
-      // strip — the Quiz menu-bar surface carrying ONE command, no menu
-      // role — then the one-line guidance, then the prompt, visible before
-      // any press because nothing is collapsed any more.
+      // ── The Deep-Dive window: guidance, prompt field, Copy under it ──
+      // No fold and no command strip. The body is the window title's own
+      // section: the heading, then the guidance, the prompt (visible on
+      // arrival) and the Copy button closing the column.
       var ddSectionEl = ddFrame.bodyEl.children[0];
-      var ddBar = ddSectionEl.children[0];
-      var ddBody = ddSectionEl.children[2];
-      check('the Copy bar heads the Deep-Dive body and no fold survives in it',
-        String(ddBar.className).indexOf('results-deep-dive-bar') >= 0 &&
-        String(ddBar.className).indexOf('results-menu-bar') >= 0 &&
+      var ddBody = ddSectionEl.children[1];
+      check('no command strip heads the Deep-Dive body and no fold survives',
+        ddSectionEl.children.length === 2 &&
+        String(ddSectionEl.children[0].className).indexOf('results-section-title') >= 0 &&
         byTag(ddFrame.bodyEl, 'details').length === 0 &&
-        byTag(ddFrame.bodyEl, 'summary').length === 0);
+        byTag(ddFrame.bodyEl, 'summary').length === 0 &&
+        byRole([ddFrame.windowEl], 'menubar').length === 0);
       check('the guidance line sits above a prompt field that is open on restore',
         ddBody.children[0].textContent === App.I18n.t('results.deepDiveSub') &&
         ddBody.children[1].tagName === 'PRE' &&
         ddBody.children[1].textContent === PROMPT_MARK,
         textOf(ddBody).join(' ').slice(0, 60));
-      var ddCommands = buttonsUnder(ddBar);
-      check('the bar owns one flat Copy Prompt command',
+      var ddCommands = buttonsUnder(ddBody);
+      check('the Copy command closes the body, under the prompt field',
         ddCommands.length === 1 &&
         buttonsUnder(ddFrame.bodyEl).length === 1 &&
+        ddBody.children[ddBody.children.length - 1] === ddCommands[0] &&
+        String(ddCommands[0].className).indexOf('results-copy-btn') >= 0 &&
         ddCommands[0].textContent === App.I18n.t('results.copy'),
         ddCommands.map(function(b) { return b.textContent; }).join('|'));
       App.SessionStore = { clear: function() {}, load: function() { return { ok: true, answers: [] }; } };
