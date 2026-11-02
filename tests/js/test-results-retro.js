@@ -287,7 +287,7 @@ exports.run = function() {
         { text: 'Option B', feedback: 'Why B.' }
       ],
       best_practice: 'Do the safe thing.',
-      ast_source_url: 'https://owasp.org/x'
+      ast_source_url: 'https://owasp.github.io/x'
     }]
   };
   var review = internals.buildReview(bank, [1]);
@@ -318,7 +318,7 @@ exports.run = function() {
     questions: [{
       id: 'q1',
       scenario: 'EN scenario', question: 'EN question?',
-      best_practice: 'EN best practice.', ast_source_url: 'https://owasp.org/en',
+      best_practice: 'EN best practice.', ast_source_url: 'https://owasp.github.io/en',
       options: [
         { text: 'EN option A', feedback: 'EN feedback A.' },
         { text: 'EN option B', feedback: 'EN feedback B.' }
@@ -334,7 +334,7 @@ exports.run = function() {
     questions: [{
       id: 'q1',
       scenario: '中文情景', question: '中文问题？',
-      best_practice: '中文最佳实践。', ast_source_url: 'https://owasp.org/zh',
+      best_practice: '中文最佳实践。', ast_source_url: 'https://owasp.github.io/zh',
       options: [
         { text: '中文选项 A', feedback: '中文反馈 A。' },
         { text: '中文选项 B', feedback: '中文反馈 B。' }
@@ -352,14 +352,14 @@ exports.run = function() {
         id: 'q1', scenario: 'EN scenario', question: 'EN question?',
         selectedOption: enBank56.questions[0].options[1],
         bestPractice: 'EN best practice.',
-        astSourceUrl: 'https://owasp.org/en',
+        astSourceUrl: 'https://owasp.github.io/en',
         astRisks: ['AST01']
       },
       {
         id: 'q99', scenario: 'EN orphan scenario', question: 'EN orphan?',
         selectedOption: { text: 'EN orphan option' },
         bestPractice: 'EN orphan practice.',
-        astSourceUrl: 'https://owasp.org/orphan',
+        astSourceUrl: 'https://owasp.github.io/orphan',
         astRisks: ['AST01']
       }
     ],
@@ -377,7 +377,7 @@ exports.run = function() {
     shownZh56.weakestQuestions[0].scenario === '中文情景' &&
     shownZh56.weakestQuestions[0].question === '中文问题？' &&
     shownZh56.weakestQuestions[0].bestPractice === '中文最佳实践。' &&
-    shownZh56.weakestQuestions[0].astSourceUrl === 'https://owasp.org/zh',
+    shownZh56.weakestQuestions[0].astSourceUrl === 'https://owasp.github.io/zh',
     shownZh56.weakestQuestions[0].scenario);
   check('the chosen Option re-anchors by structural index, not by text',
     shownZh56.weakestQuestions[0].selectedOption === zhBank56.questions[0].options[1] &&

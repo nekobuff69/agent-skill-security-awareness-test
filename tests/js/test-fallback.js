@@ -57,7 +57,7 @@ exports.run = function() {
         question: 'What would you actually do?',
         selectedOption: { text: 'Install it — 500+ people can\'t all be wrong', score: 0, feedback: '...' },
         bestPractice: 'Always verify publisher identity.',
-        astSourceUrl: 'https://owasp.org/ast01',
+        astSourceUrl: 'https://owasp.github.io/www-project-agentic-skills-top-10/ast01.html',
         astRisks: ['AST01']
       },
       {
@@ -66,7 +66,7 @@ exports.run = function() {
         question: 'Would you catch this?',
         selectedOption: { text: 'I\'d install it anyway', score: 0, feedback: '...' },
         bestPractice: 'Inspect the full dependency tree.',
-        astSourceUrl: 'https://owasp.org/ast02',
+        astSourceUrl: 'https://owasp.github.io/www-project-agentic-skills-top-10/ast02.html',
         astRisks: ['AST02']
       }
     ],

@@ -290,7 +290,7 @@ exports.run = function() {
         scenario: p.scenario + ' ' + id,
         question: p.question + ' ' + id,
         best_practice: 'Do the safe thing.',
-        ast_source_url: 'https://owasp.org/example',
+        ast_source_url: 'https://owasp.github.io/example',
         options: [0, 1, 2, 3].map(function(i) {
           return { text: p.option + ' ' + id + i, score: i, feedback: 'Why ' + i + '.' };
         })

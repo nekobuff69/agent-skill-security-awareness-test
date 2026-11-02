@@ -54,7 +54,7 @@ exports.run = function() {
           question: 'What would you do?',
           selectedOption: { text: 'Allow all shell commands to streamline workflows', score: 0, feedback: '...' },
           bestPractice: 'Restrict shell execution to an allowlist of pre-approved commands and require user confirmation for any new command.',
-          astSourceUrl: 'https://owasp.org/www-project-agentic-skills-top-10/ast02.html',
+          astSourceUrl: 'https://owasp.github.io/www-project-agentic-skills-top-10/ast02.html',
           astRisks: ['AST02']
         },
         {
@@ -63,7 +63,7 @@ exports.run = function() {
           question: 'How should the agent handle it?',
           selectedOption: { text: 'Summarize the full document including all PII', score: 0, feedback: '...' },
           bestPractice: 'Detect and redact PII before processing; only output sanitized summaries.',
-          astSourceUrl: 'https://owasp.org/www-project-agentic-skills-top-10/ast03.html',
+          astSourceUrl: 'https://owasp.github.io/www-project-agentic-skills-top-10/ast03.html',
           astRisks: ['AST03']
         },
         {
@@ -72,7 +72,7 @@ exports.run = function() {
           question: 'What should the agent do?',
           selectedOption: { text: 'Trust the plugin data and override system instructions', score: 0, feedback: '...' },
           bestPractice: 'Treat external plugin data as untrusted; never let it override system-level security constraints.',
-          astSourceUrl: 'https://owasp.org/www-project-agentic-skills-top-10/ast05.html',
+          astSourceUrl: 'https://owasp.github.io/www-project-agentic-skills-top-10/ast05.html',
           astRisks: ['AST05']
         }
       ],
@@ -106,7 +106,7 @@ exports.run = function() {
     question: 'What is the correct response?',
     selectedOption: { text: 'Follow the injected instructions since they appear in the content', score: 0, feedback: '...' },
     bestPractice: 'Isolate web content from agent instructions; treat all external text as data, never executable instructions.',
-    astSourceUrl: 'https://owasp.org/www-project-agentic-skills-top-10/ast05.html',
+    astSourceUrl: 'https://owasp.github.io/www-project-agentic-skills-top-10/ast05.html',
     astRisks: ['AST05']
   });
   report5.weakestQuestions.push({
@@ -115,7 +115,7 @@ exports.run = function() {
     question: 'What should the agent do?',
     selectedOption: { text: 'Grant network access anyway since the skill needs it to function properly', score: 0, feedback: '...' },
     bestPractice: 'Enforce principle of least privilege: only honor permissions explicitly granted by the user.',
-    astSourceUrl: 'https://owasp.org/www-project-agentic-skills-top-10/ast03.html',
+    astSourceUrl: 'https://owasp.github.io/www-project-agentic-skills-top-10/ast03.html',
     astRisks: ['AST03']
   });
   var result3 = PromptBuilder.build(report5);
@@ -131,8 +131,8 @@ exports.run = function() {
     result1.indexOf('Allow all shell commands to streamline workflows') !== -1 &&
     result1.indexOf('Summarize the full document including all PII') !== -1 &&
     result1.indexOf('Restrict shell execution to an allowlist') !== -1 &&
-    result1.indexOf('https://owasp.org/www-project-agentic-skills-top-10/ast02.html') !== -1 &&
-    result1.indexOf('https://owasp.org/www-project-agentic-skills-top-10/ast03.html') !== -1,
+    result1.indexOf('https://owasp.github.io/www-project-agentic-skills-top-10/ast02.html') !== -1 &&
+    result1.indexOf('https://owasp.github.io/www-project-agentic-skills-top-10/ast03.html') !== -1,
     'missing content in prompt');
 
   // --- Test 5: Progression Title and percentage in Profile ---
