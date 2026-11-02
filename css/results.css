@@ -267,7 +267,10 @@
   background-color: var(--color-success);
 }
 
-/* ── Action Plan ── */
+/* ── Action Plan ──
+   One ranked list (ticket #72): the Actions are rows inside a single
+   sunken panel — no per-row navy header, no per-row raised card frame.
+   Priority is carried by the sunken white badge on each row. */
 .results-action-plan {
   display: flex;
   flex-direction: column;
@@ -280,18 +283,24 @@
   line-height: 1.6;
 }
 
+/* The ranked panel: a sunken white field, exactly one in the window. */
 .results-action-list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  background: var(--color-surface);
+  box-shadow: var(--bevel-sunken);
 }
 
+/* A row of the list: plain content on the sunken body, read order led by
+   the badge. Rows keep the DOM class, but the chrome is list-row chrome. */
 .results-action-item {
   border: 0;
   border-radius: 0;
   padding: var(--space-3);
-  background: var(--color-face);
-  box-shadow: var(--bevel-raised);
+}
+
+.results-action-item + .results-action-item {
+  border-top: 1px solid var(--color-border);
 }
 
 .results-action-head {
@@ -299,50 +308,29 @@
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
+  margin: 0 0 var(--space-2);
 }
 
-/* The card head paints as the dialog's title bar (same navy gradient the
-   skin draws for .os-titlebar and the expander summaries — one idiom for
-   every nested panel: Action Plan items, Narrative Expander, Deep-Dive). */
-.results-action-item .results-action-head {
-  margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-3)) var(--space-2);
-  padding: 4px var(--space-3);
-  background: linear-gradient(90deg, #000080 0%, #1084D0 100%);
-  color: #FFFFFF;
-  font-family: var(--font-heading);
-}
-
-.results-action-item .results-action-title {
-  font-family: var(--font-heading);
-  font-weight: 400;          /* W95FA carries no bold */
-  color: #FFFFFF;
-}
-
-/* Priority number: a sunken white field on the title bar, navy digit. */
-.results-action-item .results-action-priority {
-  font-family: var(--font-heading);
-  background: var(--color-surface);
-  color: var(--color-primary);
-  border-radius: 0;
-  box-shadow: var(--bevel-sunken);
-}
-
+/* Priority badge: a sunken white field with the navy digit, Win95 square. */
 .results-action-priority {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 1.5rem;
   height: 1.5rem;
-  border-radius: 50%;
-  background: var(--color-primary);
-  color: #fff;
+  font-family: var(--font-heading);
   font-size: 0.75rem;
   font-weight: 700;
   flex-shrink: 0;
+  background: var(--color-surface);
+  color: var(--color-primary);
+  border-radius: 0;
+  box-shadow: var(--bevel-sunken);
 }
 
 .results-action-title {
-  font-weight: 600;
+  font-family: var(--font-heading);
+  font-weight: 400;          /* W95FA carries no bold */
   font-size: 0.9375rem;
   color: var(--color-text);
 }
@@ -368,8 +356,10 @@
 
 /* ── Narrative Expander ──
 
-   Same nested-dialog idiom as the Action Plan items: silver raised panel,
-   navy title-bar summary row, content on the silver body. */
+   The disclosure idiom the Review screen already uses (ticket #72): a list
+   row on the silver panel, led by the square [+]/[-] Explorer glyph — no
+   navy gradient anywhere in window content — and the Narrative prose on
+   the panel body when the row is opened. */
 
 .results-narrative-details {
   border: 0;
@@ -385,14 +375,26 @@
   font-family: var(--font-heading);
   font-size: 0.9375rem;
   font-weight: 400;
-  color: #FFFFFF;
-  background: linear-gradient(90deg, #000080 0%, #1084D0 100%);
+  color: var(--color-text);
   user-select: none;
+  list-style: none;
 }
 
-.results-narrative-summary:hover {
-  background: linear-gradient(90deg, #000080 0%, #1084D0 100%);
-  color: #FFFFFF;
+.results-narrative-summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Square Explorer toggle: [+]/[-] on the row, no easing. */
+.results-narrative-summary::before {
+  content: '[+] ';
+  color: var(--color-text);
+  font-weight: 400;
+  display: inline-block;
+  margin-right: var(--space-1);
+}
+
+.results-narrative-details[open] > .results-narrative-summary::before {
+  content: '[-] ';
 }
 
 .results-narrative-details[open] > .results-narrative-summary {
@@ -495,10 +497,11 @@
 
 /* ── Review Accordion (ticket #45: tree-style disclosure) ──
 
-   Each Question is a tree node in the Explorer idiom: a navy title-bar row
-   with a square [+]/[-] glyph toggle, and an indented sunken client panel
-   of child rows. The review text stays score-free (ADR 0005: no percentages
-   in Review). */
+   Each Question is a tree node in the Explorer idiom: a disclosure row on
+   the silver panel with a square [+]/[-] glyph toggle — ticket #72 took the
+   navy title bar off every in-window row, this one included — and an
+   indented sunken client panel of child rows. The review text stays
+   score-free (ADR 0005: no percentages in Review). */
 
 .results-review {
   display: flex;
@@ -520,8 +523,7 @@
   font-family: var(--font-heading);
   font-size: 0.9375rem;
   font-weight: 400;
-  color: #FFFFFF;
-  background: linear-gradient(90deg, #000080 0%, #1084D0 100%);
+  color: var(--color-text);
   user-select: none;
   list-style: none;
 }
@@ -530,10 +532,10 @@
   display: none;
 }
 
-/* Square Explorer toggle: [+]/[-] on the title bar, no easing. */
+/* Square Explorer toggle: [+]/[-] on the row, no easing. */
 .results-review-summary::before {
   content: '[+] ';
-  color: #FFFFFF;
+  color: var(--color-text);
   font-weight: 400;
   display: inline-block;
   margin-right: var(--space-1);
@@ -547,16 +549,11 @@
   border-bottom: 1px solid #000000;
 }
 
-.results-review-summary:hover {
-  background: linear-gradient(90deg, #000080 0%, #1084D0 100%);
-  color: #FFFFFF;
-}
-
-/* On the navy title bar (the skin paints them there too). */
+/* The Question chip rides the same silver row as its question. */
 .results-review-qnum {
   font-family: var(--font-heading);
   font-weight: 400;
-  color: #FFFFFF;
+  color: var(--color-text);
   font-size: 0.8125rem;
 }
 

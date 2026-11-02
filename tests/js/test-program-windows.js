@@ -45,6 +45,14 @@ function fakeEl(tag) {
     click: function() {
       if (el.disabled) return;
       if (el.handlers.click) el.handlers.click({ target: el, preventDefault: function() {} });
+      // The disclosure rows are native <details>/<summary> (ticket #72):
+      // the browser flips the disclosure on a press — pointer or keyboard —
+      // and the app wires no handler of its own. The fake keeps that native
+      // contract so a test can open and close a disclosure as a user does.
+      if (el.tagName === 'SUMMARY' && el.parentNode &&
+          el.parentNode.tagName === 'DETAILS') {
+        el.parentNode.open = !el.parentNode.open;
+      }
     },
     focus: function() { el.focused = true; },
     // Class-only deep search, enough for the Review screen's
@@ -119,6 +127,17 @@ function buttonsUnder(node, out) {
   if (!node || typeof node !== 'object') return out;
   if (node.tagName === 'BUTTON') out.push(node);
   (node.children || []).forEach(function(kid) { buttonsUnder(kid, out); });
+  return out;
+}
+
+// Nodes of a given tag over a tree — the disclosure rows are asserted
+// through the element a pointer or a keyboard meets (ticket #72), not
+// through the class the stylesheet happens to paint.
+function byTag(node, tag, out) {
+  out = out || [];
+  if (!node || typeof node !== 'object') return out;
+  if (node.tagName === String(tag).toUpperCase()) out.push(node);
+  (node.children || []).forEach(function(kid) { byTag(kid, tag, out); });
   return out;
 }
 
@@ -325,6 +344,38 @@ exports.run = function() {
       check('exactly one host exists for each section',
         countById([body], 'results-mount-action-plan').length === 1 &&
         countById([body], 'results-mount-deep-dive').length === 1);
+
+      // ── Ticket #72: the Action Plan window reads as one ranked list ────
+      // One panel carries one row per Action, and the Narrative Expander is
+      // the window's single disclosure: it arrives closed and a press on its
+      // row opens and closes it, exactly as the native <details> contract
+      // answers pointer and keyboard on the page.
+      var planSection = planFrame.bodyEl.children[0];
+      var planBody = planSection.children[1];   // the plan under its heading
+      var planPanel = planBody.children[0];
+      var planRow = planPanel.children[0];
+      var planExpander = byTag(planFrame.bodyEl, 'details')[0];
+      var planSummaryRow = planExpander.children[0];
+      check('the ranked panel holds one row per Action and the window owns one disclosure only',
+        planBody.children.length === 2 &&
+        planPanel.children.length === 1 &&
+        byTag(planFrame.bodyEl, 'details').length === 1 &&
+        planExpander === planBody.children[1] &&
+        textOf(planRow).join(' ').indexOf(PLAN_HEAD) >= 0 &&
+        textOf(planRow).join(' ').indexOf('Do it.') >= 0,
+        'rows=' + planPanel.children.length);
+      check('the Narrative Expander arrives closed under its Chrome String row',
+        planExpander.open !== true &&
+        planSummaryRow.tagName === 'SUMMARY' &&
+        textOf(planSummaryRow).join('') === App.I18n.t('results.narrativeSummary') &&
+        planExpander.children[1].textContent === 'A narrative.');
+      planSummaryRow.click();
+      check('a press on the disclosure row opens it',
+        planExpander.open === true);
+      planSummaryRow.click();
+      check('a second press closes it again with the Narrative still inside',
+        planExpander.open === false &&
+        planExpander.children[1].textContent === 'A narrative.');
 
       // ── The Quiz window's menu bar (ticket #65) ───────────────────────
       var allBars = byRole([body], 'menubar');

@@ -477,14 +477,10 @@ button:disabled {
   border-radius: 0;
 }
 
-.results-action-item {
-  background: var(--color-face);
-  border: 0;
-  border-radius: 0;
-  box-shadow: var(--bevel-raised);
-  padding: var(--space-3);
-}
-
+/* Ticket #72: the Action Plan is one ranked list. The rows carry no card
+   frame of their own — css/results.css paints the panel as the sunken
+   field and the rows as plain content on it — so the skin adds nothing
+   here beyond the Win95 square on the priority badge. */
 .results-action-priority {
   border-radius: 0;             /* Win95 squares                        */
 }
@@ -498,8 +494,10 @@ button:disabled {
               inset -1px -1px #FFFFFF;
 }
 
-/* Expanders (Narrative Expander, Deep-Dive Prompt, Review accordion):
-   their summary rows become Win95 title bars. */
+/* The Deep-Dive Prompt expander keeps the Win95 title-bar summary. The
+   Narrative Expander and the Review accordion are list rows now (#72):
+   their summary rows sit on the silver face in black type, so the skin
+   paints no navy title bar on them. */
 .results-narrative-details,
 .results-prompt-details,
 .results-review-item {
@@ -510,9 +508,7 @@ button:disabled {
   box-shadow: var(--bevel-raised);
 }
 
-.results-narrative-summary,
-.results-prompt-summary,
-.results-review-summary {
+.results-prompt-summary {
   font-family: var(--font-heading);
   font-weight: 400;
   background: linear-gradient(90deg, #000080 0%, #1084D0 100%);
@@ -520,25 +516,33 @@ button:disabled {
   padding: 4px var(--space-3);
 }
 
-.results-narrative-summary:hover,
-.results-prompt-summary:hover,
-.results-review-summary:hover {
+.results-prompt-summary:hover {
   background: linear-gradient(90deg, #000080 0%, #1084D0 100%);
   color: #FFFFFF;
+}
+
+.results-narrative-summary,
+.results-review-summary {
+  font-family: var(--font-heading);
+  font-weight: 400;
+  color: var(--color-text);
+  padding: 4px var(--space-3);
 }
 
 .results-review-item[open] > .results-review-summary {
   border-bottom: 1px solid #000000;
 }
 
-.results-review-summary::before {
-  color: #FFFFFF;                /* marker rides the title bar           */
+.results-review-qnum {
+  font-family: var(--font-heading);
+  color: var(--color-text);      /* on the silver disclosure row         */
 }
 
-.results-review-qnum,
+/* The Phase heading sits in the white client field, where the skin's old
+   title-bar pairing put it on navy; that paint stays as it was. */
 .results-review-phase {
   font-family: var(--font-heading);
-  color: #FFFFFF;                /* on the navy title bar                */
+  color: #FFFFFF;
 }
 
 /* Review inner content. */

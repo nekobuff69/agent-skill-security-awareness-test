@@ -32,6 +32,14 @@ exports.run = function() {
       click: function() {
         if (el.disabled) return;
         if (el.handlers.click) el.handlers.click({ target: el, preventDefault: function() {} });
+        // The disclosure rows are native <details>/<summary> (ticket #72):
+        // the browser flips the disclosure on a pointer press and on
+        // Enter/Space over the focused summary, and the app adds no handler
+        // of its own. The fake answers with the same native contract.
+        if (el.tagName === 'SUMMARY' && el.parentNode &&
+            el.parentNode.tagName === 'DETAILS') {
+          el.parentNode.open = !el.parentNode.open;
+        }
       },
       focus: function() { el.focused = true; }
     };
@@ -609,10 +617,43 @@ exports.run = function() {
     /prefers-reduced-motion: reduce\) \{\s*\.results-bar-fill \{\s*transition: none/.test(css));
   // Ticket #60: the header panel is the window's sunken client field — the
   // raised frame belongs to the real shell window, not to a nested fake.
-  check('header panel + nested panels carry Win95 bevels (no radii)',
+  // Ticket #72 retires the LAST nested raised frame in the Action Plan: the
+  // ranked list sits in one sunken panel and its rows carry no bevel.
+  check('the header panel and the ranked list are sunken fields; the rows carry no frame',
     /\.results-title-card \{[^}]*box-shadow: var\(--bevel-sunken\)/.test(css) &&
-    /\.results-action-item \{[^}]*box-shadow: var\(--bevel-raised\)/.test(css) &&
+    /\.results-action-list \{[^}]*box-shadow: var\(--bevel-sunken\)/.test(css) &&
+    /\.results-action-list \{[^}]*background: var\(--color-surface\)/.test(css) &&
+    !/\.results-action-item \{[^}]*box-shadow/.test(css) &&
+    !/\.results-action-item \{[^}]*background/.test(css) &&
     css.indexOf('.results-title-window') < 0);
+  check('priority is a sunken badge, not a navy disc or a title-bar field',
+    /\.results-action-priority \{[^}]*box-shadow: var\(--bevel-sunken\)/.test(css) &&
+    /\.results-action-priority \{[^}]*color: var\(--color-primary\)/.test(css) &&
+    /\.results-action-priority \{[^}]*border-radius: 0/.test(css) &&
+    css.indexOf('.results-action-item .results-action-priority') < 0);
+  check('the Narrative Expander row leads with the square [+]/[-] glyph in black',
+    /\.results-narrative-summary \{[^}]*cursor: pointer/.test(css) &&
+    /\.results-narrative-summary \{[^}]*color: var\(--color-text\)/.test(css) &&
+    /\.results-narrative-summary::before \{[^}]*content: '\[\+\] '/.test(css) &&
+    /\.results-narrative-details\[open\] > \.results-narrative-summary::before \{[^}]*content: '\[-\] '/.test(css) &&
+    /\.results-review-summary \{[^}]*color: var\(--color-text\)/.test(css) &&
+    /\.results-review-qnum \{[^}]*color: var\(--color-text\)/.test(css));
+  // Navy belongs to the Window Frame (css/shell.css) and — until ticket #74
+  // takes the Deep-Dive Prompt in hand — to its summary row. No other
+  // in-window element of this presenter paints a navy gradient.
+  check('no navy gradient paints inside the window content',
+    (function() {
+      var offenders = [];
+      var rule = /([^\{\}]+)\{([^\{\}]*)\}/g;
+      var m;
+      while ((m = rule.exec(css)) !== null) {
+        if (m[2].indexOf('linear-gradient(90deg, #000080') >= 0 &&
+            m[1].indexOf('.results-prompt-summary') < 0) {
+          offenders.push(m[1].replace(/\s+/g, ' ').trim());
+        }
+      }
+      return offenders.length === 0;
+    }()));
   // Ticket #65: the commands live in one strip that wraps at the window's
   // 360px floor, and the two rows that used to carry them are gone.
   check('the menu bar is a wrapping strip and the old command rows are gone',
@@ -808,6 +849,50 @@ exports.run = function() {
         saved.length === 1 && saved[0][0] === 'en' &&
         saved[0][1].narrative === 'EN LIVE PLAN',
         JSON.stringify(saved.map(function(r) { return r[0]; })));
+
+      // ── Ticket #72: the settled plan reads as ONE ranked list ──────────
+      // The Actions are rows inside a single panel, and the Narrative
+      // Expander is one disclosure row that arrives closed and flips on
+      // its summary — the markup the stylesheet now paints as list-row
+      // chrome, asserted as structure, not as colour.
+      function hasClass(node, cls) {
+        return String(node.className || '').split(/\s+/).indexOf(cls) >= 0;
+      }
+      var planPanel = wrapA.children[0];
+      var planRow = planPanel.children[0];
+      var planHead = planRow.children[0];
+      check('the Actions paint as rows inside the one ranked panel',
+        hasClass(planPanel, 'results-action-list') &&
+        wrapA.children.length === 2 &&
+        planPanel.children.length === 1 &&
+        hasClass(planRow, 'results-action-item') &&
+        hasClass(planHead, 'results-action-head') &&
+        hasClass(planHead.children[0], 'results-action-priority') &&
+        planHead.children[0].textContent === '1' &&
+        hasClass(planHead.children[1], 'results-action-title') &&
+        hasClass(planHead.children[2], 'results-ast-chip') &&
+        planHead.children[2].textContent === 'AST001' &&
+        planRow.children[1].tagName === 'P' &&
+        hasClass(planRow.children[1], 'results-action-desc') &&
+        planRow.children[1].textContent === 'Now.',
+        classOf(planPanel) + '/' + classOf(planRow));
+      var planExpander = wrapA.children[1];
+      var planSummary = planExpander.children[0];
+      check('the Narrative Expander is a disclosure row, closed by default',
+        planExpander.tagName === 'DETAILS' &&
+        hasClass(planExpander, 'results-narrative-details') &&
+        !planExpander.open &&
+        planSummary.tagName === 'SUMMARY' &&
+        hasClass(planSummary, 'results-narrative-summary') &&
+        allText(planSummary).join('') === I18n.t('results.narrativeSummary') &&
+        planExpander.children[1].textContent === 'EN LIVE PLAN');
+      planSummary.click();
+      check('a press on the disclosure row opens it',
+        planExpander.open === true);
+      planSummary.click();
+      check('another press closes it again, with the Narrative intact',
+        planExpander.open === false &&
+        planExpander.children[1].textContent === 'EN LIVE PLAN');
 
       // ── relaunch of the settled Completion: the in-page cache answers ──
       var wrapB = internals.buildActionPlan(reportA, bankPlan, bankPlan);

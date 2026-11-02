@@ -111,7 +111,7 @@ Domain vocabulary for the Agent Skills Security Self-assessment — extracted fr
 | --------------------------- | ------------------------------------------------------------------------------------------------ | ----------------------------- |
 | **Action Plan**             | The 3–5 prioritized Actions the Completion produces, OWASP-grounded; the only always-visible plan content — on the desktop they live in the Action Plan's own **Program Window**, where no window exists the same section renders in place | Recommendations, advice       |
 | **Action**                  | One prioritized improvement in the Action Plan, citing exactly one AST Risk via its AST source    | Action item, task             |
-| **Narrative**               | The personalized risk assessment that lives collapsed in the Narrative Expander beneath the action cards | Summary, story, intro text    |
+| **Narrative**               | The personalized risk assessment that lives collapsed in the Narrative Expander beneath the ranked **Action** rows (#72) | Summary, story, intro text    |
 | **Narrative Expander**      | The collapsed "Why these actions? Read the analysis" disclosure holding the Narrative on both paths | Collapsible, details block    |
 | **Deep-Dive Prompt**        | The deterministic kickoff prompt a Participant pastes into their Agent to open a tutoring session on their Blind Spots | Prompt template, composite prompt, hero artifact |
 | **LLM Path**                | The recommendation route: score report + Grounding Excerpts sent through the Proxy Worker to the Provider | Live generation, AI path      |
