@@ -22,7 +22,8 @@ exports.run = function() {
     DesktopStore: App.DesktopStore,
     renderResults: App.renderResults,
     beginPlanRestore: App.beginPlanRestore,
-    finishPlanRestore: App.finishPlanRestore
+    finishPlanRestore: App.finishPlanRestore,
+    actionPlanRecordGone: App.actionPlanRecordGone
   };
   var prevGlobal = {
     Analytics: globalThis.Analytics,
@@ -112,6 +113,8 @@ exports.run = function() {
     restoreLog.push(['finish']);
     return false;
   };
+  var goneCalls = 0;
+  App.actionPlanRecordGone = function() { goneCalls++; };
 
   var tracked = [];
   globalThis.Analytics = { track: function(ev) { tracked.push(ev); } };
@@ -185,7 +188,7 @@ exports.run = function() {
     globalThis.localStorage = fakeStorage();   // must NEVER be written here
     renders.length = 0; restoreLog.length = 0;
     tracked.length = 0; computeCalls.length = 0; i18nLog.length = 0;
-    inBracket = false;
+    inBracket = false; goneCalls = 0;
     Store = freshStore();
     return Store;
   }
@@ -467,11 +470,14 @@ exports.run = function() {
       Store.savePlan('__proto__', { narrative: 'x', actions: [] }) === false &&
       Store.cachedPlans().en.narrative === 'Narrative en.');
 
+    var goneBeforeClear = goneCalls;
     Store.clear();
     check('savePlan no-ops and never resurrects a cleared Record (#66 wins)',
       Store.savePlan('en', { narrative: 'Late.', actions: [] }) === false &&
       globalThis.sessionStorage.getItem(Store.KEY) === null &&
       Object.keys(Store.cachedPlans()).length === 0);
+    check('clear() tells the presenter the desktop Record is gone (#64/#66)',
+      goneCalls === goneBeforeClear + 1, 'gone=' + goneCalls);
 
     resetScenario();
     seedDesktop('quiz', windows);
@@ -499,6 +505,14 @@ exports.run = function() {
       garbageRestored === true && garbageBegin.length === 1 &&
       JSON.stringify(garbageBegin[0][1]) === '{}',
       JSON.stringify({ ok: garbageRestored, b: garbageBegin[0] && garbageBegin[0][1] }));
+
+    resetScenario();
+    seedDesktop('quiz', windows);
+    putRaw(recordOf({ hash: 'deadbeef' }));
+    var goneBeforeStale = goneCalls;
+    check('a quietly invalidated Record notifies the presenter too (#64/#66)',
+      Store.restore(bank) === false && goneCalls === goneBeforeStale + 1,
+      'gone=' + goneCalls);
 
     /* ── Retake drops the Record with the Session ──────────────────────── */
 
