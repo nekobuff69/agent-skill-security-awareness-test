@@ -235,15 +235,18 @@ exports.run = function() {
     refs.buttons.close.disabled === true && refs.buttons.maximize.disabled === true &&
     refs.buttons.minimize.disabled === false);
 
-  // ── Mobile rule (ticket #46): [□] gated at ≤768px ────────────────────
+  // ── Mobile rule (tickets #46, #68): [□]/[—] gated at ≤768px ──────────
   // The media query itself is CSS's job; this asserts the JS side: the
   // controller reads the same query, the live change listener re-renders,
-  // and [—]/[×] are untouched by the gate.
+  // and ticket #68 reduces the mobile chrome to close — [—] and [□] are
+  // dead controls at these widths, and the crossing restores them.
 
   var savedMM = globalThis.matchMedia;
-  var mediaState = { mobile: false, changeHandler: null };
+  var mediaState = { mobile: false, reduced: false, changeHandler: null };
   globalThis.matchMedia = function(query) {
-    var matches = query.indexOf('max-width') >= 0 ? mediaState.mobile : false;
+    var matches = false;
+    if (query.indexOf('max-width') >= 0) matches = mediaState.mobile;
+    else if (query.indexOf('prefers-reduced-motion') >= 0) matches = mediaState.reduced;
     return {
       matches: matches,
       addEventListener: function(evt, fn) {
@@ -268,6 +271,7 @@ exports.run = function() {
   mctl.setView('quiz-view');
   check('desktop viewport: [□] renders enabled and toggles normally',
     mrefs.buttons.maximize.disabled === false &&
+    mrefs.buttons.minimize.disabled === false &&
     mctl.toggleMaximize() === true &&
     mctl.getState().mode === 'maximized' &&
     mrefs.windowEl.classList.contains('is-maximized'));
@@ -283,17 +287,15 @@ exports.run = function() {
     mctl.toggleMaximize() === false &&
     mctl.getState().mode === 'maximized' &&
     mrefs.windowEl.classList.contains('is-maximized'));
-  check('mobile viewport: [—] still minimizes (gate touches maximize only)',
-    mctl.minimize() === true && mctl.getState().mode === 'minimized' &&
+  check('mobile viewport: the chrome reduces to close — [—] renders disabled',
     mrefs.buttons.minimize.disabled === true);
-  while (mpending.length) mpending.shift()();
-  mctl.restore();
-  check('mobile viewport: program-button restore returns to the pre-minimize mode',
-    mctl.getState().mode === 'maximized' &&
+  check('mobile viewport: minimize is refused — the Record keeps its mode',
+    mctl.minimize() === false && mctl.getState().mode === 'maximized');
+  check('mobile viewport: the program switch stays live (pressed window on screen)',
+    mrefs.programBtn.hidden === false &&
     mrefs.programBtn.getAttribute('aria-pressed') === 'true');
-  while (mpending.length) mpending.shift()();
 
-  // Crossing back to desktop: [□] re-enables and toggles again.
+  // Crossing back to desktop: [—]/[□] re-enable and work again.
   mediaState.mobile = false;
   mediaState.changeHandler();
   check('desktop again: [□] re-enabled and toggles out of maximized',
@@ -301,6 +303,15 @@ exports.run = function() {
     mctl.toggleMaximize() === true &&
     mctl.getState().mode === 'normal' &&
     !mrefs.windowEl.classList.contains('is-maximized'));
+  check('desktop again: [—] re-enabled and traces the window down',
+    mrefs.buttons.minimize.disabled === false &&
+    mctl.minimize() === true && mctl.getState().mode === 'minimized');
+  while (mpending.length) mpending.shift()();
+  mrefs.programBtn.click();
+  while (mpending.length) mpending.shift()();
+  check('the desktop taskbar button still restores a minimized window',
+    mctl.getState().mode === 'normal' &&
+    !mrefs.windowEl.classList.contains('is-minimized'));
   if (typeof savedMM === 'undefined') delete globalThis.matchMedia;
   else globalThis.matchMedia = savedMM;
 
@@ -497,19 +508,29 @@ exports.run = function() {
   pointer(drefs.resizeGrip, 'pointermove', 600, 600);
   check('mobile ignores the drag and resize handles',
     dctl.geometry().x === gMobile.x && dctl.geometry().w === gMobile.w);
-  // Close on mobile (ticket #62): this layout has no desktop to stand a
-  // put-away window on and no shortcut column to bring it back, so the
-  // Quiz [×] keeps ticket #43's answer — the End Program confirmation —
-  // and every window stays reachable.
-  check('the mobile Quiz [×] asks the End Program question instead of hiding',
-    dctl.close() === 'dialog' && dctl.getState().mode === 'normal' &&
-    dctl.getState().confirmOpen === true &&
+  // Close on mobile (ticket #68): the windowed stage puts the window away
+  // on this layout too — the mode change keeps the Record, the answers and
+  // the finished report — and the taskbar's PERMANENT Quiz switch is the way
+  // back, so nothing is stranded by the absence of the shortcut column.
+  check('the mobile Quiz [×] puts the window away (no dialog, report intact)',
+    dctl.close() === 'hidden' && dctl.getState().mode === 'hidden' &&
+    dctl.getState().confirmOpen === false &&
+    drefs.windowEl.classList.contains('is-hidden'));
+  check('the mobile Quiz keeps its switch entry while put away',
     drefs.programBtn.hidden === false &&
-    dctl.runningPrograms().join(',') === 'quiz');
+    drefs.programBtn.getAttribute('aria-pressed') === 'false');
+  var gPutAway = dctl.geometry();
   drefs.programBtn.click();
   while (dpending.length) dpending.shift()();
-  check('the mobile taskbar keeps no restore bridge (nothing is hidden to restore)',
-    dctl.getState().mode === 'normal');
+  check('its switch entry brings the Quiz window back at its arrangement',
+    dctl.getState().mode === 'normal' &&
+    !drefs.windowEl.classList.contains('is-hidden') &&
+    dctl.geometry().x === gPutAway.x && dctl.geometry().w === gPutAway.w &&
+    drefs.programBtn.getAttribute('aria-pressed') === 'true');
+  while (dpending.length) dpending.shift()();
+  dctl.setView('quiz-view');
+  check('the mobile FLOW stage still routes the Quiz [×] to the End Program dialog',
+    dctl.close() === 'dialog' && dctl.getState().confirmOpen === true);
   dctl.cancelClose();
   while (dpending.length) dpending.shift()();
   delete globalThis.matchMedia;
@@ -832,27 +853,235 @@ exports.run = function() {
     lrefs.programBtn.getAttribute('aria-pressed') === 'true');
   while (lpending.length) lpending.shift()();
 
-  // The ≤768px layout has no shortcut column, so the put-away gesture is
-  // refused there: hiding a program would drop its button out of the
-  // taskbar (the running-windows-only rule) with nothing left to bring it
-  // back. The taskbar switcher is the only way between programs there.
+  // ── The ≤768px single-program desktop (ticket #68) ───────────────────
+  // The shortcut column does not fit on this layout, so the taskbar's
+  // THREE entries are permanent — the only route between the programs —
+  // the chrome reduces to close, and crossing the boundary re-lays the
+  // desktop without touching a Record. The assertions are behaviour: what
+  // the bar lists for every mode, what a switch click does, which gestures
+  // the layout refuses, and what a crossing preserves.
+
+  var crossState = { mobile: true, reduced: false, handler: null };
   globalThis.matchMedia = function(query) {
+    var matches = false;
+    if (query.indexOf('max-width') >= 0) matches = crossState.mobile;
+    else if (query.indexOf('prefers-reduced-motion') >= 0) matches = crossState.reduced;
     return {
-      matches: query.indexOf('max-width') >= 0,
-      addEventListener: function() {}, addListener: function() {}
+      matches: matches,
+      addEventListener: function(evt, fn) {
+        if (evt === 'change') crossState.handler = fn;
+      },
+      addListener: function(fn) { crossState.handler = fn; }
     };
   };
-  lctl.render();
-  check('mobile grays a program frame [×] and refuses its put-away',
-    lplan.buttons.close.disabled === true &&
-    lctl.closeProgram('action-plan') === false &&
-    lctl.getState('action-plan').mode === 'normal' &&
-    lplan.taskbarBtn.hidden === false &&
-    lctl.runningPrograms().join(',') === 'quiz,action-plan');
-  check('mobile keeps the Quiz [×] live — it asks the End Program question (#43)',
-    lrefs.buttons.close.disabled === false &&
-    lctl.close() === 'dialog' && lctl.getState().confirmOpen === true);
-  lctl.cancelClose();
+
+  var xdoc = fakeDoc();
+  var xpending = [];
+  var xtraces = [];                       // the delay each trace was scheduled with
+  var xctl = Windows.create({
+    doc: xdoc,
+    schedule: function(fn, ms) { xtraces.push(ms); xpending.push(fn); },
+    viewport: function() { return VP61; }
+  });
+  var xrefs = {
+    windowEl: fakeEl('div'),
+    titleBar: fakeEl('div'),
+    resizeGrip: fakeEl('div'),
+    programBtn: fakeEl('button'),
+    buttons: { minimize: fakeEl('button'), maximize: fakeEl('button'), close: fakeEl('button') }
+  };
+  var xplan = programFrame();
+  var xdd = programFrame();
+  xctl.attach(xrefs);                     // registers the live crossing handler
+  xctl.attachProgram('action-plan', xplan);
+  xctl.attachProgram('deep-dive', xdd);
+  xctl.setView('results-view');
+  while (xpending.length) xpending.shift()();
+
+  check('the mobile bar lists all three programs from the first desktop render',
+    xrefs.programBtn.hidden === false &&
+    xplan.taskbarBtn.hidden === false &&
+    xdd.taskbarBtn.hidden === false &&
+    xctl.hasWindow('action-plan') === false);
+  check('exactly one switch reads pressed while only the Quiz window runs',
+    xrefs.programBtn.getAttribute('aria-pressed') === 'true' &&
+    xplan.taskbarBtn.getAttribute('aria-pressed') === 'false' &&
+    xdd.taskbarBtn.getAttribute('aria-pressed') === 'false');
+
+  xplan.taskbarBtn.click();
+  while (xpending.length) xpending.shift()();
+  check('a switch entry opens the program that has not arrived — one Record',
+    xctl.hasWindow('action-plan') === true &&
+    xctl.getState('action-plan').mode === 'normal' &&
+    xctl.snapshot().active === 'action-plan' &&
+    Object.keys(xctl.snapshot().windows).length === 2);
+  check('the pressed entry moves to the program filling the screen',
+    xplan.taskbarBtn.getAttribute('aria-pressed') === 'true' &&
+    xrefs.programBtn.getAttribute('aria-pressed') === 'false');
+  xplan.taskbarBtn.click();
+  while (xpending.length) xpending.shift()();
+  check('a second switch click raises the SAME window (one Record per program)',
+    Object.keys(xctl.snapshot().windows).length === 2 &&
+    xctl.snapshot().active === 'action-plan');
+
+  xrefs.programBtn.click();
+  while (xpending.length) xpending.shift()();
+  check('the Quiz switch raises the Quiz program back',
+    xctl.snapshot().active === 'quiz' &&
+    xrefs.programBtn.getAttribute('aria-pressed') === 'true' &&
+    xplan.taskbarBtn.getAttribute('aria-pressed') === 'false' &&
+    xctl.getState('action-plan').mode === 'normal');
+
+  check('the mobile chrome offers only close, on every frame',
+    xrefs.buttons.close.disabled === false &&
+    xrefs.buttons.minimize.disabled === true &&
+    xrefs.buttons.maximize.disabled === true &&
+    xplan.buttons.minimize.disabled === true &&
+    xplan.buttons.maximize.disabled === true &&
+    xplan.buttons.close.disabled === false);
+
+  var xplanG = xctl.geometry('action-plan');
+  p61(xplan.titleBar, 'pointerdown', 500, 300);
+  p61(xplan.titleBar, 'pointermove', 560, 340);
+  p61(xplan.titleBar, 'pointerup', 560, 340);
+  p61(xplan.resizeGrip, 'pointerdown', 800, 700);
+  p61(xplan.resizeGrip, 'pointermove', 900, 780);
+  p61(xplan.resizeGrip, 'pointerup', 900, 780);
+  check('the mobile layout ignores the drag and resize handles of a program frame',
+    xctl.geometry('action-plan').x === xplanG.x &&
+    xctl.geometry('action-plan').w === xplanG.w &&
+    xctl.applyGeometry({ x: 1, y: 1, w: 400, h: 400 }, 'action-plan') === false);
+  check('the mobile layout refuses maximize and minimize',
+    xctl.toggleMaximize('action-plan') === false &&
+    xctl.minimize('action-plan') === false &&
+    xctl.getState('action-plan').mode === 'normal');
+
+  check("a program's [×] puts it away and the bar keeps its switch",
+    xctl.closeProgram('action-plan') === 'hidden' &&
+    xctl.getState('action-plan').mode === 'hidden' &&
+    xplan.windowEl.classList.contains('is-hidden') &&
+    xplan.taskbarBtn.hidden === false &&
+    xplan.taskbarBtn.getAttribute('aria-pressed') === 'false');
+  check('the put-away hands the screen to the program still on it',
+    xctl.snapshot().active === 'quiz' &&
+    xrefs.programBtn.getAttribute('aria-pressed') === 'true');
+  xplan.taskbarBtn.click();
+  while (xpending.length) xpending.shift()();
+  check('the switch entry is the route back: the window returns at its arrangement',
+    xctl.getState('action-plan').mode === 'normal' &&
+    !xplan.windowEl.classList.contains('is-hidden') &&
+    xctl.snapshot().active === 'action-plan' &&
+    xctl.geometry('action-plan').x === xplanG.x &&
+    xctl.geometry('action-plan').w === xplanG.w);
+
+  check('the Quiz [×] hides too on this stage — the switch keeps the report live',
+    xctl.close() === 'hidden' && xctl.getState().mode === 'hidden' &&
+    xctl.getState().confirmOpen === false &&
+    xrefs.programBtn.hidden === false);
+  xrefs.programBtn.click();
+  while (xpending.length) xpending.shift()();
+  check('and the Quiz switch brings the report back',
+    xctl.getState().mode === 'normal' &&
+    xctl.snapshot().active === 'quiz' &&
+    xrefs.programBtn.getAttribute('aria-pressed') === 'true');
+
+  check("Escape puts the Quiz away onto its own switch entry (hide's sibling)",
+    xctl.escapeFocused() === true && xctl.getState().mode === 'hidden' &&
+    xrefs.programBtn.hidden === false && xrefs.programBtn.focused === true);
+  xrefs.programBtn.click();
+  while (xpending.length) xpending.shift()();
+  check('the switch entry restores it again — one Record, no second window',
+    xctl.getState().mode === 'normal' &&
+    Object.keys(xctl.snapshot().windows).length === 2);
+
+  xctl.setView('review-view');
+  check('the review stage is the same switcher: three permanent entries',
+    xrefs.programBtn.hidden === false &&
+    xplan.taskbarBtn.hidden === false &&
+    xdd.taskbarBtn.hidden === false);
+  xctl.setView('results-view');
+
+  check('the Deep-Dive Prompt arrives minimized behind a permanent switch',
+    xctl.deepDiveArrived() === true &&
+    xctl.getState('deep-dive').mode === 'minimized' &&
+    xdd.taskbarBtn.hidden === false &&
+    xdd.taskbarBtn.getAttribute('aria-pressed') === 'false' &&
+    xdd.windowEl.classList.contains('is-minimized'));
+  xdd.taskbarBtn.click();
+  while (xpending.length) xpending.shift()();
+  check('its switch restores and focuses it — one program fills the screen',
+    xctl.getState('deep-dive').mode === 'normal' &&
+    xctl.snapshot().active === 'deep-dive' &&
+    xdd.taskbarBtn.getAttribute('aria-pressed') === 'true' &&
+    xrefs.programBtn.getAttribute('aria-pressed') === 'false');
+  check('live motion: every window transition traced at the era delay',
+    xtraces.length > 0 && xtraces.every(function(ms) {
+      return ms === Windows.TRACE_MS;
+    }), 'delays=' + JSON.stringify(xtraces));
+
+  check("Escape puts the focused window away onto its switch entry",
+    xctl.escapeFocused() === true &&
+    xctl.getState('deep-dive').mode === 'hidden' &&
+    xdd.taskbarBtn.hidden === false &&
+    xdd.taskbarBtn.focused === true);
+
+  // Reduced motion: no transition on this viewport carries a trace delay.
+  var traceBefore = xtraces.length;
+  crossState.reduced = true;
+  xdd.taskbarBtn.click();
+  while (xpending.length) xpending.shift()();
+  check('reduced motion: the switch restore lands with no trace delay',
+    xctl.getState('deep-dive').mode === 'normal' &&
+    xtraces.length > traceBefore &&
+    xtraces.slice(traceBefore).every(function(ms) { return ms === 0; }),
+    JSON.stringify(xtraces.slice(traceBefore)));
+  crossState.reduced = false;
+
+  // Crossing the boundary keeps the desktop: records, modes, arrangements.
+  xctl.closeProgram('deep-dive');
+  var xSnapHidden = JSON.stringify(xctl.snapshot());
+  check('on the desktop layout a put-away program leaves the bar again',
+    (function() {
+      crossState.mobile = false;
+      crossState.handler();
+      return xctl.getState('deep-dive').mode === 'hidden' &&
+        xdd.taskbarBtn.hidden === true &&
+        xrefs.programBtn.hidden === false &&
+        xdd.windowEl.classList.contains('is-hidden');
+    })());
+  check('crossing to the desktop re-lays the frames at their Geometry',
+    xplan.windowEl.classList.contains('is-windowed') &&
+    xplan.windowEl.style.width === xctl.geometry('action-plan').w + 'px' &&
+    xrefs.windowEl.classList.contains('is-windowed') &&
+    JSON.stringify(xctl.snapshot()) === xSnapHidden);
+  check('crossing back to mobile keeps every Record and re-lists them permanently',
+    (function() {
+      crossState.mobile = true;
+      crossState.handler();
+      return xdd.taskbarBtn.hidden === false &&
+        xdd.taskbarBtn.getAttribute('aria-pressed') === 'false' &&
+        xctl.getState('deep-dive').mode === 'hidden' &&
+        xctl.geometry('action-plan').w === xplanG.w &&
+        JSON.stringify(xctl.snapshot()) === xSnapHidden;
+    })());
+  check('the mobile frames wear no positioned box',
+    !xplan.windowEl.classList.contains('is-windowed') &&
+    xplan.windowEl.style.width === '' &&
+    !xrefs.windowEl.classList.contains('is-windowed'));
+
+  // The switcher belongs to the desktop stage: the flow views have no
+  // desktop to switch programs on.
+  xctl.setView('quiz-view');
+  check('the mobile flow stage is not the switcher: unrunning entries stand aside',
+    xplan.taskbarBtn.hidden === true &&
+    xdd.taskbarBtn.hidden === true &&
+    xrefs.programBtn.hidden === false);
+  xctl.setView('results-view');
+  check('back on the mobile desktop the three switches are permanent again',
+    xplan.taskbarBtn.hidden === false &&
+    xdd.taskbarBtn.hidden === false &&
+    xrefs.programBtn.hidden === false);
+
   delete globalThis.matchMedia;
   lctl.render();
   while (lpending.length) lpending.shift()();

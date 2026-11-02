@@ -599,15 +599,35 @@ exports.run = function() {
 
   // The mobile rule: no shortcut column at ≤768px (presentation, exactly
   // like the #46 maximized-by-default rule — the state model stays blind).
+  // Ticket #68 completes that layout: the frame fills the screen above the
+  // slim bar, its body scrolls inside, the chrome reduces to close, and
+  // the taskbar's three program entries — painted permanent by
+  // js/windows.js — share the bar as the only switcher.
   var shellCss = fs.readFileSync(
     path.join(__dirname, '..', '..', 'css', 'shell.css'), 'utf8');
   var mobileBlock = (function() {
     var at = shellCss.indexOf('@media (max-width: 768px)');
     return at < 0 ? '' : shellCss.slice(at);
   })();
+  var mobileOnly = mobileBlock.slice(0, mobileBlock.indexOf('@media (max-width: 480px'));
   check('css: the shortcut column disappears at ≤768px',
-    /\.os-shortcuts\s*\{[^}]*display:\s*none/.test(
-      mobileBlock.slice(0, mobileBlock.indexOf('@media (max-width: 480px'))));
+    /\.os-shortcuts\s*\{[^}]*display:\s*none/.test(mobileOnly));
+  check('css: at ≤768px one program frame fills the screen above the slim taskbar',
+    /\.os-window\s*\{[^}]*position:\s*fixed[^}]*inset:\s*0 0 var\(--os-taskbar-height\) 0/.test(mobileOnly) &&
+    /:root\s*\{[^}]*--os-taskbar-height:\s*44px/.test(mobileOnly));
+  check('css: the window body keeps its own scroll inside the full-screen frame',
+    /\.os-window\s*\{[^}]*overflow:\s*hidden/.test(mobileOnly) &&
+    /\.os-window #app\s*\{[^}]*height:\s*100%[^}]*overflow:\s*auto/.test(mobileOnly));
+  check('css: the mobile chrome reduces to close — [—] and [□] leave the frame',
+    /\.os-titlebar-btn\[data-os-button="minimize"\][^}]*\{[^}]*display:\s*none/.test(mobileOnly) &&
+    /\.os-titlebar-btn\[data-os-button="maximize"\]/.test(mobileOnly));
+  check('css: the title bar is no drag handle at ≤768px (and no grip either)',
+    /\.os-window\.is-windowed \.os-titlebar\s*\{[^}]*cursor:\s*default/.test(mobileOnly) &&
+    /\.os-window\.is-windowed \.os-resize-grip\s*\{[^}]*display:\s*none/.test(mobileOnly));
+  check('css: the three program switches share the slim bar',
+    /\.os-taskbar \.os-program-btn\s*\{[^}]*flex:\s*1 1 0/.test(mobileOnly) &&
+    /\.os-taskbar-programs:has\(\.os-program-btn:not\(\[hidden\]\)\)\s*\{[^}]*flex:\s*2 1 0/.test(mobileOnly) &&
+    /\.os-start-btn,\s*\.os-program-btn,\s*\.os-lang-toggle\s*\{[^}]*height:\s*100%/.test(mobileOnly));
   check('css: the desktop column is a top-left stack of icons',
     /\.os-shortcuts\s*\{[^}]*position:\s*fixed/.test(shellCss) &&
     /\.os-shortcuts\s*\{[^}]*flex-direction:\s*column/.test(shellCss) &&
@@ -625,6 +645,21 @@ exports.run = function() {
         taskbarZ === 1000;
     })(),
     'shortcuts above the window rung, under 1000');
+  // Reduced motion covers every window transition on this viewport: the
+  // gate is a top-level block, so the ≤768px layout inherits it, and it
+  // parks BOTH traces the switcher can paint.
+  check('css: reduced motion parks the window traces at every viewport',
+    (function() {
+      var rmAt = shellCss.indexOf('@media (prefers-reduced-motion: reduce)');
+      var mediaAt = shellCss.indexOf('@media (max-width: 768px)');
+      var rmBlock = rmAt < 0 ? '' : shellCss.slice(rmAt,
+        shellCss.indexOf('@media', rmAt + 1) < 0 ? shellCss.length
+          : shellCss.indexOf('@media', rmAt + 1));
+      return rmAt >= 0 && rmAt < mediaAt &&
+        /\.os-window\.is-minimizing/.test(rmBlock) &&
+        /\.os-window\.is-restoring/.test(rmBlock) &&
+        /animation:\s*none/.test(rmBlock);
+    })());
 
   return results;
 };
