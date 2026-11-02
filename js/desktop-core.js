@@ -83,13 +83,15 @@
    *  excluded). The Quiz default is the ticket #60 arrangement: at
    *  1024×768 the score header, Risk Radar and Blind-Spot Bars stay
    *  readable without internal scrolling (768 − 36 taskbar = 732 desktop
-   *  height; 40 + 644 = 684 clears it, 48 + 928 = 976 clears 1024). The two
-   *  adjunct programs are tuned to sit inside the same desktop when they
-   *  arrive beside it. Nothing in the core renders these. */
+   *  height; 16 + 704 = 720 clears it) and clear of the 104px desktop
+   *  shortcut column (120 > 104) so its labels never sit on window
+   *  content. The two adjunct programs are tuned to sit inside the same
+   *  desktop when they arrive beside it. Nothing in the core renders
+   *  these. */
   var DESIGN_DEFAULTS = {
-    'quiz': { x: 48, y: 40, w: 928, h: 644 },
-    'action-plan': { x: 152, y: 120, w: 640, h: 480 },
-    'deep-dive': { x: 136, y: 96, w: 600, h: 440 }
+    'quiz': { x: 120, y: 16, w: 888, h: 704 },
+    'action-plan': { x: 152, y: 64, w: 640, h: 480 },
+    'deep-dive': { x: 152, y: 88, w: 620, h: 440 }
   };
 
   /** The cascade step: a window born (or re-opened) while another window

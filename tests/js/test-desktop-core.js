@@ -262,8 +262,9 @@ exports.run = function() {
     geoEqual(c2.windowSnapshot('action-plan').geometry, D['action-plan']),
     JSON.stringify(c2.windowSnapshot('action-plan').geometry));
   check('the designed Quiz default still fits 1024×768 without internal scrolling',
-    geoEqual(D.quiz, { x: 48, y: 40, w: 928, h: 644 }) &&
+    geoEqual(D.quiz, { x: 120, y: 16, w: 888, h: 704 }) &&
     D.quiz.x + D.quiz.w <= 1024 &&
+    D.quiz.x > 104 &&   // clear of the desktop shortcut column
     D.quiz.y + D.quiz.h <= 768 - 36,
     JSON.stringify(D.quiz));
 

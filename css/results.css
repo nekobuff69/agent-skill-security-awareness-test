@@ -3,11 +3,13 @@
 #results-view {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
   /* Vertical inset inside the fixed window (ticket #52); the horizontal
-     edge inset comes from css/shell.css's view rule. */
-  padding-top: var(--space-3);
-  padding-bottom: var(--space-4);
+     edge inset comes from css/shell.css's view rule. Tight on purpose:
+     the header, the Risk Radar and the Blind-Spot Bars must fit one
+     desktop window at 1024×768 without internal scrolling. */
+  padding-top: var(--space-2);
+  padding-bottom: var(--space-2);
 }
 
 /* ── Results header panel (ticket #60: the window's first body panel) ──
@@ -21,8 +23,8 @@
 
 .results-title-card {
   text-align: left;
-  margin: var(--space-1) 0;
-  padding: var(--space-3);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
   background: var(--color-surface);
   color: var(--color-text);
   border-radius: 0;
@@ -45,11 +47,11 @@
 
 .results-title-pct {
   font-family: var(--font-heading);
-  font-size: 4rem;
+  font-size: 2.5rem;
   font-weight: 400;        /* W95FA has one weight; no faux bold */
   color: var(--color-accent);
   opacity: 1;
-  margin-top: var(--space-1);
+  margin-top: 0;
 }
 
 /* The score's meaning, on the headline itself.
@@ -70,15 +72,51 @@
 .results-section {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .results-section-title {
   font-family: var(--font-heading);
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 400;
   color: var(--color-text);
   margin: 0;
+}
+
+/* Id-scoped so these win over the later-loaded skin rules (#58 fit): the
+   header, radar and bars must share one 1024×768 window body. */
+#results-view .results-title-card {
+  padding: var(--space-2) var(--space-3);
+  margin: 0;
+}
+
+#results-view .results-radar-wrap {
+  max-width: 240px;
+  padding: var(--space-1);
+}
+
+#results-view .results-section {
+  gap: var(--space-1);
+}
+
+#results-view .results-section-title {
+  font-size: 1.125rem;
+}
+
+/* Ten bars become five rows of two on a desktop window, so the section
+   fits beside the radar instead of tripling the window's scroll. */
+@media (min-width: 769px) {
+  #results-view .results-bars {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-1) var(--space-3);
+  }
+}
+
+/* A section mounted into its own program window already has the program
+   name on the window's title bar: the in-body heading would repeat it. */
+.os-window-body .results-section > .results-section-title {
+  display: none;
 }
 
 /* ── Risk Radar ──
@@ -89,10 +127,10 @@
 .results-radar-wrap {
   display: flex;
   justify-content: center;
-  max-width: 400px;
+  max-width: 320px;
   margin: 0 auto;
   width: 100%;
-  padding: var(--space-3);
+  padding: var(--space-2);
   background: var(--color-surface);
   border-radius: 0;
   box-shadow: var(--bevel-sunken);

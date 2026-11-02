@@ -251,9 +251,9 @@
 
       var tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
       tspan.setAttribute('x', lx);
-      tspan.setAttribute('y', ly - 6);
+      tspan.setAttribute('y', ly - 8);
       tspan.setAttribute('text-anchor', anchor);
-      tspan.setAttribute('font-size', '9');
+      tspan.setAttribute('font-size', '14');
       tspan.setAttribute('font-family', font);
       tspan.setAttribute('font-weight', '400');
       tspan.setAttribute('fill', '#000000');
@@ -261,9 +261,9 @@
 
       var tspan2 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
       tspan2.setAttribute('x', lx);
-      tspan2.setAttribute('y', ly + 6);
+      tspan2.setAttribute('y', ly + 8);
       tspan2.setAttribute('text-anchor', anchor);
-      tspan2.setAttribute('font-size', '8');
+      tspan2.setAttribute('font-size', '13');
       tspan2.setAttribute('font-family', font);
       tspan2.setAttribute('font-weight', '400');
       tspan2.setAttribute('fill', scoreColor(pct));
