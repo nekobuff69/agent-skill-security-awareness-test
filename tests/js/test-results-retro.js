@@ -40,6 +40,23 @@ exports.run = function() {
       remove: function(c) { delete el.classes[c]; },
       contains: function(c) { return !!el.classes[c]; }
     };
+    // The presenters clear a subtree by assigning `innerHTML = ''` before
+    // re-mounting (renderResults, renderPlanContent): the fake node has to
+    // answer with the same detach, or a re-render check would see the old
+    // children still hanging under it.
+    Object.defineProperty(el, 'innerHTML', {
+      get: function() { return el._innerHTML || ''; },
+      set: function(value) {
+        el._innerHTML = value;
+        if (value === '') {
+          for (var c = 0; c < el.children.length; c++) el.children[c].parentNode = null;
+          el.children = [];
+          el.textContent = '';
+        }
+      },
+      enumerable: true,
+      configurable: true
+    });
     return el;
   }
 
@@ -614,17 +631,207 @@ exports.run = function() {
     captured.blob && captured.blob.type.indexOf('image/svg+xml') === 0 &&
     captured.blob.parts[0] === '<svg data-retro-radar/>');
 
-  // ── restore globals for the sibling test modules ────────────────────────
+  // ══ Action Plan: requested once per (report, language), cached (#64) ═══
+  // The presenter is exercised through the buildActionPlan seam with the
+  // module's own restore bracket (App.beginPlanRestore / finishPlanRestore)
+  // and stubs for the two collaborators it talks to: App.ActionPlan (the
+  // generation) and App.DesktopStore (the per-tab Record cache). Behaviour
+  // is asserted — request counts, painted text, cache entries — never
+  // markup. Async because a settled request paints on a microtask, like
+  // the page does.
+  var AppG = globalThis.App;
+  var planPrev = {
+    window: globalThis.window,
+    actionPlan: AppG.ActionPlan,
+    desktopStore: AppG.DesktopStore,
+    windows: AppG.Windows,
+    locale: I18n.locale
+  };
+  var assembles = [];   // one row per App.ActionPlan.assemble call
+  var resolvers = [];   // the test's control over each request
+  var saved = [];       // one row per desktop Record patch
+  globalThis.window = { APP_CONFIG: { proxyUrl: 'https://proxy.test' }, Corpus: {} };
+  AppG.ActionPlan = {
+    assemble: function(reportArg, bankArg, corpusArg, configArg) {
+      assembles.push({ report: reportArg, bank: bankArg, corpus: corpusArg, config: configArg });
+      return new Promise(function(res) { resolvers.push(res); });
+    }
+  };
+  AppG.DesktopStore = {
+    savePlan: function(lang, plan) {
+      if (typeof plan.narrative !== 'string' || !Array.isArray(plan.actions)) return false;
+      saved.push([lang, plan]);
+      return true;
+    }
+  };
+  AppG.Windows = {};   // no controller here: arrival gestures quietly no-op
+
+  function planText(node) { return allText(node).join(' '); }
+  function planReport(pct) {
+    return {
+      percentage: pct, title: { emoji: 'X', name: 'Sentinel' },
+      astScores: {}, astRanked: [], weakestQuestions: []
+    };
+  }
+  // ── restore globals for the sibling test modules ──────────────────────
   function restoreGlobal(name, prev) {
     if (prev === undefined) delete globalThis[name];
     else globalThis[name] = prev;
   }
-  restoreGlobal('XMLSerializer', prevXMLSerializer);
-  restoreGlobal('Blob', prevBlob);
-  restoreGlobal('URL', prevURL);
-  restoreGlobal('Image', prevImage);
-  if (prevDoc === undefined) delete globalThis.document;
-  else globalThis.document = prevDoc;
 
-  return results;
+  var bankPlan = { questions: [] };
+  function settlePlan() { return new Promise(function(res) { setTimeout(res, 0); }); }
+
+  return (async function() {
+    try {
+      I18n.use('en');
+      var loadingEn = I18n.t('results.planLoading');
+
+      // ── a live Completion: one request, loading while in flight, then
+      //    the settled payload paints and lands in the Record cache ──
+      var reportA = planReport(62);
+      var wrapA = internals.buildActionPlan(reportA, bankPlan, bankPlan);
+      check('the live first render issues exactly one Action Plan request (#64)',
+        assembles.length === 1 && resolvers.length === 1 &&
+        planText(wrapA).indexOf(loadingEn) >= 0,
+        'calls=' + assembles.length);
+      resolvers[0]({
+        narrative: 'EN LIVE PLAN',
+        actions: [{ priority: '1', title: 'Lock it', description: 'Now.', ast_source: 'AST001' }],
+        path: 'llm'
+      });
+      await settlePlan();
+      check('the settled plan paints over the loading state',
+        planText(wrapA).indexOf('EN LIVE PLAN') >= 0 &&
+        planText(wrapA).indexOf('Lock it') >= 0 &&
+        planText(wrapA).indexOf(loadingEn) < 0,
+        planText(wrapA).slice(0, 80));
+      check('the settled payload is cached in the desktop Record under its language (#64)',
+        saved.length === 1 && saved[0][0] === 'en' &&
+        saved[0][1].narrative === 'EN LIVE PLAN',
+        JSON.stringify(saved.map(function(r) { return r[0]; })));
+
+      // ── relaunch of the settled Completion: the in-page cache answers ──
+      var wrapB = internals.buildActionPlan(reportA, bankPlan, bankPlan);
+      check('re-rendering the settled Completion answers from cache: no request, no loading (#64)',
+        assembles.length === 1 && saved.length === 1 &&
+        planText(wrapB).indexOf('EN LIVE PLAN') >= 0 &&
+        planText(wrapB).indexOf(loadingEn) < 0);
+
+      // ── the restore bracket: a cached payload for the restored
+      //    language re-renders without a request (recomputed report — a
+      //    fresh object identity, exactly what App.Scoring hands back) ──
+      AppG.beginPlanRestore({
+        en: { narrative: 'CACHED EN PLAN', actions: [{ priority: '2', title: 'Cached card', description: 'From cache.', ast_source: 'AST002' }] }
+      });
+      var wrapC = internals.buildActionPlan(planReport(62), bankPlan, bankPlan);
+      check('a restore with a cached payload for its language renders it with no request and no loading frame (#64)',
+        assembles.length === 1 &&
+        planText(wrapC).indexOf('CACHED EN PLAN') >= 0 &&
+        planText(wrapC).indexOf('Cached card') >= 0 &&
+        planText(wrapC).indexOf(loadingEn) < 0,
+        planText(wrapC).slice(0, 80));
+      check('the close of a covered restore fires no request (#64)',
+        AppG.finishPlanRestore() === false && assembles.length === 1 && saved.length === 1);
+
+      // ── the restore without a payload for this language: nothing is
+      //    issued inside the render, the payload cached for another
+      //    language is never shown, and the close fires the one request
+      //    through the live path (proxy config reaches assemble — the
+      //    #63 forced Deterministic Fallback is gone) ──
+      AppG.beginPlanRestore({ zh: { narrative: 'ZH ONLY PLAN', actions: [] } });
+      var reportM = planReport(62);
+      var wrapD = internals.buildActionPlan(reportM, bankPlan, bankPlan);
+      check('a payload cached for another language is never rendered (#64)',
+        planText(wrapD).indexOf('ZH ONLY PLAN') < 0);
+      check('the cache-missed restore render fires NO request and shows no loading frame yet (#64)',
+        assembles.length === 1 && planText(wrapD).indexOf(loadingEn) < 0 &&
+        resolvers.length === 1);
+      check('the restore close issues exactly one queued request through the live path (#64)',
+        AppG.finishPlanRestore() === true && assembles.length === 2 &&
+        assembles[1].config === globalThis.window.APP_CONFIG &&
+        assembles[1].report === reportM);
+      check('the re-request shows the loading state until it settles',
+        planText(wrapD).indexOf(loadingEn) >= 0);
+      resolvers[1]({ narrative: 'EN RESTORED PLAN', actions: [], path: 'fallback' });
+      await settlePlan();
+      check('the restored desktop settles once and re-caches the payload (#64)',
+        planText(wrapD).indexOf('EN RESTORED PLAN') >= 0 &&
+        planText(wrapD).indexOf(loadingEn) < 0 &&
+        saved.length === 2 && saved[1][0] === 'en' &&
+        saved[1][1].narrative === 'EN RESTORED PLAN',
+        JSON.stringify(saved.map(function(r) { return r[0] + ':' + r[1].narrative; })));
+
+      // ── the language switch: the only regeneration trigger; the late
+      //    resolution caches under the language that ISSUED the request ──
+      I18n.use('zh');
+      var loadingZh = I18n.t('results.planLoading');
+      var reportZ = planReport(62);
+      var wrapZ = internals.buildActionPlan(reportZ, bankPlan, bankPlan);
+      check('a language switch outside a restore requests exactly once for the new language (#64)',
+        assembles.length === 3 && planText(wrapZ).indexOf(loadingZh) >= 0,
+        'calls=' + assembles.length);
+      I18n.use('en');   // switch away while the zh request is still in flight
+      resolvers[2]({ narrative: 'ZH LATE PLAN', actions: [], path: 'llm' });
+      await settlePlan();
+      check('a late resolution caches under the language that issued the request (#64)',
+        saved.length === 3 && saved[2][0] === 'zh' &&
+        saved[2][1].narrative === 'ZH LATE PLAN',
+        JSON.stringify(saved.map(function(r) { return r[0]; })));
+      I18n.use('zh');
+      var wrapZ2 = internals.buildActionPlan(reportZ, bankPlan, bankPlan);
+      check('switching back to a language whose plan settled re-renders from cache, not a new request (#64)',
+        assembles.length === 3 &&
+        planText(wrapZ2).indexOf('ZH LATE PLAN') >= 0 &&
+        planText(wrapZ2).indexOf(loadingZh) < 0);
+      I18n.use('en');
+
+      // ── a superseded Completion caches nothing: the live report is
+      //    replaced before the old request's late resolution lands ──
+      var reportOld = planReport(40);
+      internals.buildActionPlan(reportOld, bankPlan, bankPlan);   // assembles #4
+      var reportNew = planReport(40);
+      internals.buildActionPlan(reportNew, bankPlan, bankPlan);   // assembles #5
+      check('a new Completion takes one fresh request per language (#64)',
+        assembles.length === 5);
+      var savedBeforeStale = saved.length;
+      resolvers[3]({ narrative: 'DEAD COMPLETION', actions: [], path: 'llm' });
+      await settlePlan();
+      check('the superseded report\'s late resolution never enters the cache (#64)',
+        saved.length === savedBeforeStale &&
+        saved.every(function(r) { return r[1].narrative !== 'DEAD COMPLETION'; }),
+        JSON.stringify(saved.map(function(r) { return r[1].narrative; })));
+      resolvers[4]({ narrative: 'LIVE COMPLETION', actions: [], path: 'llm' });
+      await settlePlan();
+      check('the live Completion\'s resolution does (#64)',
+        saved.length === savedBeforeStale + 1 &&
+        saved[saved.length - 1][1].narrative === 'LIVE COMPLETION',
+        JSON.stringify(saved.map(function(r) { return r[1].narrative; })));
+    } catch (err) {
+      check('Action Plan cache block ran without throwing', false,
+        err && err.stack || String(err));
+    } finally {
+      AppG.finishPlanRestore();   // never strand the bracket for a sibling
+      function restoreAppG(name, prev) {
+        if (prev === undefined) delete AppG[name];
+        else AppG[name] = prev;
+      }
+      if (planPrev.window === undefined) delete globalThis.window;
+      else globalThis.window = planPrev.window;
+      restoreAppG('ActionPlan', planPrev.actionPlan);
+      restoreAppG('DesktopStore', planPrev.desktopStore);
+      restoreAppG('Windows', planPrev.windows);
+      if (planPrev.locale) I18n.use(planPrev.locale);
+    }
+
+    // ── restore globals for the sibling test modules ────────────────────
+    restoreGlobal('XMLSerializer', prevXMLSerializer);
+    restoreGlobal('Blob', prevBlob);
+    restoreGlobal('URL', prevURL);
+    restoreGlobal('Image', prevImage);
+    if (prevDoc === undefined) delete globalThis.document;
+    else globalThis.document = prevDoc;
+
+    return results;
+  })();
 };
