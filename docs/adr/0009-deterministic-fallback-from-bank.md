@@ -14,7 +14,7 @@ A hand-authored pattern file (~20 profiles with overlap matching) was the origin
 
 The Deterministic Fallback assembles its Action Plan from Question Bank fields only — no secondary content source.
 
-1. Rank AST Risks by percentage ascending; take the 3–5 weakest.
+1. Rank AST Risks by percentage ascending; take all Blind Spots when there are three or fewer, otherwise the five weakest.
 2. Each Action = that AST Risk's Mitigations distilled from the mapped Questions' Best Practices, plus the OWASP source link.
 3. Narrative = 2–3 sentences per weak AST Risk referencing the Participant's own choices (e.g. "on Question 01 you chose to trust review counts — that is the exact gap the ClawHavoc campaign exploited").
 

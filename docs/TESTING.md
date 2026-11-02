@@ -257,10 +257,10 @@ grounding text = docs/owasp-ast-full.md
 Extract all numbers from the LLM output (regex: `\b\d[\d,\.]*\b`). For each number found:
 
 - Check if it appears (as a substring) in the Grounding Corpus — see the source-language corpus note above
-- If a number is a common structural value (year like `2026`, single digit, percentage format `%`), allow it without source verification
+- If a number is a common structural value (one of 2, 3, 4, 5, 10, 20, a year like `2025`/`2026`, or any `\d{1,3}%`), allow it without source verification
 - Flag any statistic (e.g., `1,184`, `13.4%`, `280+`, `135,000`) not traceable to that corpus
 
-**Numbers to allow without source check:** 2, 3, 4, 5, 10, 20 (quiz structural numbers); years `2026`, `2025`; any number followed by `%` if it appears in a title range string.
+**Numbers to allow without source check:** 2, 3, 4, 5, 10, 20 (quiz structural numbers); years `2026`, `2025`; any number followed by `%` (up to three digits).
 
 #### Rule 2 — No Phantom Campaigns
 
@@ -307,7 +307,7 @@ For each item in `actions[]`:
 #### Rule 6 (moved) — Deep-Dive Prompt Budget
 
 `prompt_template` is no longer LLM output. The app assembles the deep-dive prompt
-deterministically (ADR-0006), so the 200-3000 character budget is now a
+deterministically (ADR-0006), so the ≤ 3000-character budget is now a
 **builder invariant** covered by fixture tests, not an LLM-output rule. Section 4
 has five grounding rules.
 
@@ -385,7 +385,7 @@ A valid mock output for testing Section 4. Every claim traces to `source_note` f
 
 ```json
 {
-  "narrative": "Your results reveal significant blind spots in three critical areas of agent skill security. Most concerning is your pattern around skill installation trust — you scored lowest on questions about verifying publishers before installing skills. The ClawHavoc campaign in January 2026 exploited exactly this trust gap, publishing 1,184 malicious skills across 12 accounts on a major marketplace. Five of the top seven most-downloaded skills were confirmed malware.\n\nYour second area of concern is permission management. You tended to accept broad permissions without scoping them to the skill's actual function. OWASP research found 280+ skills exposing API keys and PII beyond their declared function. A calendar skill requesting shell execution and full file system access is a red flag that marketplaces won't catch for you.\n\nYour strongest area is post-installation awareness — you show good instincts about update verification and runtime monitoring. Building on this strength, consider applying the same scrutiny to the pre-installation phase where most damage originates.",
+  "narrative": "Your results reveal significant blind spots in three critical areas of agent skill security. Most concerning is your pattern around skill installation trust — you scored lowest on questions about verifying publishers before installing skills. The ClawHavoc campaign in January 2026 exploited exactly this trust gap, publishing 1,184 malicious skills across 12 accounts on a major marketplace. Five of the top seven most-downloaded skills at peak infection were confirmed malware.\n\nYour second area of concern is permission management. You tended to accept broad permissions without scoping them to the skill's actual function. OWASP research found 280+ skills exposing API keys and PII beyond their declared function. A calendar skill requesting shell execution and full file system access should raise an immediate red flag.\n\nYour third gap is metadata hygiene — you rarely inspected SKILL.md files for hidden instructions. OWASP's AST04 checklist shows that invisible payloads in skill metadata (ASCII control characters, zero-width Unicode, base64 encoding) can evade human review. Running every skill through a scanner is the only reliable defense.",
   "actions": [
     {
       "priority": 1,
@@ -404,12 +404,6 @@ A valid mock output for testing Section 4. Every claim traces to `source_note` f
       "title": "Run SKILL.md through a security scanner",
       "description": "Human eyes can't see hidden instructions embedded via ASCII control characters, zero-width Unicode, or base64 encoding. Use a scanning tool that checks for these patterns — OWASP specifically recommends this in the AST04 checklist.",
       "ast_source": "AST04 — Insecure Metadata"
-    },
-    {
-      "priority": 4,
-      "title": "Enable sandboxing for all installed skills",
-      "description": "Skills execute in your full user permission context by default. Microsoft Defender warned that agents should be treated as untrusted code execution with persistent credentials. Enable sandboxing to limit what any single skill can reach.",
-      "ast_source": "AST06 — Weak Isolation"
     }
   ]
 }
