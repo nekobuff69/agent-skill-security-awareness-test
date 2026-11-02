@@ -1538,17 +1538,17 @@ exports.run = function() {
   check('the Quiz window is back at the arrangement it was born with',
     movedQuiz.x === 300 &&
     JSON.stringify(tctl.geometry('quiz')) ===
-      JSON.stringify(globalThis.App.Desktop.DESIGN_DEFAULTS.quiz));
+      JSON.stringify(globalThis.App.DesktopCore.DESIGN_DEFAULTS.quiz));
   check('the torn-down desktop hosts the next run: a program arrives fresh',
     tctl.deepDiveArrived() === true &&
     tctl.hasWindow('deep-dive') === true &&
     (function() {
-      var born = globalThis.App.Desktop.DESIGN_DEFAULTS;
+      var born = globalThis.App.DesktopCore.DESIGN_DEFAULTS;
       var g = tctl.geometry('deep-dive');
       // A newcomer cascades off the born Quiz window, exactly as it did
       // on the desktop's first Finish Commit.
-      return g.x === born.quiz.x + globalThis.App.Desktop.CASCADE &&
-        g.y === born.quiz.y + globalThis.App.Desktop.CASCADE &&
+      return g.x === born.quiz.x + globalThis.App.DesktopCore.CASCADE &&
+        g.y === born.quiz.y + globalThis.App.DesktopCore.CASCADE &&
         g.w === born['deep-dive'].w && g.h === born['deep-dive'].h;
     })(),
     JSON.stringify(tctl.geometry('deep-dive')));

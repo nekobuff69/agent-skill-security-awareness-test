@@ -17,7 +17,7 @@ exports.run = function() {
     I18n: App.I18n,
     Scoring: App.Scoring,
     SessionStore: App.SessionStore,
-    Desktop: App.Desktop,
+    Desktop: App.DesktopCore,
     Windows: App.Windows,
     DesktopStore: App.DesktopStore,
     renderResults: App.renderResults,
@@ -352,7 +352,7 @@ exports.run = function() {
 
     /* ── the real core: the Records round-trip through loadSnapshot ────── */
 
-    var Desktop = App.Desktop;
+    var Desktop = App.DesktopCore;
 
     resetScenario();
     var live = Desktop.createCore({ id: Desktop.QUIZ_ID });

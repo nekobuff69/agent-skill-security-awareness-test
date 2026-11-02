@@ -141,10 +141,10 @@
    * models.
    */
   function coreModule() {
-    if (!app.Desktop && typeof require === 'function') {
+    if (!app.DesktopCore && typeof require === 'function') {
       require('./desktop-core.js');   // Node seam; the page loads it by tag
     }
-    return app.Desktop || null;
+    return app.DesktopCore || null;
   }
 
   /**

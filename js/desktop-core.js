@@ -62,7 +62,7 @@
   var app = global.App || {};
   global.App = app;
 
-  app.Desktop = app.Desktop || {};
+  app.DesktopCore = app.DesktopCore || {};
 
   var VIEW_LANDING = 'landing-view';
 
@@ -639,14 +639,14 @@
     };
   }
 
-  app.Desktop.createCore = createCore;
-  app.Desktop.VIEW_LANDING = VIEW_LANDING;
-  app.Desktop.PROGRAM_IDS = PROGRAM_IDS;
-  app.Desktop.QUIZ_ID = QUIZ_ID;
-  app.Desktop.ACTION_PLAN_ID = ACTION_PLAN_ID;
-  app.Desktop.DEEP_DIVE_ID = DEEP_DIVE_ID;
-  app.Desktop.DESIGN_DEFAULTS = DESIGN_DEFAULTS;
-  app.Desktop.CASCADE = CASCADE;
+  app.DesktopCore.createCore = createCore;
+  app.DesktopCore.VIEW_LANDING = VIEW_LANDING;
+  app.DesktopCore.PROGRAM_IDS = PROGRAM_IDS;
+  app.DesktopCore.QUIZ_ID = QUIZ_ID;
+  app.DesktopCore.ACTION_PLAN_ID = ACTION_PLAN_ID;
+  app.DesktopCore.DEEP_DIVE_ID = DEEP_DIVE_ID;
+  app.DesktopCore.DESIGN_DEFAULTS = DESIGN_DEFAULTS;
+  app.DesktopCore.CASCADE = CASCADE;
 
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = app;

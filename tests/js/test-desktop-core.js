@@ -25,7 +25,7 @@ exports.run = function() {
   }
 
   var App = require('../../js/desktop-core.js');
-  var Desktop = App.Desktop;
+  var Desktop = App.DesktopCore;
 
   check('the desktop core is exposed on the App.* seam',
     Desktop && typeof Desktop.createCore === 'function',
