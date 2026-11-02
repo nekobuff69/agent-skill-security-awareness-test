@@ -138,7 +138,7 @@ exports.run = function() {
     skin.indexOf('#FFFFFF') !== -1 && skin.indexOf('#808080') !== -1 &&
     skin.indexOf('#000000') !== -1);
   check('title bars use navy→lighter-blue gradient',
-    /linear-gradient\(90deg,\s*#000080\s*0%,\s*#1084D0/.test(skin));
+    /linear-gradient\(90deg,\s*#000080\s*0%,\s*#1084D0/.test(read('css/shell.css')));
   check('1px dither token present (graphics-only)',
     /--dither:\s*repeating-conic-gradient/.test(skin));
 

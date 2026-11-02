@@ -632,42 +632,72 @@
     }
   }
 
-  /* ── Deep-Dive Prompt ── */
-  function buildDeepDive(report) {
-    var promptText = App.PromptBuilder.build(report);
+  /* ── Deep-Dive Prompt (ticket #74) ────────────────────────────────────
+
+     The fold is gone: the Prompt window's body is the one-line guidance
+     above a sunken field the prompt itself fills and scrolls. The title
+     bar already names the program, so no heading stands in the body.
+
+     The body has ONE command, in a bar at the head of the section — the
+     Quiz window's menu strip surface with a single flat command in it:
+     no menu role, no dropdown, no keyboard chords. One activation copies
+     and the existing results.copy / results.copied / results.copyFailed
+     feedback answers. */
+  function buildDeepDive(promptText) {
     var wrap = el('div', { className: 'results-deep-dive' });
 
-    // Engaging heading + supporting line
-    wrap.appendChild(el('h3', { className: 'results-deep-dive-heading', textContent: t('results.deepDiveHeading') }));
+    // The retained one-line guidance (the old sub-paragraph copy).
     wrap.appendChild(el('p', { className: 'results-deep-dive-sub', textContent: t('results.deepDiveSub') }));
 
-    var details = el('details', { className: 'results-prompt-details' });
-    var summary = el('summary', { className: 'results-prompt-summary' }, [
-      document.createTextNode(t('results.showPrompt'))
-    ]);
-    details.appendChild(summary);
+    // The prompt itself: visible on restore, scrolling inside the sunken
+    // field — never the page.
+    wrap.appendChild(el('pre', { className: 'results-prompt-pre', textContent: promptText }));
 
-    var pre = el('pre', { className: 'results-prompt-pre', textContent: promptText });
-    details.appendChild(pre);
-
-    var btn = el('button', { className: 'results-copy-btn', textContent: t('results.copy') });
-    btn.addEventListener('click', function() {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(promptText).then(function() {
-          window.Analytics.track('template_copied');
-          btn.textContent = t('results.copied');
-          setTimeout(function() { btn.textContent = t('results.copy'); }, 2000);
-        }).catch(function() {
-          fallbackCopy(promptText, btn);
-        });
-      } else {
-        fallbackCopy(promptText, btn);
-      }
-    });
-    details.appendChild(btn);
-
-    wrap.appendChild(details);
     return wrap;
+  }
+
+  /** The Deep-Dive window's bar: the Quiz strip surface, one flat command. */
+  function buildDeepDiveBar(promptText) {
+    var bar = el('div', { className: 'results-menu-bar results-deep-dive-bar' });
+    bar.appendChild(buildCopyPromptCmd(promptText));
+    return bar;
+  }
+
+  /**
+   * The Copy Prompt command: one press, no confirmation step. It rides the
+   * same clipboard path and the same feedback the body control used before
+   * the fold went away (#74), and the same `results-menu-item` sizing the
+   * Quiz bar commands get, so the strip reads as one surface family.
+   */
+  function buildCopyPromptCmd(promptText) {
+    var cmd = el('button', {
+      className: 'results-copy-btn results-menu-item',
+      textContent: t('results.copy')
+    });
+    cmd.setAttribute('type', 'button');
+    cmd.addEventListener('click', function() {
+      copyPrompt(promptText, cmd);
+    });
+    return cmd;
+  }
+
+  function copyPrompt(text, btn) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function() {
+        window.Analytics.track('template_copied');
+        flashCopyState(btn, 'results.copied');
+      }).catch(function() {
+        fallbackCopy(text, btn);
+      });
+    } else {
+      fallbackCopy(text, btn);
+    }
+  }
+
+  /** The label answers with the result, then returns to its command name. */
+  function flashCopyState(btn, labelId) {
+    btn.textContent = t(labelId);
+    setTimeout(function() { btn.textContent = t('results.copy'); }, 2000);
   }
 
   function fallbackCopy(text, btn) {
@@ -680,11 +710,9 @@
     try {
       document.execCommand('copy');
       window.Analytics.track('template_copied');
-      btn.textContent = t('results.copied');
-      setTimeout(function() { btn.textContent = t('results.copy'); }, 2000);
+      flashCopyState(btn, 'results.copied');
     } catch (e) {
-      btn.textContent = t('results.copyFailed');
-      setTimeout(function() { btn.textContent = t('results.copy'); }, 2000);
+      flashCopyState(btn, 'results.copyFailed');
     }
     document.body.removeChild(ta);
   }
@@ -1088,9 +1116,9 @@
      Retake — live in ONE menu bar at the head of the window body, so the
      body below it carries only the score header, the Risk Radar and the
      Blind-Spot Bars. The bar is built by the Quiz presenter and mounted
-     into the Quiz body alone: the Action Plan and the Deep-Dive Prompt are
-     sections of their own windows and own no commands, and the Deep-Dive
-     Copy control stays in that window's body.
+     into the Quiz body alone: the Action Plan owns no commands, and the
+     Deep-Dive Prompt owns one flat Copy Prompt command in a bar of its
+     own (ticket #74) — the same strip surface, but not a menu.
 
      Keyboard: the bar is a `menubar` of `menuitem`s with a roving tabindex,
      so Arrow/Home/End move the command focus and Enter/Space (native button
@@ -1297,10 +1325,14 @@
     // Deep-Dive Prompt — mounted on its stable section host, which is the
     // Deep-Dive Prompt window's body on the desktop (#61). Its content is
     // built synchronously (the Deterministic Prompt Builder), so the Finish
-    // Commit below is also its arrival.
+    // Commit below is also its arrival. The body is unfolded (#74): no fold
+    // remains, the window's one Copy Prompt command sits in the bar at the
+    // head of the body, then the guidance, then the prompt field.
+    var ddPromptText = App.PromptBuilder.build(shown);
     var ddSection = el('div', { className: 'results-section' });
+    ddSection.appendChild(buildDeepDiveBar(ddPromptText));
     ddSection.appendChild(el('h2', { className: 'results-section-title', textContent: t('results.deepDiveTitle') }));
-    ddSection.appendChild(buildDeepDive(shown));
+    ddSection.appendChild(buildDeepDive(ddPromptText));
     mountSection('deep-dive', ddSection, view);
 
     // Review and Retake left the body with ticket #65: they are menu-bar

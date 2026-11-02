@@ -410,23 +410,44 @@ exports.run = function() {
           return allBars[0].children.indexOf(b) >= 0;
         }),
         'buttons=' + buttonsUnder(views['results-view']).length);
-      check('the other two windows own no commands at all',
+      check('the other two windows own no menu and the Action Plan owns no command',
         byRole([planFrame.windowEl], 'menubar').length === 0 &&
         byRole([planFrame.windowEl], 'menuitem').length === 0 &&
         buttonsUnder(planFrame.bodyEl).length === 0 &&
         byRole([ddFrame.windowEl], 'menubar').length === 0 &&
         byRole([ddFrame.windowEl], 'menuitem').length === 0);
-      check('the Deep-Dive Prompt keeps its Copy control in its own body',
-        buttonsUnder(ddFrame.bodyEl).map(function(b) { return b.textContent; })
-          .indexOf(App.I18n.t('results.copy')) >= 0,
-        buttonsUnder(ddFrame.bodyEl).map(function(b) { return b.textContent; }).join('|'));
+
+      // ── Ticket #74: the Deep-Dive window is one prompt field and its bar ──
+      // The fold is gone. The body leads with the window's flat command
+      // strip — the Quiz menu-bar surface carrying ONE command, no menu
+      // role — then the one-line guidance, then the prompt, visible before
+      // any press because nothing is collapsed any more.
+      var ddSectionEl = ddFrame.bodyEl.children[0];
+      var ddBar = ddSectionEl.children[0];
+      var ddBody = ddSectionEl.children[2];
+      check('the Copy bar heads the Deep-Dive body and no fold survives in it',
+        String(ddBar.className).indexOf('results-deep-dive-bar') >= 0 &&
+        String(ddBar.className).indexOf('results-menu-bar') >= 0 &&
+        byTag(ddFrame.bodyEl, 'details').length === 0 &&
+        byTag(ddFrame.bodyEl, 'summary').length === 0);
+      check('the guidance line sits above a prompt field that is open on restore',
+        ddBody.children[0].textContent === App.I18n.t('results.deepDiveSub') &&
+        ddBody.children[1].tagName === 'PRE' &&
+        ddBody.children[1].textContent === PROMPT_MARK,
+        textOf(ddBody).join(' ').slice(0, 60));
+      var ddCommands = buttonsUnder(ddBar);
+      check('the bar owns one flat Copy Prompt command',
+        ddCommands.length === 1 &&
+        buttonsUnder(ddFrame.bodyEl).length === 1 &&
+        ddCommands[0].textContent === App.I18n.t('results.copy'),
+        ddCommands.map(function(b) { return b.textContent; }).join('|'));
       App.SessionStore = { clear: function() {}, load: function() { return { ok: true, answers: [] }; } };
-      var copyBtn = buttonsUnder(ddFrame.bodyEl)[0];
-      copyBtn.click();
+      ddCommands[0].click();
       await Promise.resolve(); await Promise.resolve();
-      check('the Copy control still answers with its copied state',
-        copyWrites.length === 1 && copyBtn.textContent === App.I18n.t('results.copied'),
-        copyBtn.textContent);
+      check('one activation copies the prompt and answers with its copied state',
+        copyWrites.length === 1 && copyWrites[0] === PROMPT_MARK &&
+        ddCommands[0].textContent === App.I18n.t('results.copied'),
+        ddCommands[0].textContent);
 
       // Keyboard traversal inside the bar, and a pointer click that runs a
       // command: Review reaches the Review stage, Back returns.

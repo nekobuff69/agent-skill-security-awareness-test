@@ -638,22 +638,38 @@ exports.run = function() {
     /\.results-narrative-details\[open\] > \.results-narrative-summary::before \{[^}]*content: '\[-\] '/.test(css) &&
     /\.results-review-summary \{[^}]*color: var\(--color-text\)/.test(css) &&
     /\.results-review-qnum \{[^}]*color: var\(--color-text\)/.test(css));
-  // Navy belongs to the Window Frame (css/shell.css) and — until ticket #74
-  // takes the Deep-Dive Prompt in hand — to its summary row. No other
-  // in-window element of this presenter paints a navy gradient.
+  // Navy belongs to the Window Frame (css/shell.css). The Deep-Dive Prompt's
+  // navy expander row — the last in-window gradient — went with the fold
+  // itself (#74), so no exemption is needed any more.
   check('no navy gradient paints inside the window content',
     (function() {
       var offenders = [];
       var rule = /([^\{\}]+)\{([^\{\}]*)\}/g;
       var m;
       while ((m = rule.exec(css)) !== null) {
-        if (m[2].indexOf('linear-gradient(90deg, #000080') >= 0 &&
-            m[1].indexOf('.results-prompt-summary') < 0) {
+        if (m[2].indexOf('linear-gradient(90deg, #000080') >= 0) {
           offenders.push(m[1].replace(/\s+/g, ' ').trim());
         }
       }
       return offenders.length === 0;
-    }()));
+    })());
+  // Ticket #74: the Prompt window is unfolded. Its body is the one-line
+  // guidance above a sunken field the prompt scrolls inside, the fold's
+  // chrome is gone from both sheets, and the window's one command paints
+  // through the shared menu-bar strip rules (its own class only scopes it).
+  var skin = fs.readFileSync(require('path').join(__dirname, '../../css/theme-retro-os.css'), 'utf8');
+  check('the Deep-Dive body is one sunken scrolling prompt field with no fold chrome',
+    /\.results-prompt-pre \{[^}]*max-height[^}]*overflow: auto/.test(css) &&
+    /\.results-prompt-pre \{[^}]*box-shadow: var\(--bevel-sunken\)/.test(css) &&
+    css.indexOf('.results-prompt-details') < 0 &&
+    css.indexOf('.results-prompt-summary') < 0 &&
+    css.indexOf('.results-deep-dive-heading') < 0 &&
+    skin.indexOf('.results-prompt-details') < 0 &&
+    skin.indexOf('.results-prompt-summary') < 0 &&
+    skin.indexOf('.results-deep-dive-heading') < 0);
+  check('the Copy Prompt command sits in the shared menu-bar strip',
+    /\.results-menu-bar \{[^}]*display: flex/.test(css) &&
+    /\.results-menu-bar \.results-menu-item/.test(css));
   // Ticket #65: the commands live in one strip that wraps at the window's
   // 360px floor, and the two rows that used to carry them are gone.
   check('the menu bar is a wrapping strip and the old command rows are gone',

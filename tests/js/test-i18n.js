@@ -178,7 +178,7 @@ exports.run = function() {
     'quiz.labelQuestion', 'quiz.previous', 'quiz.bankChanged',
     'results.radarTitle', 'results.barsTitle', 'results.actionPlanTitle',
     'results.deepDiveTitle', 'results.planLoading', 'results.narrativeSummary',
-    'results.deepDiveHeading', 'results.deepDiveSub', 'results.showPrompt',
+    'results.deepDiveSub',
     'results.copy', 'results.copied', 'results.copyFailed', 'results.downloadPng',
     'results.share', 'results.shareTitle', 'results.shareText', 'results.retake',
     'results.reviewBtn', 'results.reviewTitle', 'results.reviewBack',
