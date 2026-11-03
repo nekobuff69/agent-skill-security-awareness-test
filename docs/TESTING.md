@@ -10,6 +10,8 @@ Rule-based validation only. No LLM-as-judge, no external API calls, no network r
 
 **Approach:** Every check is deterministic. The Python runner (`run_tests.py`) discovers every Bank Variant in the repo root (`questions*.json`), validates each one's schema, scoring fixtures, and grounding rules, and prints every failure with the file it came from. The Node runner (`tests/js/run-tests.js`) executes the JS module tests (pure functions, no browser) — including a gate on the shipped Grounding Corpus itself. Both must pass; `scripts/preflight.sh` runs both as the single pre-deploy gate and exits 0 (all pass) or 1 (any fail).
 
+The preflight also exercises the LLM grounding rules in both directions: `tests/mock_llm_output.json` (a grounded plan citing only corpus statistics and a valid AST source URL) must PASS, and `tests/mock_llm_output_negative.json` (phantom statistic, phantom campaign, non-OWASP URLs, unknown AST id) must FAIL — a regression that would otherwise let a broken grounding gate pass silently.
+
 **Scripts:** `run_tests.py` (stdlib only — `json`, `re`, `sys`, `os`, `glob`, `argparse`) and `tests/js/run-tests.js` (Node, zero dependencies)
 
 **Usage:**

@@ -64,6 +64,13 @@ try {
         exit 1
     }
 
+    Write-Host 'Running LLM grounding negative fixture (must FAIL)...'
+    & python3 run_tests.py --llm tests/mock_llm_output_negative.json *> $null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host 'FAIL: negative LLM grounding fixture unexpectedly PASSED - the grounding gate is broken'
+        exit 1
+    }
+
     Write-Host 'Running Node module tests...'
     & node tests/js/run-tests.js
     if ($LASTEXITCODE -ne 0) {

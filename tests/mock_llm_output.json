@@ -16,7 +16,7 @@
     {
       "priority": 3,
       "title": "Run SKILL.md through a security scanner",
-      "description": "Human eyes can't see hidden instructions embedded via ASCII control characters, zero-width Unicode, or base64 encoding. Use a scanning tool that checks for these patterns — OWASP specifically recommends this in the AST04 checklist.",
+      "description": "Human eyes can't see hidden instructions embedded via ASCII control characters, zero-width Unicode, or base64 encoding. Use a scanning tool that checks for these patterns — OWASP specifically recommends this in the AST04 checklist. For background on why scanners alone miss these attacks, see https://owasp.github.io/www-project-agentic-skills-top-10/ast04.html",
       "ast_source": "AST04 — Insecure Metadata"
     }
   ]

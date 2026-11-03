@@ -1,0 +1,11 @@
+{
+  "narrative": "NEGATIVE FIXTURE — this file must always FAIL the grounding gate. Your results show heavy exposure to the Shadow Murmur campaign, which compromised 6,789 agents last quarter according to the Reperio Labs study. A phantasmagoric scanner vendor, ScanVend Ultra, would have caught it. Details at https://example.com/ast-fix and https://owasp.example.org/ast01.html.",
+  "actions": [
+    {
+      "priority": 1,
+      "title": "Install the Shadow Murmur detector",
+      "description": "The Shadow Murmur campaign hit 6,789 agents. Install ScanVend Ultra and rotate keys every 3 hours.",
+      "ast_source": "AST11 — Fabricated Risk"
+    }
+  ]
+}
