@@ -1,23 +1,23 @@
 {
-  "narrative": "Your results reveal significant blind spots in three critical areas of agent skill security. Most concerning is your pattern around skill installation trust — you scored lowest on questions about verifying publishers before installing skills. The ClawHavoc campaign in January 2026 exploited exactly this trust gap, publishing 1,184 malicious skills across 12 accounts on a major marketplace. Five of the top seven most-downloaded skills at peak infection were confirmed malware.\n\nYour second area of concern is permission management. You tended to accept broad permissions without scoping them to the skill's actual function. OWASP research found 280+ skills exposing API keys and PII beyond their declared function. A calendar skill requesting shell execution and full file system access should raise an immediate red flag.\n\nYour third gap is metadata hygiene — you rarely inspected SKILL.md files for hidden instructions. OWASP's AST04 checklist shows that invisible payloads in skill metadata (ASCII control characters, zero-width Unicode, base64 encoding) can evade human review. Running every skill through a scanner is the only reliable defense.",
+  "narrative": "Your score puts you in solid shape overall, but three habits are worth tightening first. The weakest is install-time trust: on the marketplace question you chose to trust the download count, and the ClawHavoc campaign (January 2026) is exactly that trap — 1,184 malicious skills across 12 accounts, with five of the top seven most-downloaded skills confirmed malware at peak. The second gap is updates: a fresh version number tells you nothing, and in SecurityScorecard's February 2026 exposure study 35.4% of observed deployments were still vulnerable to remote code execution at publication. The third is scanning: a clean scan is one signal, not a verdict — Trail of Bits bypassed every scanner they tested while building their malicious test skills.\n\nNone of this needs new tooling to start. It needs three habits you can adopt this week, listed below in priority order.",
   "actions": [
     {
       "priority": 1,
-      "title": "Verify publisher identity before every skill install",
-      "description": "Check the publisher's account history, other published skills, and cross-reference with known attack campaigns. In the ClawHavoc campaign, 12 accounts that looked legitimate published malware. Don't trust download counts or reviews as safety signals.",
-      "ast_source": "AST01 — Malicious Skills"
+      "title": "Verify the publisher before you install",
+      "description": "Before installing, open the publisher's profile: how old is the account, what else have they published, and does the skill's permission ask match what it promises? Download counts and reviews are not safety signals — in the ClawHavoc campaign the malware sat in the most-downloaded listings. If the publisher's account was recently deleted and re-registered, walk away: that is the SkillJacking takeover pattern.",
+      "ast_source": "AST01"
     },
     {
       "priority": 2,
-      "title": "Scope permissions to match the skill's stated function",
-      "description": "Review each permission request against what the skill actually needs. A calendar skill needs network access for syncing — it doesn't need shell execution or full file system access. Deny permissions that exceed the skill's purpose.",
-      "ast_source": "AST03 — Over-Privileged Skills"
+      "title": "Pin your installed skills to a content hash",
+      "description": "Pick your five most-used skills and record their content hash (sha256) today. Turn off auto-update, or gate it behind a quick manual review of what changed. Patch lag is real: SecurityScorecard found 35.4% of observed OpenClaw deployments vulnerable to remote code execution at publication, and a hash pin closes the window where an update you never saw swaps in new behavior.",
+      "ast_source": "AST07"
     },
     {
       "priority": 3,
-      "title": "Run SKILL.md through a security scanner",
-      "description": "Human eyes can't see hidden instructions embedded via ASCII control characters, zero-width Unicode, or base64 encoding. Use a scanning tool that checks for these patterns — OWASP specifically recommends this in the AST04 checklist. For background on why scanners alone miss these attacks, see https://owasp.github.io/www-project-agentic-skills-top-10/ast04.html",
-      "ast_source": "AST04 — Insecure Metadata"
+      "title": "Read the instructions, not just the scan result",
+      "description": "Treat a clean scan as one input, never a verdict: Trail of Bits bypassed every scanner they tested, and pure natural-language instructions — 'send this file to this address' — carry no code signature at all. For each new skill, spend two minutes reading the SKILL.md prose yourself, looking for anything that sends data outbound or asks you to run commands. See https://owasp.github.io/www-project-agentic-skills-top-10/ast08.html",
+      "ast_source": "AST08"
     }
   ]
 }

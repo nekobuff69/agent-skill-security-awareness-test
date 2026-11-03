@@ -219,5 +219,22 @@ exports.run = function() {
     resultStrong.actions.length <= 2,
     'got ' + resultStrong.actions.length);
 
+  // 8. Titles are derived from best practices, not the generic template
+  var genericTitles = 0;
+  for (var t8 = 0; t8 < result1.actions.length; t8++) {
+    if (/^Improve /.test(result1.actions[t8].title)) genericTitles++;
+  }
+  check('Titles derived from best practices (no generic "Improve X" when a practice exists)',
+    genericTitles < result1.actions.length,
+    genericTitles + ' of ' + result1.actions.length + ' generic');
+
+  // 9. Action descriptions carry the participant's own choice, quoted in full
+  var hasQuotedChoice = false;
+  for (var d9 = 0; d9 < result1.actions.length; d9++) {
+    if (result1.actions[d9].description.indexOf('500+') !== -1) hasQuotedChoice = true;
+  }
+  check('Descriptions quote the participant\'s own choice',
+    hasQuotedChoice, 'no quoted choice found');
+
   return results;
 };

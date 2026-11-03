@@ -68,9 +68,11 @@
       var severityWeight = severityValues[q.severity_weight];
       var weightedScore = optionScore * severityWeight;
       var maxOptionScore = 0;
+      var bestOptionIndex = 0;
       for (var j = 0; j < q.options.length; j++) {
         if (q.options[j].score > maxOptionScore) {
           maxOptionScore = q.options[j].score;
+          bestOptionIndex = j;
         }
       }
       var maxPossible = maxOptionScore * severityWeight;
@@ -83,7 +85,9 @@
         weightedScore: weightedScore,
         maxPossible: maxPossible,
         optionScore: optionScore,
+        maxScore: maxOptionScore,
         selectedOption: q.options[resolved[i]],
+        bestOption: q.options[bestOptionIndex],
         scenario: q.scenario,
         question: q.question,
         bestPractice: q.best_practice,
@@ -161,6 +165,9 @@
         scenario: wc.scenario,
         question: wc.question,
         selectedOption: wc.selectedOption,
+        optionScore: wc.optionScore,
+        maxScore: wc.maxScore,
+        bestOption: wc.bestOption,
         bestPractice: wc.bestPractice,
         astSourceUrl: wc.astSourceUrl,
         astRisks: wc.astRisks

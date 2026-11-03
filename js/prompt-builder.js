@@ -47,17 +47,37 @@
     // --- Section 3: Choices ---
     var weakestQuestions = (report.weakestQuestions || []).slice(0, 5);
 
-    function buildChoices(questions, truncateScenarios) {
+    function buildChoices(questions, scenarioCap) {
       var choices = t('prompt.weakest.heading');
       for (var q = 0; q < questions.length; q++) {
         var wq = questions[q];
         var scenario = wq.scenario || '';
-        if (truncateScenarios && scenario.length > 80) {
-          scenario = scenario.substring(0, 80) + t('fallback.ellipsis');
+        if (scenarioCap && scenario.length > scenarioCap) {
+          scenario = scenario.substring(0, scenarioCap) + t('fallback.ellipsis');
         }
         choices += '\n\n### ' + wq.id + ': ' + (wq.astRisks || []).join(', ');
         choices += '\n' + t('prompt.item.scenario', { text: scenario });
-        choices += '\n' + t('prompt.item.chose', { text: (wq.selectedOption && wq.selectedOption.text ? wq.selectedOption.text : '') });
+        // Scored choice line when the report carries the numbers; plain
+        // line otherwise (older reports and test fixtures).
+        if (wq.selectedOption && wq.selectedOption.text) {
+          if (wq.optionScore != null && wq.maxScore != null) {
+            choices += '\n' + t('prompt.item.choseScored', {
+              text: wq.selectedOption.text,
+              score: wq.optionScore,
+              max: wq.maxScore
+            });
+          } else {
+            choices += '\n' + t('prompt.item.chose', { text: wq.selectedOption.text });
+          }
+        }
+        // The stronger answer with its reason — the tutor's first teaching
+        // material. Only rendered when the report carries a best option.
+        if (wq.bestOption && wq.bestOption.text) {
+          choices += '\n' + t('prompt.item.better', {
+            text: wq.bestOption.text,
+            reason: (wq.bestOption.feedback || '').trim()
+          });
+        }
         choices += '\n' + t('prompt.item.bestPractice', { text: (wq.bestPractice || '') });
         choices += '\n' + t('prompt.item.owasp', { url: (wq.astSourceUrl || '') });
       }
@@ -69,14 +89,16 @@
       return framing + '\n\n' + profile + '\n\n' + choices + '\n\n' + t('prompt.sessionRules');
     }
 
-    var choicesText = buildChoices(weakestQuestions, false);
+    // Scenarios clip to 120 chars by default; the budget ladder's first
+    // step tightens that to 80 before any question is dropped.
+    var choicesText = buildChoices(weakestQuestions, 120);
     var prompt = assemble(choicesText);
 
     // --- Budget enforcement ---
     var budget = t('prompt.budget');
     if (prompt.length > budget) {
       // Step 1: truncate scenarios to 80 chars
-      choicesText = buildChoices(weakestQuestions, true);
+      choicesText = buildChoices(weakestQuestions, 80);
       prompt = assemble(choicesText);
     }
 
@@ -84,7 +106,7 @@
       // Step 2: remove weakest questions from bottom until under budget
       while (weakestQuestions.length > 1 && prompt.length > budget) {
         weakestQuestions.pop();
-        choicesText = buildChoices(weakestQuestions, true);
+        choicesText = buildChoices(weakestQuestions, 80);
         prompt = assemble(choicesText);
       }
     }

@@ -129,27 +129,30 @@ def main() -> None:
     needed = needed_codepoints()
     print(f'{len(needed)} codepoints needed from {len(SOURCES)} sources')
 
-    with tempfile.TemporaryDirectory(prefix='fusion-pixel-') as tmp:
-        upstream = fetch_upstream_woff2(pathlib.Path(tmp))
+    # Persistent cache: the pinned upstream zip survives across runs, so a
+    # flaky network (or a 502-ing proxy) does not re-download it every time.
+    cache = pathlib.Path(tempfile.gettempdir()) / 'fusion-pixel-cache'
+    cache.mkdir(parents=True, exist_ok=True)
+    upstream = fetch_upstream_woff2(cache)
 
-        # Roundtrip: read the font once (with the upstream cmap intact) so we
-        # can report what the subset *actually* kept, independent of what we
-        # asked for.
-        probe = TTFont(upstream)
-        cmap = set()
-        for table in probe['cmap'].tables:
-            cmap.update(table.cmap.keys())
-        probe.close()
+    # Roundtrip: read the font once (with the upstream cmap intact) so we
+    # can report what the subset *actually* kept, independent of what we
+    # asked for.
+    probe = TTFont(upstream)
+    cmap = set()
+    for table in probe['cmap'].tables:
+        cmap.update(table.cmap.keys())
+    probe.close()
 
-        subsetted = needed & cmap
-        missing = needed - cmap
-        if missing:
-            print('upstream face lacks (%d): ' % len(missing) +
-                  ', '.join(hex(c) for c in sorted(missing)))
+    subsetted = needed & cmap
+    missing = needed - cmap
+    if missing:
+        print('upstream face lacks (%d): ' % len(missing) +
+              ', '.join(hex(c) for c in sorted(missing)))
 
-        font = subset_font(upstream, sorted(subsetted))
-        font.save(OUT_WOFF2)
-        font.close()
+    font = subset_font(upstream, sorted(subsetted))
+    font.save(OUT_WOFF2)
+    font.close()
 
     # Emit the committed inventory from the SAVED subset: reopen the artifact
     # itself so the JSON describes the file that ships, byte-for-byte.

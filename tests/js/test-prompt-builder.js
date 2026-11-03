@@ -151,5 +151,24 @@ exports.run = function() {
     pos02 < pos04 && pos04 < pos01 && pos01 < pos03,
     'AST02=' + pos02 + ' AST04=' + pos04 + ' AST01=' + pos01 + ' AST03=' + pos03);
 
+  // --- Test 7: Scored choice line and stronger-answer line render when the
+  // report carries the fields (real reports do via scoring.js) ---
+  var report7 = mockReport();
+  report7.weakestQuestions[0].optionScore = 0;
+  report7.weakestQuestions[0].maxScore = 3;
+  report7.weakestQuestions[0].bestOption = {
+    text: 'Restrict shell execution to an allowlist',
+    score: 3,
+    feedback: 'Allowlisted commands keep the blast radius known and small.'
+  };
+  var result7 = PromptBuilder.build(report7);
+  check('Scored choice line renders (scored 0 out of 3)',
+    result7.indexOf('(scored 0 out of 3)') !== -1,
+    'missing scored choice');
+  check('Stronger-answer line renders with its reason',
+    result7.indexOf('A stronger answer: Restrict shell execution to an allowlist') !== -1 &&
+    result7.indexOf('Allowlisted commands keep the blast radius known and small.') !== -1,
+    'missing better-answer line');
+
   return results;
 };

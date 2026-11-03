@@ -45,28 +45,52 @@
   }
 
   /**
-   * Build a summary of the participant's behavior from weakestQuestions for a given risk.
+   * The participant's weak questions mapped to one risk, in report order.
    */
-  function summarizeBehavior(weakQuestions, astId) {
+  function matchedWeakQuestions(weakQuestions, astId) {
     var matched = [];
+    if (!Array.isArray(weakQuestions)) return matched;
     for (var i = 0; i < weakQuestions.length; i++) {
       var wq = weakQuestions[i];
-      for (var j = 0; j < wq.astRisks.length; j++) {
-        if (wq.astRisks[j] === astId) {
+      var risks = wq.astRisks || [];
+      for (var j = 0; j < risks.length; j++) {
+        if (risks[j] === astId) {
           matched.push(wq);
           break;
         }
       }
     }
+    return matched;
+  }
+
+  /**
+   * The best practice to act on for one risk: the participant's weakest
+   * question's practice when one exists (personalized), else the first
+   * bank question mapped to the risk.
+   */
+  function bestPracticeFor(bank, astId, weakQuestions) {
+    var matched = matchedWeakQuestions(weakQuestions, astId);
+    if (matched.length > 0 && matched[0].bestPractice) {
+      return matched[0].bestPractice;
+    }
+    var qs = questionsForRisk(bank, astId);
+    for (var i = 0; i < qs.length; i++) {
+      if (qs[i].best_practice) return qs[i].best_practice;
+    }
+    return '';
+  }
+
+  /**
+   * Build a summary of the participant's behavior from weakestQuestions for a given risk.
+   */
+  function summarizeBehavior(weakQuestions, astId) {
+    var matched = matchedWeakQuestions(weakQuestions, astId);
     if (matched.length === 0) return t('fallback.behavior.none');
     var snippets = [];
     for (var k = 0; k < matched.length; k++) {
       var opt = matched[k].selectedOption;
       if (opt && opt.text) {
-        var snippet = opt.text.length > 60
-          ? opt.text.slice(0, 57) + t('fallback.ellipsis')
-          : opt.text;
-        snippets.push(t('fallback.quoteOpen') + snippet + t('fallback.quoteClose'));
+        snippets.push(t('fallback.quoteOpen') + opt.text + t('fallback.quoteClose'));
       }
     }
     if (snippets.length === 0) return t('fallback.behavior.none');
@@ -76,7 +100,43 @@
   }
 
   /**
-   * Build the narrative string.
+   * Derive a concise action title from the best practice for a risk.
+   * The practice text is an imperative sentence, so its opening clause
+   * reads as a title: English keeps the first six words (comma-clipped,
+   * then word-boundary clipped at 48 chars); Chinese clips at the first
+   * punctuation mark (20 chars). Falls back to "Improve {risk}".
+   */
+  function deriveTitle(bank, astId, weakQuestions) {
+    var risk = riskName(astId);
+    var practice = bestPracticeFor(bank, astId, weakQuestions);
+    if (practice) {
+      var title = '';
+      if (/[\u4e00-\u9fff]/.test(practice)) {
+        // CJK: clip at the first punctuation run.
+        title = practice.split(/[，。：；！？、——…]/)[0].trim();
+        if (title.length > 20) title = title.slice(0, 20).replace(/[\s,;:]+$/, '');
+      } else {
+        var commaPart = practice.split(',')[0].trim().replace(/[.:;!?]+$/, '');
+        var words = commaPart.split(/\s+/);
+        title = words.slice(0, 6).join(' ');
+        if (title.length > 48) {
+          title = title.slice(0, 48);
+          var lastSpace = title.lastIndexOf(' ');
+          if (lastSpace > 20) title = title.slice(0, lastSpace);
+        }
+        title = title.trim().replace(/[.,;:!?]+$/, '');
+      }
+      if (title.split(/\s+/).length >= 3 || title.length >= 6) {
+        return title;
+      }
+    }
+    return t('fallback.action.title', { risk: risk });
+  }
+
+  /**
+   * Build the narrative string: one short paragraph per weak risk —
+   * the score, then what the participant actually did. Best practices
+   * live in the actions; the narrative never repeats them.
    */
   function buildNarrative(weakIds, astScores, bank, weakQuestions) {
     var parts = [];
@@ -85,71 +145,54 @@
       var pct = astScores[astId].percentage;
       var risk = riskName(astId);
       var behavior = summarizeBehavior(weakQuestions, astId);
-
-      var qs = questionsForRisk(bank, astId);
-      var bestPractices = [];
-      for (var j = 0; j < qs.length; j++) {
-        if (qs[j].best_practice) bestPractices.push(qs[j].best_practice);
-      }
-      var insight = bestPractices.length > 0
-        ? bestPractices[0]
-        : t('fallback.insight.generic', { risk: risk });
-
       parts.push(t('fallback.narrative.item', {
         risk: risk,
         percentage: pct,
-        behavior: behavior,
-        insight: insight
+        behavior: behavior
       }));
     }
     return parts.join('\n\n');
   }
 
   /**
-   * Derive a concise action title from best practices for a risk.
+   * Build actions array. Each action: a personalized why (the
+   * participant's own choice, quoted in full) followed by the one best
+   * practice that fixes it — no boilerplate tail.
    */
-  function deriveTitle(bank, astId) {
-    var risk = riskName(astId);
-    var qs = questionsForRisk(bank, astId);
-    if (qs.length === 0) return t('fallback.action.title', { risk: risk });
-
-    // Default to "Improve {risk_name}" — the most concise, clear pattern
-    return t('fallback.action.title', { risk: risk });
-  }
-
-  /**
-   * Build actions array.
-   */
-  function buildActions(weakIds, bank) {
+  function buildActions(weakIds, bank, weakQuestions) {
     var actions = [];
     for (var i = 0; i < weakIds.length; i++) {
       var astId = weakIds[i];
       var risk = riskName(astId);
-      var qs = questionsForRisk(bank, astId);
-
-      var bestPractices = [];
-      for (var j = 0; j < qs.length; j++) {
-        if (qs[j].best_practice) bestPractices.push(qs[j].best_practice);
+      var practice = bestPracticeFor(bank, astId, weakQuestions);
+      var matched = matchedWeakQuestions(weakQuestions, astId);
+      var chosen = null;
+      for (var m = 0; m < matched.length; m++) {
+        if (matched[m].selectedOption && matched[m].selectedOption.text) {
+          chosen = matched[m].selectedOption.text;
+          break;
+        }
       }
 
-      // Build description from 1–2 best practices
       var descriptionParts = [];
-      var limit = Math.min(2, bestPractices.length);
-      for (var k = 0; k < limit; k++) {
-        descriptionParts.push(bestPractices[k]);
+      if (chosen) {
+        descriptionParts.push(t('fallback.action.why', {
+          quote: t('fallback.quoteOpen') + chosen + t('fallback.quoteClose')
+        }));
+      }
+      if (practice) {
+        descriptionParts.push(practice);
       }
       if (descriptionParts.length === 0) {
         descriptionParts.push(
           t('fallback.action.description.generic', { risk: risk })
         );
       }
-      descriptionParts.push(t('fallback.action.description.owaspRef'));
-      var description = descriptionParts.join(' ');
 
       actions.push({
         priority: i + 1,
-        title: deriveTitle(bank, astId),
-        description: description,
+        title: deriveTitle(bank, astId, weakQuestions),
+        description: descriptionParts.join(' '),
         ast_source: astId + ': ' + risk
       });
     }
@@ -179,7 +222,7 @@
 
     var weakQuestions = report.weakestQuestions || [];
     var narrative = buildNarrative(weakIds, report.astScores, bank, weakQuestions);
-    var actions = buildActions(weakIds, bank);
+    var actions = buildActions(weakIds, bank, weakQuestions);
 
     return { narrative: narrative, actions: actions };
   }
