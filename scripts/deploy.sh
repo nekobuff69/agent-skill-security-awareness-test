@@ -12,5 +12,5 @@ echo "Deploying Worker..."
 # Worker and leaves the next plain `wrangler deploy` creating a second one.
 npx wrangler deploy --config worker/wrangler.toml
 
-echo "Deploying Pages..."
-npx wrangler pages deploy ./ --project-name=agent-security-quiz
+# No manual Pages upload step: the project (agentic-skill-awareness-test) is
+# Git-connected, so pushing to GitHub deploys the site.

@@ -387,13 +387,13 @@ Design decisions live in `docs/adr/`. Enforcement and invariants live in the tes
 
 ```bash
 ./scripts/preflight.sh                                # gate: before every deploy
-./scripts/deploy.sh                                   # preflight + worker + pages in one
+./scripts/deploy.sh                                   # preflight + worker in one
 # or individually:
 python3 run_tests.py
 python3 run_tests.py --llm tests/mock_llm_output.json
 node tests/js/run-tests.js
 npx wrangler deploy --config worker/wrangler.toml   # Worker name `llm-proxy`, declared in that file — no --name override
-npx wrangler pages deploy ./ --project-name=agent-security-quiz
+# Site: Git-connected Pages project (agentic-skill-awareness-test) — pushing to main deploys
 ```
 
 ---

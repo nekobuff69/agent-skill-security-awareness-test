@@ -14,15 +14,15 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://agent-security-quiz.pages.dev/</loc>
-    <xhtml:link rel="alternate" hreflang="en" href="https://agent-security-quiz.pages.dev/"/>
-    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://agent-security-quiz.pages.dev/zh/"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://agent-security-quiz.pages.dev/"/>
+    <loc>https://agentic-skill-awareness-test.pages.dev/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://agentic-skill-awareness-test.pages.dev/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://agentic-skill-awareness-test.pages.dev/zh/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://agentic-skill-awareness-test.pages.dev/"/>
   </url>
   <url>
-    <loc>https://agent-security-quiz.pages.dev/zh/</loc>
-    <xhtml:link rel="alternate" hreflang="en" href="https://agent-security-quiz.pages.dev/"/>
-    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://agent-security-quiz.pages.dev/zh/"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://agent-security-quiz.pages.dev/"/>
+    <loc>https://agentic-skill-awareness-test.pages.dev/zh/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://agentic-skill-awareness-test.pages.dev/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://agentic-skill-awareness-test.pages.dev/zh/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://agentic-skill-awareness-test.pages.dev/"/>
   </url>
 </urlset>

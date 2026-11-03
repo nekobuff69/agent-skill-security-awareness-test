@@ -7,4 +7,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://agent-security-quiz.pages.dev/sitemap.xml
+Sitemap: https://agentic-skill-awareness-test.pages.dev/sitemap.xml
