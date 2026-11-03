@@ -254,6 +254,8 @@ grounding text = docs/owasp-ast-full.md
 
 `GROUNDING_CORPUS_PATH` names the corpus and it is loaded once per run, then reused for every Bank Variant (`--grounding-source` overrides which bank contributes the `source_note` fields). This matters because a translated Bank Variant's `source_note` fields are prose in another language: an English campaign name like `ClawHavoc` in an LLM output would otherwise be rejected as phantom, and translated numerals could raise spurious phantom-statistic hits. Every Bank Variant, in any language, is validated against the same source-language vocabulary. If the corpus or the source-language bank cannot be read, the gate fails rather than comparing against an empty string.
 
+**Corpus provenance (2026-11):** the corpus is aligned to the OWASP Agentic Skills Top 10 Whitepaper V1 — the newest upstream revision, whose content runs through July 2026 (the web pages stopped at March 2026). Notable upstream corrections carried in the corpus: ClawJacked is CVE-2026-32025 / CVSS 7.5 (superseding the earlier CVE-2026-28363 / CVSS 9.9 references), the 135,000-instance exposure is attributed to Bitdefender (Feb 12, 2026), the SecurityScorecard patch-lag study is 40,000+ instances in 24 hours with 35.4% RCE-vulnerable at publication, and the AST01 "100% of malicious skills combine both attack vectors" claim is softened to match the whitepaper's wording. The question banks cite only evidence present in this corpus, so Authoring-Time Validation passes on both variants.
+
 #### Rule 1 — No Phantom Statistics
 
 Extract all numbers from the LLM output (regex: `\b\d[\d,\.]*\b`). For each number found:

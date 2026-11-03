@@ -1,0 +1,5 @@
+appId: wbapp_I10jBZO2F72KScWKYktDrM
+name: 智能体安全意识测评
+localDir: D:\WorkBuddyData\aengtic-skill-awareness-test
+appType: web
+entryHtml: index.html

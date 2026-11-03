@@ -15,7 +15,7 @@ A no-build web app delivering a self-assessment quiz on AI agent skill security,
 | `questions.json`    | Question Bank (English) — source of truth for scenarios, Options, scoring, Feedback, Best Practices, OWASP sources | Content author |
 | `questions.zh.json` | Bank Variant (Simplified Chinese) — structurally identical to the English bank; authored text only (ADR 0015) | Content author |
 | `i18n/en.js`<br>`i18n/zh.js` | Chrome String dictionaries — every user-visible interface string by id, plus the AST Risk display names. A missing id throws (ADR 0015) | Content author |
-| `docs/owasp-ast-full.md` | Full extracted OWASP AST content (~53 KB) — Grounding Corpus               | Content author |
+| `docs/owasp-ast-full.md` | Full extracted OWASP AST content (~70 KB) — Grounding Corpus               | Content author |
 | `docs/architecture.md` | Overview, journey, deployment + ADR index; decisions live in `docs/adr/` | Developer      |
 | `docs/TESTING.md`   | Testing spec: schema validation, scoring fixtures, grounding rules                             | Developer      |
 | `run_tests.py`      | Stdlib-only Python runner implementing the testing spec; discovers every `questions*.json`      | Developer      |

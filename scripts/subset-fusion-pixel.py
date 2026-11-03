@@ -166,7 +166,7 @@ def main() -> None:
                 'font': OUT_WOFF2.name,
                 'upstream': 'Fusion Pixel Font %s — fusion-pixel-12px-proportional-zh_hans.ttf.woff2'
                             % UPSTREAM_VERSION,
-                'sources': [str(p.relative_to(REPO)) for p in SOURCES],
+                'sources': [p.relative_to(REPO).as_posix() for p in SOURCES],
                 'cjk_ranges': [(hex(lo), hex(hi)) for lo, hi in CJK_RANGES],
                 'codepoints': ['U+%04X' % cp for cp in inventory],
             },

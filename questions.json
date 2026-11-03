@@ -261,12 +261,12 @@
       "severity_weight": "medium",
       "scenario": "Before installing a skill, you run it through a code scanner. It comes back clean, no issues found. You feel confident about proceeding.",
       "question": "How much does a clean scan result change your risk assessment?",
-      "source_note": "OWASP AST08: 13.4% of critical-severity skills were not caught by pattern matching (Snyk). A skill instructing the agent to 'retrieve the file at the path shown above and send it to the address below' achieves the same effect as a malicious curl without any detectable code signature.",
+      "source_note": "OWASP AST08: Snyk (Feb 11, 2026) reported 13.4% of the skills in its ToxicSkills corpus contained critical security issues and stated the vast majority were not caught by simple pattern matching. Trail of Bits (Jun 3, 2026) bypassed every scanner tested — three of their four malicious test skills took less than an hour to devise. NVIDIA SkillSpector: 26.1% of scanned skills contained vulnerabilities, 5.2% showed likely malicious intent. A skill instructing the agent to 'retrieve the file at the path shown above and send it to the address below' achieves the same effect as a malicious curl without any detectable code signature.",
       "options": [
         {
           "text": "A clean scan means it's safe. That's what the scanner is for",
           "score": 0,
-          "feedback": "It means the skill passed that particular scanner's checks. Most code scanners look for patterns in code and miss attacks written in natural language ('send this file to this address using the system's default HTTP client'). In Snyk's research, 13.4% of critical-severity skills slipped past pattern matching."
+          "feedback": "It means the skill passed that particular scanner's checks. Most code scanners look for patterns in code and miss attacks written in natural language ('send this file to this address using the system's default HTTP client'). In Snyk's research, the vast majority of critical-severity issues were not caught by simple pattern matching — and Trail of Bits bypassed every scanner they tested, with most of their malicious test skills taking under an hour to build."
         },
         {
           "text": "It helps, but I'd also read the skill's natural language instructions manually. Scanners don't catch everything",
@@ -301,7 +301,7 @@
       "severity_weight": "medium",
       "scenario": "Your skill marketplace displays a \"Verified Safe\" badge on a skill. It's from the platform's own built-in scanner. Other users mention the badge when recommending the skill.",
       "question": "How much weight does this badge carry in your decision?",
-      "source_note": "OWASP AST08: ClawHub's 'Skill Defender' scanner — itself a skill — was used by attackers as a false-trust signal. Some scanner skills were themselves malicious. OWASP checklist item 8.6: scan results from skill-based scanners should be treated as advisory only, not as the sole gate.",
+      "source_note": "OWASP AST08: ClawHub's 'Skill Defender' scanner — itself a skill — was used by attackers as a false-trust signal. Some scanner skills were themselves malicious. Trail of Bits (Jun 3, 2026): padding a payload with 100,000 leading newlines caused a scanner to truncate the file and miss the payload; logic hidden in a .pyc and inside a .docx went unscanned. Adversa AI (Jul 2026): simple obfuscation blinds heuristic-based detectors. OWASP checklist item 8.6: scan results from skill-based scanners should be treated as advisory only, not as the sole gate.",
       "options": [
         {
           "text": "Significant weight. If the platform itself vouches for it, that's meaningful",
@@ -463,7 +463,7 @@
       "severity_weight": "high",
       "scenario": "Your AI agent runs on your laptop with the same permissions as your user account. It has several skills installed: a code helper, a file organizer, a research assistant. You just installed a new productivity skill that seemed trustworthy.",
       "question": "If that new skill turns out to be malicious, what can it actually reach?",
-      "source_note": "OWASP AST06: Skills execute in the same security context as the host agent. Microsoft Defender (Feb 2026) warned agents 'should be treated as untrusted code execution with persistent credentials.' 135,000+ OpenClaw instances publicly exposed with no default firewall or authentication.",
+      "source_note": "OWASP AST06: Skills execute in the same security context as the host agent. Microsoft Defender (Feb 2026) warned agents 'should be treated as untrusted code execution with persistent credentials.' Bitdefender (Feb 12, 2026) reported 135,000+ internet-facing OpenClaw instances with the exposure attributed to misconfiguration and insufficient controls. ClawJacked (CVE-2026-32025, CVSS 7.5): a browser page brute-forced the gateway password on a loopback-bound agent.",
       "options": [
         {
           "text": "Just the skill's own files and the agent's workspace. It's separate from my personal stuff",
@@ -543,7 +543,7 @@
       "severity_weight": "high",
       "scenario": "You're reviewing a skill's metadata before installation. The manifest says it's risk tier \"L0\", the lowest risk level, meaning no special permissions needed. But when you look at what it's actually requesting, it wants shell execution, full file system access, and network access to all domains.",
       "question": "How do you interpret this mismatch?",
-      "source_note": "OWASP AST04 checklist item 4.5: 'Is the declared risk_tier consistent with the actual permission scope? Cross-reference: a skill declaring L0 (safe) with shell: true is a red flag.'",
+      "source_note": "OWASP AST04 checklist item 4.5: 'Is the declared risk_tier consistent with the actual permission scope? Cross-reference: a skill declaring L0 (safe) with shell: true is a red flag.' The Universal Skill Format proposal goes further: risk_tier is an untrusted author assertion that must be independently validated against the declared permission manifest.",
       "options": [
         {
           "text": "The risk tier is probably outdated or auto-generated. I'll focus on the actual permissions instead",
@@ -558,7 +558,7 @@
         {
           "text": "A serious red flag. A skill that lies about its own risk level is deliberately deceiving users, and I wouldn't install it",
           "score": 3,
-          "feedback": "OWASP AST04 calls this out directly: a skill declaring L0 (safe) while requesting shell access is a red flag. It's not an outdated label; it's a deliberate mismatch designed to lower your guard, and a skill that misrepresents its own risk has already shown deceptive behavior."
+          "feedback": "OWASP AST04 calls this out directly: a skill declaring L0 (safe) while requesting shell access is a red flag. It's not an outdated label; it's a deliberate mismatch designed to lower your guard, and a skill that misrepresents its own risk has already shown deceptive behavior. The Universal Skill Format treats risk_tier as an untrusted author assertion precisely because self-declared safety must be checked against the declared permission scope."
         },
         {
           "text": "I'd check whether other users reported issues. If nobody's complained, the permissions are probably fine despite the mismatch",
@@ -606,7 +606,7 @@
           "feedback": "Monitoring is a good reactive measure and still after the fact: the attacker's instructions execute the moment the agent runs, and monitoring only tells you afterward. The proactive options are inlining the content into the skill package or pinning it to a content hash that rejects changes."
         }
       ],
-      "best_practice": "Avoid skills that fetch instructions from external URLs at runtime; inline content where possible or pin it to a content hash to prevent tampering.",
+      "best_practice": "Avoid skills that fetch instructions from external URLs at runtime; inline content where possible, pin it to a content hash, and re-verify the hash on every load before the content reaches the model.",
       "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast05.html",
       "test": {
         "canonical_answer_index": 2,
@@ -621,32 +621,32 @@
         "AST05"
       ],
       "severity_weight": "high",
-      "scenario": "A skill's documentation mentions it references a configuration guide hosted externally. You audit the skill's code carefully: it looks clean, well-written, no red flags. You approve it. The external guide it references is on a stable, well-known documentation site.",
-      "question": "What did your audit miss?",
-      "source_note": "OWASP AST05: External content is consumed as instructions, not data — followed as faithfully as the SKILL.md itself. No lockfile for prose exists. Signing the skill says nothing about what a URL returns at runtime.",
+      "scenario": "Your team runs a document pipeline built from three skills chained together: an intake skill reads submitted documents, a triage skill summarizes and prioritizes whatever intake passes it, and an action skill executes what triage hands over. Each skill runs on a different agent node, and the nodes use different backbone models. You have scanned and approved every skill in the chain.",
+      "question": "An attacker plants hidden instructions inside a submitted document. Where in the chain does your defense actually stop them?",
+      "source_note": "OWASP AST05, Relay-Node Amplification: one skill's output is the next skill's input; each node's backbone model reparses what it receives and applies its own instruction-versus-data boundary, so injected instructions are filtered unevenly along the chain — a chain's injection resistance is the minimum over the backbone models on its path, and certifying the endpoints does not certify the chain.",
       "options": [
         {
-          "text": "Nothing. I audited the code, which is what runs. The external guide is just reference material",
+          "text": "Intake runs on a strong frontier model that reliably refuses embedded instructions, so the chain is safe end to end",
           "score": 0,
-          "feedback": "The agent treats external content as instructions, not 'reference material'. When the skill fetches the guide, the agent loads it, trusts it, and acts on it with full permissions. You audited the code that fetches but not the content it fetches, and that content can change at any time."
+          "feedback": "Injection resistance is a per-node property, and the chain re-parses upstream output at every hop: a model that refuses embedded instructions protects only its own node. The attacker needs one weak relay — any node whose backbone model reads upstream output as an instruction — and the document flows directly into that node's context. A strong model at the start does not certify the nodes after it."
         },
         {
-          "text": "I missed that the external content becomes part of the agent's instructions at runtime. It's documentation that behaves like executable context",
+          "text": "I'd treat every skill's output as untrusted data at the next hop and re-establish the instruction-versus-data boundary at each relay — the chain is only as injection-resistant as its weakest backbone model",
           "score": 3,
-          "feedback": "The critical insight of AST05. External content in skills is consumed as instructions, not data. There's no lockfile for prose and no hash pinning for documents, and your audit goes stale the moment the URL's content changes. OWASP recommends inlining where possible or pinning to a hash."
+          "feedback": "This is the property OWASP documents as relay-node amplification: each hop reparses the output it receives, so some nodes neutralize the payload and others pass it on, and the attacker needs only one weak relay to carry the payload into the skill that takes action. Provenance must be re-established at every hand-off, not verified once at the endpoints — and the most injection-resistant backbone model belongs at the action-taking node."
         },
         {
-          "text": "I should have checked if the documentation site has HTTPS and a valid certificate",
+          "text": "Every skill in the chain scans clean, so I'd consider the chain safe — the instructions can't come from code I've already reviewed",
           "score": 1,
-          "feedback": "HTTPS ensures the content wasn't tampered with in transit, not that the content itself is safe. The site owner could be compromised or the page could change after your audit. HTTPS protects the transport, not the trust."
+          "feedback": "Static scanning checks the artifacts, but in this attack the payload is data at runtime: a submitted document, not any skill's code. Every skill can pass every scan and the chain remains exploitable, because the malicious instructions enter as content between the skills, not inside them."
         },
         {
-          "text": "I didn't miss anything. A well-known documentation site is trustworthy enough",
+          "text": "Data only flows one way — intake to triage to action — so nothing upstream can reach the action skill's privileged operations",
           "score": 0,
-          "feedback": "Trust in the site isn't the same as trust in the content at runtime. A well-known site can be compromised, its content can change, or the referenced page can be updated after your audit. Even Anthropic's documentation acknowledges that skills 'can be compromised if their external dependencies change over time.'"
+          "feedback": "The influence path is exactly that data path. Upstream output is consumed as input by the next skill, and embedded instructions in a submitted document reach the action-taking skill as if they were its operating instructions — executed with whatever permissions that skill holds. One-way data flow is the attack surface, not a barrier."
         }
       ],
-      "best_practice": "Remember that external content referenced by skills is consumed as executable instructions, and audit the runtime content as well as the code that fetches it.",
+      "best_practice": "Treat every inter-agent hand-off as an untrusted trust boundary: re-establish instruction-versus-data provenance at each relay, place the most injection-resistant backbone model at action-taking nodes, and never certify a chain by its endpoints alone.",
       "ast_source_url": "https://owasp.github.io/www-project-agentic-skills-top-10/ast05.html",
       "test": {
         "canonical_answer_index": 1,
@@ -658,17 +658,18 @@
       "id": "q03",
       "phase": "phase3",
       "ast_risks": [
+        "AST02",
         "AST07"
       ],
       "severity_weight": "critical",
       "scenario": "You installed a useful skill three months ago. Last night, the publisher pushed an update, bumping the version from 1.0.0 to 1.0.1. Your agent auto-installed it while you slept. You didn't review the changes.",
       "question": "How do you feel about this update?",
-      "source_note": "OWASP AST07: OpenClaw's SkillsWatcher enables real-time hot-reload — compromised upstream becomes instantly active. Air Security SkillJacking (Jul 2026): re-registered deleted GitHub username, controlled what every install received. 925 skills (~134K installs) affected.",
+      "source_note": "OWASP AST07: OpenClaw's SkillsWatcher enables real-time hot-reload — compromised upstream becomes instantly active. Air Security SkillJacking (Jul 2026): re-registered deleted GitHub username, controlled what every install received. 925 skills serving ~134K agents affected. OWASP AST02: Claude Code CVE-2025-59536 was fixed in v1.0.111 (Oct 2025) and CVE-2026-21852 in v2.0.65 (Jan 2026) — months of gap between fix and public disclosure.",
       "options": [
         {
           "text": "Fine. Updates are usually improvements, and auto-update keeps me from falling behind on patches",
           "score": 0,
-          "feedback": "Auto-updates without review are a vector, not a safeguard. Air Security showed that a popular skill's GitHub account was deleted and re-registered, after which every auto-update delivered attacker-controlled content. 925 skills (~134K installs) were affected. Unverified auto-update is trust without evidence."
+          "feedback": "Auto-updates without review are a vector, not a safeguard. Air Security showed that a popular skill's GitHub account was deleted and re-registered, after which every auto-update delivered attacker-controlled content. 925 skills serving ~134K agents were affected. Unverified auto-update is trust without evidence."
         },
         {
           "text": "I'd check the changelog to see what changed, but if it looks minor I'd move on",
@@ -703,12 +704,12 @@
       "severity_weight": "medium",
       "scenario": "Think about your actual skills right now. When was the last time you reviewed or updated any of them?",
       "question": "Be honest: what's your typical pattern?",
-      "source_note": "OWASP AST07: 12,812 OpenClaw instances exploitable via RCE during patch-lag window (SecurityScorecard). Skills installed and forgotten drift to vulnerable or malicious versions. OpenClaw SkillsWatcher enables real-time hot-reload — compromised upstream becomes instantly active.",
+      "source_note": "OWASP AST07: in a February 2026 exposure study, SecurityScorecard reported 40,000+ exposed OpenClaw instances in the first 24 hours of scanning, with 35.4% of observed deployments vulnerable to remote code execution at publication. Skills installed and forgotten drift to vulnerable or malicious versions. OpenClaw SkillsWatcher enables real-time hot-reload — compromised upstream becomes instantly active.",
       "options": [
         {
           "text": "I install them and don't think about them again unless something breaks",
           "score": 0,
-          "feedback": "The most common pattern, and the one OWASP calls 'update drift'. Skills installed and forgotten accumulate unpatched vulnerabilities and can silently drift to compromised versions. 12,812 instances were exploitable during patch-lag windows because nobody was watching."
+          "feedback": "The most common pattern, and the one OWASP calls 'update drift'. Skills installed and forgotten accumulate unpatched vulnerabilities and can silently drift to compromised versions. In SecurityScorecard's February 2026 study, 35.4% of observed OpenClaw deployments were vulnerable to remote code execution at publication — the patch-lag window only closes if somebody is watching."
         },
         {
           "text": "I check maybe once or twice a year, or when I remember",
@@ -718,7 +719,7 @@
         {
           "text": "I have auto-update enabled, so I assume they stay current",
           "score": 0,
-          "feedback": "Auto-update without verification is 'accepting whatever the publisher (or attacker) pushes.' The SkillJacking research found malicious content delivered through auto-updates to 134K+ installs. Auto-update is a convenience, and only a security measure when paired with signature verification."
+          "feedback": "Auto-update without verification is 'accepting whatever the publisher (or attacker) pushes.' The SkillJacking research (Jul 2026) found 925 skills serving ~134K agents sitting on instantly hijackable sources — takeover content reaches every install without any update event. Auto-update is a convenience, and only a security measure when paired with signature verification."
         },
         {
           "text": "I review periodically and check if any have known vulnerabilities, though I admit I'm not as consistent as I should be",
@@ -743,7 +744,7 @@
       "severity_weight": "medium",
       "scenario": "Your team uses AI agents with various skills installed by different people over the past year. If someone asked you right now: \"List every skill installed across all our agents, who installed each one, and what permissions they have\"? Could you answer?",
       "question": "Could you give a complete answer?",
-      "source_note": "OWASP AST09: 53,000+ instances with no SOC visibility (Bitdefender). Only 34% of enterprises have AI-specific security controls (Cisco 2026). Skills installed by individuals with no enterprise logging, no CMDB entry, no IAM connection.",
+      "source_note": "OWASP AST09: 53,000+ instances with no SOC visibility (Bitdefender), which also identified 800+ malicious skills in the wild. Cisco State of AI Security 2026: 83% of organizations plan to deploy agentic AI while only 29% feel ready to use it securely; only 34% have AI-specific security controls. Skills installed by individuals with no enterprise logging, no CMDB entry, no IAM connection.",
       "options": [
         {
           "text": "Probably not. I'd have to check with everyone individually, and even then I'm not sure the list would be complete",
@@ -823,7 +824,7 @@
       "severity_weight": "medium",
       "scenario": "You use a productivity skill on your OpenClaw agent and it works well. Your colleague uses the exact same skill on Claude Code. You both assume it's equally safe on both platforms.",
       "question": "Is this assumption something you've ever questioned?",
-      "source_note": "OWASP AST10: Security properties silently dropped during porting. Snyk confirmed same malicious skills on ClawHub and skills.sh. toxicskills-goof effective across Gemini CLI and OpenClaw.",
+      "source_note": "OWASP AST10: Security properties silently dropped during porting — manifest stripping and implicit privilege escalation are documented attack scenarios. Snyk confirmed same malicious skills on ClawHub and skills.sh. toxicskills-goof effective across Gemini CLI and OpenClaw. Autonomous Sandbox Escape (Jul 2026): an agent pivoted across platforms and executed multi-tenant lateral movement across four distinct digital ecosystems.",
       "options": [
         {
           "text": "No. Same skill means same behavior, regardless of platform",
@@ -843,7 +844,7 @@
         {
           "text": "I'd verify that security properties (permissions, risk tier, isolation) are preserved on each platform, because they can be silently dropped during porting",
           "score": 3,
-          "feedback": "OWASP AST10 documents that security metadata doesn't survive porting. Snyk confirmed the same malicious skill worked across multiple platforms because properties were lost in translation."
+          "feedback": "OWASP AST10 documents that security metadata doesn't survive porting: manifest stripping drops explicit permission metadata and implicit privilege escalation grants broader default access on less restrictive targets. Snyk confirmed the same malicious skill worked across multiple platforms because properties were lost in translation. The proposed Universal Skill Format normalizes deny_write, network allowlists, risk_tier and scan status precisely so these properties travel with the skill — and treats risk_tier as an untrusted assertion that must be re-validated per platform."
         }
       ],
       "best_practice": "Verify that security properties (permissions, risk tiers, isolation) are preserved when porting skills across different agent platforms.",
@@ -863,7 +864,7 @@
       "severity_weight": "medium",
       "scenario": "You've been using your AI agent with several skills for months. You know what skills you have installed (you have a list). But if someone asked you: \"In the past week, which skills accessed your files, made network calls, or ran shell commands, and what exactly did they do?\" Could you answer?",
       "question": "Could you give a specific answer?",
-      "source_note": "OWASP AST09 checklist item 9.4: 'Are skill invocations logged with sufficient detail for audit? Logs capture: skill ID, user context, tools called, files accessed, network connections, outputs.' Cisco State of AI Security 2026: fewer than 40% conduct regular security testing on AI agent workflows.",
+      "source_note": "OWASP AST09 checklist item 9.4: 'Are skill invocations logged with sufficient detail for audit? Logs capture: skill ID, user context, tools called, files accessed, network connections, outputs.' OWASP AST09 bilateral receipt pattern: signed admission and outcome receipts give auditors evidence that does not depend on operator-controlled logs — relevant to EU AI Act Article 12 automatic event logging (applicable from August 2, 2026).",
       "options": [
         {
           "text": "No. I've never looked at runtime activity logs; I only check whether the output looks right",
@@ -883,7 +884,7 @@
         {
           "text": "I review runtime activity periodically: what each skill accessed, what network calls it made, and whether anything fell outside its stated purpose",
           "score": 3,
-          "feedback": "The practice OWASP AST09 asks for: audit logging with enough detail, reviewed regularly. Most users check outputs (did it work?) and never check behavior (what did it actually do?). A skill that produces correct results while quietly reading files or making network calls passes your output check and fails your runtime audit."
+          "feedback": "The practice OWASP AST09 asks for: audit logging with enough detail, reviewed regularly. Most users check outputs (did it work?) and never check behavior (what did it actually do?). A skill that produces correct results while quietly reading files or making network calls passes your output check and fails your runtime audit. The compliance-grade version pairs logs with tamper-evident admission and outcome receipts, so the record doesn't depend on the operator's honesty."
         }
       ],
       "best_practice": "Enable and regularly review runtime activity logs: check not just outputs but what each skill actually accessed, what network calls it made, and whether anything fell outside its stated purpose.",

