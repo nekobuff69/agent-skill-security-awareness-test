@@ -99,12 +99,19 @@
     return t('fallback.behavior.multiple', { list: snippets.join(', '), last: last });
   }
 
+  var TITLE_STOPWORDS = {
+    for: 1, to: 1, the: 1, a: 1, an: 1, of: 1, in: 1, on: 1, with: 1,
+    from: 1, and: 1, or: 1, against: 1, by: 1, at: 1, into: 1, before: 1
+  };
+
   /**
    * Derive a concise action title from the best practice for a risk.
    * The practice text is an imperative sentence, so its opening clause
    * reads as a title: English keeps the first six words (comma-clipped,
-   * then word-boundary clipped at 48 chars); Chinese clips at the first
-   * punctuation mark (20 chars). Falls back to "Improve {risk}".
+   * then word-boundary clipped at 48 chars, never ending on a dangling
+   * preposition/article or cutting a parenthetical open); Chinese clips
+   * at the first punctuation mark (20 chars). Falls back to "Improve
+   * {risk}".
    */
   function deriveTitle(bank, astId, weakQuestions) {
     var risk = riskName(astId);
@@ -124,7 +131,17 @@
           var lastSpace = title.lastIndexOf(' ');
           if (lastSpace > 20) title = title.slice(0, lastSpace);
         }
-        title = title.trim().replace(/[.,;:!?]+$/, '');
+        // Never cut inside an open parenthesis — fall back to before it.
+        var open = title.indexOf('(');
+        if (open !== -1 && title.indexOf(')') === -1) {
+          title = title.slice(0, open);
+        }
+        // Drop dangling function words so a title never ends on "for"/"the".
+        var parts = title.split(' ');
+        while (parts.length > 2 && TITLE_STOPWORDS[parts[parts.length - 1].toLowerCase()]) {
+          parts.pop();
+        }
+        title = parts.join(' ').replace(/[.,;:!?(]+$/, '').trim();
       }
       if (title.split(/\s+/).length >= 3 || title.length >= 6) {
         return title;
@@ -134,22 +151,33 @@
   }
 
   /**
-   * Build the narrative string: one short paragraph per weak risk —
-   * the score, then what the participant actually did. Best practices
-   * live in the actions; the narrative never repeats them.
+   * Build the narrative string: one short paragraph per weak risk that
+   * has a specific answer to point at; risks without one are merged
+   * into a single closing line so the paragraph shapes never repeat.
    */
   function buildNarrative(weakIds, astScores, bank, weakQuestions) {
     var parts = [];
+    var quietIds = [];
     for (var i = 0; i < weakIds.length; i++) {
       var astId = weakIds[i];
       var pct = astScores[astId].percentage;
       var risk = riskName(astId);
-      var behavior = summarizeBehavior(weakQuestions, astId);
+      var matched = matchedWeakQuestions(weakQuestions, astId);
+      var hasChoice = matched.some(function(wq) {
+        return wq.selectedOption && wq.selectedOption.text;
+      });
+      if (!hasChoice) {
+        quietIds.push(risk);
+        continue;
+      }
       parts.push(t('fallback.narrative.item', {
         risk: risk,
         percentage: pct,
-        behavior: behavior
+        behavior: summarizeBehavior(weakQuestions, astId)
       }));
+    }
+    if (quietIds.length > 0) {
+      parts.push(t('fallback.narrative.others', { risks: quietIds.join(t('fallback.listSep')) }));
     }
     return parts.join('\n\n');
   }
