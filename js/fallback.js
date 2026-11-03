@@ -99,55 +99,14 @@
     return t('fallback.behavior.multiple', { list: snippets.join(', '), last: last });
   }
 
-  var TITLE_STOPWORDS = {
-    for: 1, to: 1, the: 1, a: 1, an: 1, of: 1, in: 1, on: 1, with: 1,
-    from: 1, and: 1, or: 1, against: 1, by: 1, at: 1, into: 1, before: 1
-  };
-
   /**
-   * Derive a concise action title from the best practice for a risk.
-   * The practice text is an imperative sentence, so its opening clause
-   * reads as a title: English keeps the first six words (comma-clipped,
-   * then word-boundary clipped at 48 chars, never ending on a dangling
-   * preposition/article or cutting a parenthetical open); Chinese clips
-   * at the first punctuation mark (20 chars). Falls back to "Improve
-   * {risk}".
+   * Action titles are curated per-risk Chrome Strings ('action.AST01'…
+   * 'action.AST10' in the locale dictionary) — a short imperative label
+   * that paraphrases the practice rather than repeating its first clause,
+   * so the title and the description never duplicate each other.
    */
-  function deriveTitle(bank, astId, weakQuestions) {
-    var risk = riskName(astId);
-    var practice = bestPracticeFor(bank, astId, weakQuestions);
-    if (practice) {
-      var title = '';
-      if (/[\u4e00-\u9fff]/.test(practice)) {
-        // CJK: clip at the first punctuation run.
-        title = practice.split(/[，。：；！？、——…]/)[0].trim();
-        if (title.length > 20) title = title.slice(0, 20).replace(/[\s,;:]+$/, '');
-      } else {
-        var commaPart = practice.split(',')[0].trim().replace(/[.:;!?]+$/, '');
-        var words = commaPart.split(/\s+/);
-        title = words.slice(0, 6).join(' ');
-        if (title.length > 48) {
-          title = title.slice(0, 48);
-          var lastSpace = title.lastIndexOf(' ');
-          if (lastSpace > 20) title = title.slice(0, lastSpace);
-        }
-        // Never cut inside an open parenthesis — fall back to before it.
-        var open = title.indexOf('(');
-        if (open !== -1 && title.indexOf(')') === -1) {
-          title = title.slice(0, open);
-        }
-        // Drop dangling function words so a title never ends on "for"/"the".
-        var parts = title.split(' ');
-        while (parts.length > 2 && TITLE_STOPWORDS[parts[parts.length - 1].toLowerCase()]) {
-          parts.pop();
-        }
-        title = parts.join(' ').replace(/[.,;:!?(]+$/, '').trim();
-      }
-      if (title.split(/\s+/).length >= 3 || title.length >= 6) {
-        return title;
-      }
-    }
-    return t('fallback.action.title', { risk: risk });
+  function deriveTitle(astId) {
+    return t('action.' + astId);
   }
 
   /**
@@ -198,7 +157,7 @@
 
       actions.push({
         priority: i + 1,
-        title: deriveTitle(bank, astId, weakQuestions),
+        title: deriveTitle(astId),
         description: description,
         ast_source: astId + ': ' + risk
       });

@@ -90,9 +90,9 @@ exports.run = function() {
     I18n.t('landing.meta', { count: 20, time: '8-12 minutes' }));
 
   check('placeholder substitution fills {risk} in a fallback string',
-    I18n.t('fallback.action.title', { risk: 'Malicious Skills' }) ===
-      'Improve Malicious Skills',
-    I18n.t('fallback.action.title', { risk: 'Malicious Skills' }));
+    I18n.t('fallback.action.description.generic', { risk: 'Malicious Skills' }) ===
+      'Review the OWASP guidance for Malicious Skills and work the mitigations into your routine.',
+    I18n.t('fallback.action.description.generic', { risk: 'Malicious Skills' }));
 
   check('a single placeholder used twice is substituted both times',
     I18n.t('llm.weakestLine', { id: 'Q01', selected: 'it', score: 0 }) ===
@@ -186,8 +186,9 @@ exports.run = function() {
     'fallback.behavior.none', 'fallback.behavior.single', 'fallback.behavior.multiple',
     'fallback.quoteOpen', 'fallback.quoteClose', 'fallback.ellipsis',
     'fallback.narrative.item', 'fallback.narrative.others', 'fallback.narrative.clear',
-    'fallback.action.title',
     'fallback.action.description.generic',
+    'action.AST01', 'action.AST02', 'action.AST03', 'action.AST04', 'action.AST05',
+    'action.AST06', 'action.AST07', 'action.AST08', 'action.AST09', 'action.AST10',
     'prompt.budget', 'prompt.titleFallback', 'prompt.titleFallbackEmoji',
     'prompt.framing', 'prompt.sessionRules', 'prompt.profile.heading',
     'prompt.profile.title', 'prompt.profile.overall', 'prompt.profile.astScores',

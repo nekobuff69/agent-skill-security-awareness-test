@@ -151,6 +151,19 @@
     'ast.AST09': 'No Governance',
     'ast.AST10': 'Cross-Platform Reuse',
 
+    /* ── Action Plan titles — curated per-risk labels, deliberately
+       paraphrased so a title never repeats its description's opening ── */
+    'action.AST01': 'Verify the publisher first',
+    'action.AST02': 'Check the whole dependency tree',
+    'action.AST03': 'Trim permissions to the stated function',
+    'action.AST04': 'Judge every skill by the same bar',
+    'action.AST05': 'Don\'t let skills fetch their own instructions',
+    'action.AST06': 'Know the attack history before you install',
+    'action.AST07': 'Verify every update before it lands',
+    'action.AST08': 'Never trust one scan',
+    'action.AST09': 'Log every skill you install',
+    'action.AST10': 'Re-check security after every port',
+
     /* ── Deterministic Fallback prose ── */
     'fallback.behavior.none': 'No single question stands out here — the score slipped away across several partly-safe choices.',
     'fallback.behavior.single': 'On the question that matters most here, you chose {quote} — the option that lands exactly where attackers aim first.',
@@ -162,7 +175,6 @@
     'fallback.narrative.others': 'Also below the 70% line: {risks}. The action list covers what to do there — none of them had a single standout miss.',
     'fallback.listSep': ', ',
     'fallback.narrative.clear': 'Your overall score is {percentage}%. Every risk area sits at or above 70% — nothing critical to fix. Keep the habits that got you here.',
-    'fallback.action.title': 'Improve {risk}',
     'fallback.action.description.generic': 'Review the OWASP guidance for {risk} and work the mitigations into your routine.',
 
     /* ── Deep-Dive Prompt ── */

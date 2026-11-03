@@ -144,6 +144,18 @@
     'ast.AST09': '缺乏治理',
     'ast.AST10': '跨平台复用',
 
+    /* ── 行动计划标题 —— 逐风险策展短语，刻意改写以免与描述首句重复 ── */
+    'action.AST01': '先核实发布者，再谈安装',
+    'action.AST02': '查依赖要查整棵树',
+    'action.AST03': '权限只给声称要用的',
+    'action.AST04': '所有技能用同一把尺子',
+    'action.AST05': '别让技能自己拉指令',
+    'action.AST06': '安装前先查案底',
+    'action.AST07': '更新先验后收',
+    'action.AST08': '扫描只是信号之一',
+    'action.AST09': '每装一个技能都登记',
+    'action.AST10': '跨平台后重新验一遍',
+
     /* ── 确定性兜底的文案 ── */
     'fallback.behavior.none': '这里没有哪一题特别突出——分数是在几个「看起来还行」的选择里慢慢溜走的。',
     'fallback.behavior.single': '这里最关键的一题，你选了{quote}——攻击者最希望你就这么选。',
@@ -155,7 +167,6 @@
     'fallback.narrative.others': '同样低于 70% 线的还有：{risks}。这些领域没有哪一题单独失手——行动清单里已给出对应做法。',
     'fallback.listSep': '、',
     'fallback.narrative.clear': '你的总分为 {percentage}%。所有风险领域都在 70% 以上——没有需要紧急处理的问题，保持现在的好习惯。',
-    'fallback.action.title': '改进{risk}',
     'fallback.action.description.generic': '查阅 OWASP 关于「{risk}」的指引，把对应的缓解做法融入日常。',
 
     /* ── 深度提问 ── */

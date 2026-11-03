@@ -1,6 +1,6 @@
 # 模板输出样张（common-user fixture，双语）
 
-> 生成于行动计划「只含具体行动建议」改版之后。行动行不再引用作答；作答分析只出现在 Narrative。
+> 行动标题为逐风险策展短语（i18n），与描述首句不再同源；行动行只含具体做法。
 
 
 ## EN — 称号 Uncharted，总分 10.2%，最弱题 q02, q04, q05, q14, q06
@@ -15,31 +15,31 @@ Also below the 70% line: Untrusted External Instructions, Update Drift, Cross-Pl
 
 ### 行动计划 · Actions（纯建议）
 
-**[1] Inspect the full dependency tree**
+**[1] Check the whole dependency tree**
 
 > Inspect the full dependency tree for typosquatting and verify each package name against the legitimate registry before installing.
 
 _(AST02: Supply Chain Compromise)_
 
-**[2] Review each permission request**
+**[2] Trim permissions to the stated function**
 
 > Review each permission request against the skill's stated function and deny any access that isn't necessary for the task.
 
 _(AST03: Over-Privileged Skills)_
 
-**[3] Avoid skills that fetch instructions**
+**[3] Don't let skills fetch their own instructions**
 
 > Avoid skills that fetch instructions from external URLs at runtime; inline content where possible, pin it to a content hash, and re-verify the hash on every load before the content reaches the model.
 
 _(AST05: Untrusted External Instructions)_
 
-**[4] Verify publisher identity**
+**[4] Verify every update before it lands**
 
 > Verify publisher identity, check for cryptographic signatures, and review update diffs before accepting any skill update. Never auto-update without verification.
 
 _(AST07: Update Drift)_
 
-**[5] Verify that security properties**
+**[5] Re-check security after every port**
 
 > Verify that security properties (permissions, risk tiers, isolation) are preserved when porting skills across different agent platforms.
 
@@ -102,31 +102,31 @@ OWASP: https://owasp.github.io/www-project-agentic-skills-top-10/ast02.html
 
 ### 行动计划 · Actions（纯建议）
 
-**[1] 安装前检查整棵依赖树有没有仿冒包**
+**[1] 查依赖要查整棵树**
 
 > 安装前检查整棵依赖树有没有仿冒包，并把每个包名和正牌仓库核对一遍。
 
 _(AST02: 供应链入侵)_
 
-**[2] 逐条把权限申请和技能声称的功能对照一遍**
+**[2] 权限只给声称要用的**
 
 > 逐条把权限申请和技能声称的功能对照一遍，拒绝任何对该任务不必要的访问。
 
 _(AST03: 权限过度的技能)_
 
-**[3] 避开那些在运行时从外部 URL 拉取指令**
+**[3] 别让技能自己拉指令**
 
 > 避开那些在运行时从外部 URL 拉取指令的技能；尽量把内容内联进去，或锁定到内容哈希上，并在每次加载、内容进入模型之前重新校验哈希。
 
 _(AST05: 不可信的外部指令)_
 
-**[4] 接受任何技能更新之前**
+**[4] 更新先验后收**
 
 > 接受任何技能更新之前，先验证发布方身份、检查加密签名、审阅更新差异。没有验证就绝不自动更新。
 
 _(AST07: 更新漂移)_
 
-**[5] 在不同智能体平台之间移植技能时**
+**[5] 跨平台后重新验一遍**
 
 > 在不同智能体平台之间移植技能时，验证安全属性（权限、风险等级、隔离）是否完整保留。
 
