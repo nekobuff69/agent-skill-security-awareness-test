@@ -13,7 +13,7 @@ LLM_MODEL = "deepseek-flash"
 LLM_REASONING_EFFORT = "low"
 # LLM_API_KEY stored as a secret, never in config (`npx wrangler secret put LLM_API_KEY`)
 # Exact Pages origin; unset = deny all origins (ADR-0007).
-ALLOWED_ORIGIN = "https://agent-security-quiz.pages.dev"
+ALLOWED_ORIGIN = "https://agentic-skill-awareness-test.pages.dev"
 # UPSTREAM_TIMEOUT_MS = upstream abort budget (ADR-0007 amended 2026-09-10, was 8s).
 # 30000, not 20000: even at reasoning_effort=low, deepseek-flash occasionally
 # thinks ~20s on the Action Plan prompt (observed 6/8/20s). Client timeout in
