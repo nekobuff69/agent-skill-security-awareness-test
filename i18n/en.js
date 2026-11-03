@@ -159,9 +159,10 @@
     'fallback.quoteClose': '"',
     'fallback.ellipsis': '...',
     'fallback.narrative.item': '{risk} is your weakest area at {percentage}%. {behavior}',
+    'fallback.narrative.others': 'Also below the 70% line: {risks}. The action list covers what to do there — none of them had a single standout miss.',
+    'fallback.listSep': ', ',
     'fallback.narrative.clear': 'Your overall score is {percentage}%. Every risk area sits at or above 70% — nothing critical to fix. Keep the habits that got you here.',
     'fallback.action.title': 'Improve {risk}',
-    'fallback.action.why': 'Your answer: {quote}.',
     'fallback.action.description.generic': 'Review the OWASP guidance for {risk} and work the mitigations into your routine.',
 
     /* ── Deep-Dive Prompt ── */

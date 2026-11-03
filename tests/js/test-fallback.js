@@ -228,13 +228,17 @@ exports.run = function() {
     genericTitles < result1.actions.length,
     genericTitles + ' of ' + result1.actions.length + ' generic');
 
-  // 9. Action descriptions carry the participant's own choice, quoted in full
-  var hasQuotedChoice = false;
+  // 9. Actions carry concrete advice only — the participant's own choices
+  // belong to the narrative, never to the action rows.
+  var actionQuoting = false;
   for (var d9 = 0; d9 < result1.actions.length; d9++) {
-    if (result1.actions[d9].description.indexOf('500+') !== -1) hasQuotedChoice = true;
+    if (result1.actions[d9].description.indexOf('500+') !== -1) actionQuoting = true;
   }
-  check('Descriptions quote the participant\'s own choice',
-    hasQuotedChoice, 'no quoted choice found');
+  check('Actions carry advice only (no quoted participant choices)',
+    !actionQuoting, 'an action row quotes a participant choice');
+  check('Narrative quotes the participant\'s own choice (answer analysis lives there)',
+    result1.narrative.indexOf('500+') !== -1,
+    'narrative missing the quoted choice');
 
   return results;
 };

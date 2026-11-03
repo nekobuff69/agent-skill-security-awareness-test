@@ -183,9 +183,9 @@
   }
 
   /**
-   * Build actions array. Each action: a personalized why (the
-   * participant's own choice, quoted in full) followed by the one best
-   * practice that fixes it — no boilerplate tail.
+   * Build actions array. Each action is one concrete practice — no
+   * backstory: the participant's answers and their analysis live in the
+   * narrative, never in the action rows.
    */
   function buildActions(weakIds, bank, weakQuestions) {
     var actions = [];
@@ -193,34 +193,13 @@
       var astId = weakIds[i];
       var risk = riskName(astId);
       var practice = bestPracticeFor(bank, astId, weakQuestions);
-      var matched = matchedWeakQuestions(weakQuestions, astId);
-      var chosen = null;
-      for (var m = 0; m < matched.length; m++) {
-        if (matched[m].selectedOption && matched[m].selectedOption.text) {
-          chosen = matched[m].selectedOption.text;
-          break;
-        }
-      }
-
-      var descriptionParts = [];
-      if (chosen) {
-        descriptionParts.push(t('fallback.action.why', {
-          quote: t('fallback.quoteOpen') + chosen + t('fallback.quoteClose')
-        }));
-      }
-      if (practice) {
-        descriptionParts.push(practice);
-      }
-      if (descriptionParts.length === 0) {
-        descriptionParts.push(
-          t('fallback.action.description.generic', { risk: risk })
-        );
-      }
+      var description = practice ||
+        t('fallback.action.description.generic', { risk: risk });
 
       actions.push({
         priority: i + 1,
         title: deriveTitle(bank, astId, weakQuestions),
-        description: descriptionParts.join(' '),
+        description: description,
         ast_source: astId + ': ' + risk
       });
     }

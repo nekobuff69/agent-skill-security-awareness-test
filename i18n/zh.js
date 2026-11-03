@@ -152,9 +152,10 @@
     'fallback.quoteClose': '」',
     'fallback.ellipsis': '……',
     'fallback.narrative.item': '{risk}是你最薄弱的一项，得分 {percentage}%。{behavior}',
+    'fallback.narrative.others': '同样低于 70% 线的还有：{risks}。这些领域没有哪一题单独失手——行动清单里已给出对应做法。',
+    'fallback.listSep': '、',
     'fallback.narrative.clear': '你的总分为 {percentage}%。所有风险领域都在 70% 以上——没有需要紧急处理的问题，保持现在的好习惯。',
     'fallback.action.title': '改进{risk}',
-    'fallback.action.why': '你的作答：{quote}。',
     'fallback.action.description.generic': '查阅 OWASP 关于「{risk}」的指引，把对应的缓解做法融入日常。',
 
     /* ── 深度提问 ── */

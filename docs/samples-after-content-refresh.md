@@ -1,9 +1,11 @@
 # 模板输出样张（common-user fixture，双语）
 
+> 生成于行动计划「只含具体行动建议」改版之后。行动行不再引用作答；作答分析只出现在 Narrative。
+
 
 ## EN — 称号 Uncharted，总分 10.2%，最弱题 q02, q04, q05, q14, q06
 
-### 行动计划 · Narrative
+### 行动计划 · Narrative（作答分析）
 
 Supply Chain Compromise is your weakest area at 0%. On the question that matters most here, you chose "I probably wouldn't notice a one-letter difference in a dependency name, and if I did, I'd assume it was a fork" — the option that lands exactly where attackers aim first.
 
@@ -11,17 +13,17 @@ Over-Privileged Skills is your weakest area at 0%. On the question that matters 
 
 Also below the 70% line: Untrusted External Instructions, Update Drift, Cross-Platform Reuse. The action list covers what to do there — none of them had a single standout miss.
 
-### 行动计划 · Actions
+### 行动计划 · Actions（纯建议）
 
 **[1] Inspect the full dependency tree**
 
-> Your answer: "I probably wouldn't notice a one-letter difference in a dependency name, and if I did, I'd assume it was a fork". Inspect the full dependency tree for typosquatting and verify each package name against the legitimate registry before installing.
+> Inspect the full dependency tree for typosquatting and verify each package name against the legitimate registry before installing.
 
 _(AST02: Supply Chain Compromise)_
 
 **[2] Review each permission request**
 
-> Your answer: "Accept all. The marketplace wouldn't list it if the permissions weren't appropriate". Review each permission request against the skill's stated function and deny any access that isn't necessary for the task.
+> Review each permission request against the skill's stated function and deny any access that isn't necessary for the task.
 
 _(AST03: Over-Privileged Skills)_
 
@@ -90,7 +92,7 @@ OWASP: https://owasp.github.io/www-project-agentic-skills-top-10/ast02.html
 
 ## ZH — 称号 未开垦，总分 10.2%，最弱题 q02, q04, q05, q14, q06
 
-### 行动计划 · Narrative
+### 行动计划 · Narrative（作答分析）
 
 供应链入侵是你最薄弱的一项，得分 0%。这里最关键的一题，你选了「依赖名里差一个字母，我多半看不出来；就算看出来了，也会以为只是个 fork。」——攻击者最希望你就这么选。
 
@@ -98,17 +100,17 @@ OWASP: https://owasp.github.io/www-project-agentic-skills-top-10/ast02.html
 
 同样低于 70% 线的还有：不可信的外部指令、更新漂移、跨平台复用。这些领域没有哪一题单独失手——行动清单里已给出对应做法。
 
-### 行动计划 · Actions
+### 行动计划 · Actions（纯建议）
 
 **[1] 安装前检查整棵依赖树有没有仿冒包**
 
-> 你的作答：「依赖名里差一个字母，我多半看不出来；就算看出来了，也会以为只是个 fork。」。 安装前检查整棵依赖树有没有仿冒包，并把每个包名和正牌仓库核对一遍。
+> 安装前检查整棵依赖树有没有仿冒包，并把每个包名和正牌仓库核对一遍。
 
 _(AST02: 供应链入侵)_
 
 **[2] 逐条把权限申请和技能声称的功能对照一遍**
 
-> 你的作答：「全部接受。市场上不会上架一个权限不合适的技能」。 逐条把权限申请和技能声称的功能对照一遍，拒绝任何对该任务不必要的访问。
+> 逐条把权限申请和技能声称的功能对照一遍，拒绝任何对该任务不必要的访问。
 
 _(AST03: 权限过度的技能)_
 
