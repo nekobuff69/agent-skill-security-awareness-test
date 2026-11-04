@@ -12,7 +12,10 @@ that appears in the two content sources:
 
 Latin, Greek, arrows, emoji, parentheses-style quotes in U+2000–206F are
 deliberately NOT subset into the face: those runs must keep resolving to
-the W95FA chrome face / the system stacks (ticket #51). The emitted
+the W95FA chrome face / the system stacks (ticket #51). The one carve-out
+is U+2026 (HORIZONTAL ELLIPSIS): zh copy uses it as the CJK ellipsis
+（……）, so it is pulled into the face like the rest of the CJK
+punctuation. The emitted
 codepoint inventory is committed beside the font as
 `fonts/fusion-pixel-12px-proportional-sc-subset.codepoints.json` and is the
 contract the Node test `tests/js/test-theme-retro-os.js` enforces: add a
@@ -71,8 +74,11 @@ OUT_CODEPOINTS = FONTS / 'fusion-pixel-12px-proportional-sc-subset.codepoints.js
 # CJK ranges the renderer is allowed to pull from this face. Everything
 # outside these ranges (Latin, typographic punctuation U+2000–206F, arrows,
 # emoji) stays on W95FA / the system stacks and is excluded from the subset
-# on purpose — see the module docstring.
+# on purpose — see the module docstring. U+2026 is the sanctioned
+# exception: zh copy ends "扫雷……" with the CJK ellipsis, which this face
+# must draw.
 CJK_RANGES = (
+    (0x2026, 0x2026),   # HORIZONTAL ELLIPSIS — the CJK ellipsis 省略号
     (0x3000, 0x303F),   # CJK Symbols and Punctuation
     (0x3040, 0x30FF),   # Hiragana / Katakana (defensive; zh copy should avoid)
     (0x3130, 0x318F),   # Hangul_compat (defensive)

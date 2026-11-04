@@ -36,6 +36,7 @@ exports.run = function() {
   /* Mirror of CJK_RANGES in scripts/subset-fusion-pixel.py — the ranges
      the @font-face unicode-range may pull from this face. */
   var CJK_RANGES = [
+    [0x2026, 0x2026],  // HORIZONTAL ELLIPSIS — the CJK ellipsis (扫雷……)
     [0x3000, 0x303F],  // CJK Symbols and Punctuation
     [0x3040, 0x30FF],  // Hiragana / Katakana (defensive)
     [0x3130, 0x318F],  // Hangul compatibility (defensive)
