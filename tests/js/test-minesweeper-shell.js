@@ -135,7 +135,10 @@ exports.run = function() {
      both dictionaries; a missing id throws, so mere resolution is the test */
 
   var MINES_IDS = ['mines.menuItem', 'mines.windowTitle', 'mines.counterLabel',
-    'mines.timerLabel', 'mines.boardLabel', 'mines.boardHint', 'mines.smileyRestart'];
+    'mines.timerLabel', 'mines.boardLabel', 'mines.boardHint', 'mines.smileyRestart',
+    'mines.cellPosition', 'mines.cellUnrevealed', 'mines.cellFlagged',
+    'mines.cellClear', 'mines.cellAdjacent', 'mines.cellMine',
+    'mines.cellDetonated', 'mines.cellWrongFlag'];
 
   check('every mines.* Chrome String resolves in the en dictionary',
     (function() {
@@ -291,21 +294,35 @@ exports.run = function() {
       return ok && en.ctl.minesTitle.textContent === 'Minesweeper';
     })());
 
-  check('opening the game disturbs neither the About window nor the program frames',
+  check('opening the game closes About: the floating surfaces are exclusive',
     (function() {
       var probe = mount('en');
       probe.ctl.openAbout();
-      // Snapshot every body child's class EXCEPT the game backdrop's own —
-      // opening the game toggles .open on its backdrop and nothing else.
+      // Snapshot every body child's class EXCEPT the two floating
+      // backdrops' own — opening the game toggles .open on the mines
+      // backdrop and OFF the About backdrop, and nothing else.
       function snapshot() {
         return JSON.stringify(probe.doc.body.children.map(function(c) {
-          return c === probe.ctl.minesBackdrop ? '(game)' : c.className;
+          return c === probe.ctl.minesBackdrop ? '(game)'
+            : c === probe.ctl.aboutBackdrop ? '(about)' : c.className;
         }));
       }
       var before = snapshot();
       probe.ctl.openMines();
-      return probe.ctl.isAboutOpen() && snapshot() === before &&
+      return !probe.ctl.isAboutOpen() && probe.ctl.isMinesOpen() &&
+        !probe.ctl.aboutBackdrop.classList.contains('open') &&
+        snapshot() === before &&
         probe.doc.body.children[probe.doc.body.children.length - 1] === probe.ctl.minesBackdrop;
+    })());
+
+  check('with About open, activating the Mines menu item closes About and opens Mines',
+    (function() {
+      var probe = mount('en');
+      probe.ctl.openAbout();
+      probe.ctl.openMenu();
+      probe.ctl.minesItem.click();
+      return !probe.ctl.isMenuOpen() && !probe.ctl.isAboutOpen() &&
+        probe.ctl.isMinesOpen();
     })());
 
   check('destroy() removes the game backdrop',
@@ -364,7 +381,7 @@ exports.run = function() {
         return c.className === 'ms-cell' && c.innerHTML === '';
       });
       return s.counterEl.textContent === '010' && s.timerEl.textContent === '000' &&
-        s.smileyEl.getAttribute('data-face') === 'smile' &&
+        s.smileyEl.getAttribute('data-ms-face') === 'smile' &&
         s.cellEls.length === 81 && allCovered;
     })());
 
@@ -376,7 +393,9 @@ exports.run = function() {
         s.timerEl.getAttribute('aria-label') === 'Timer' &&
         s.boardEl.getAttribute('role') === 'grid' &&
         s.boardEl.getAttribute('aria-label') === 'Minefield' &&
-        s.boardEl.getAttribute('aria-description') ===
+        s.boardEl.getAttribute('aria-describedby') ===
+          s.hintEl.getAttribute('id') &&
+        s.hintEl.textContent ===
           'Click to reveal a square. Right-click or long-press to flag one.' &&
         s.smileyEl.getAttribute('aria-label') === 'New game';
     })());
@@ -389,10 +408,55 @@ exports.run = function() {
       g.ctl.refreshLang();
       var zh = s.counterEl.getAttribute('aria-label') === '剩余雷数' &&
         s.boardEl.getAttribute('aria-label') === '雷区' &&
+        s.hintEl.textContent === '左键或点按翻开格子，右键或长按插旗。' &&
         s.smileyEl.getAttribute('aria-label') === '新开一局';
       I18n.use('en');
       g.ctl.refreshLang();
       return zh && s.counterEl.getAttribute('aria-label') === 'Mines remaining';
+    })());
+
+  check('every covered cell announces its position and unrevealed state (en/zh)',
+    (function() {
+      var g = mountGame('en');
+      var first = g.ctl.minesSurface.cellEls[0].getAttribute('aria-label');
+      var last = g.ctl.minesSurface.cellEls[80].getAttribute('aria-label');
+      I18n.use('zh');
+      g.ctl.refreshLang();
+      var zhFirst = g.ctl.minesSurface.cellEls[0].getAttribute('aria-label');
+      I18n.use('en');
+      g.ctl.refreshLang();
+      return first === 'Row 1, column 1, unrevealed' &&
+        last === 'Row 9, column 9, unrevealed' &&
+        zhFirst === '第1行，第1列, 未翻开';
+    })());
+
+  check('revealed and flagged cells announce their live state',
+    (function() {
+      var g = mountGame('en');
+      var s = g.ctl.minesSurface;
+      cellAt(g, 8, 8).handlers.contextmenu({ preventDefault: function() {} });
+      cellAt(g, 4, 4).click();          // flood: (4,4) is a zero cell
+      return s.cellEls[4 * 9 + 4].getAttribute('aria-label') ===
+          'Row 5, column 5, no adjacent mines' &&
+        cellAt(g, 0, 3).getAttribute('aria-label') ===
+          'Row 4, column 1, 1 adjacent mines' &&
+        cellAt(g, 8, 8).getAttribute('aria-label') ===
+          'Row 9, column 9, flagged';
+    })());
+
+  check('a loss announces mines, the detonated cell and wrong flags',
+    (function() {
+      var g = mountGame('en');
+      var s = g.ctl.minesSurface;
+      flagged(g, 1, 0);                 // wrong flag before mines exist
+      cellAt(g, 4, 4).click();
+      cellAt(g, 0, 0).click();          // a mine: lost
+      return cellAt(g, 1, 0).getAttribute('aria-label') ===
+          'Row 1, column 2, wrongly flagged' &&
+        cellAt(g, 0, 0).getAttribute('aria-label') ===
+          'Row 1, column 1, detonated mine' &&
+        cellAt(g, 2, 0).getAttribute('aria-label') ===
+          'Row 1, column 3, mine';
     })());
 
   check('the board is a grid of located cells: rows, gridcells, data-x/data-y',
@@ -490,7 +554,7 @@ exports.run = function() {
         if (MINE_CELLS.indexOf(i) === -1) s.cellEls[i].click();
       }
       return s.engine().status() === 'won' &&
-        s.smileyEl.getAttribute('data-face') === 'won' &&
+        s.smileyEl.getAttribute('data-ms-face') === 'won' &&
         s.smileyEl.innerHTML.indexOf('data-ms-face="won"') !== -1 &&
         g.timers.cleared.indexOf(1) !== -1;
     })());
@@ -507,7 +571,7 @@ exports.run = function() {
       var otherMine = cellAt(g, 2, 0).classList;
       var wrong = cellAt(g, 1, 0).classList;
       return s.engine().status() === 'lost' &&
-        s.smileyEl.getAttribute('data-face') === 'lost' &&
+        s.smileyEl.getAttribute('data-ms-face') === 'lost' &&
         detonated.contains('is-mine') && detonated.contains('is-detonated') &&
         otherMine.contains('is-mine') && !otherMine.contains('is-revealed') &&
         wrong.contains('is-flagged') && wrong.contains('is-wrong') &&
@@ -521,12 +585,12 @@ exports.run = function() {
       var s = g.ctl.minesSurface;
       var cell = cellAt(g, 8, 8);
       cell.handlers.pointerdown({ pointerType: 'mouse', preventDefault: function() {} });
-      var held = s.smileyEl.getAttribute('data-face') === 'pressed';
+      var held = s.smileyEl.getAttribute('data-ms-face') === 'pressed';
       cell.handlers.pointerup({ pointerType: 'mouse' });
-      return held && s.smileyEl.getAttribute('data-face') === 'smile';
+      return held && s.smileyEl.getAttribute('data-ms-face') === 'smile';
     })());
 
-  check('a touch long-press flags the cell and swallows the tap that follows',
+  check('a touch long-press flags the cell and swallows the tap of the same gesture',
     (function() {
       var g = mountGame('en');
       var s = g.ctl.minesSurface;
@@ -542,6 +606,21 @@ exports.run = function() {
         !cell.classList.contains('is-revealed');
     })());
 
+  check('a long-press that emits no click never eats the next tap on another cell',
+    (function() {
+      var g = mountGame('en');
+      var a = cellAt(g, 8, 8);
+      a.handlers.pointerdown({ pointerType: 'touch', preventDefault: function() {} });
+      g.timers.timeouts[0].fire();      // flag armed; no click follows (the
+                                        // real-browser long-press norm)
+      var b = cellAt(g, 7, 7);
+      b.handlers.pointerdown({ pointerType: 'touch', preventDefault: function() {} });
+      b.handlers.pointerup({ pointerType: 'touch' });
+      b.click();                        // the NEXT gesture's tap
+      return a.classList.contains('is-flagged') &&
+        b.classList.contains('is-revealed');
+    })());
+
   check('a touch tap reveals: the long-press is cancelled on pointerup',
     (function() {
       var g = mountGame('en');
@@ -553,14 +632,44 @@ exports.run = function() {
         cell.classList.contains('is-revealed');
     })());
 
-  check('moving the pointer cancels the long-press without flagging',
+  check('small movement within the pressed cell does NOT cancel the long-press',
+    (function() {
+      var g = mountGame('en');
+      cellAt(g, 8, 8).handlers.pointerdown({ pointerType: 'touch', preventDefault: function() {} });
+      cellAt(g, 8, 8).handlers.pointermove({ pointerType: 'touch' });
+      cellAt(g, 8, 8).handlers.pointermove({ pointerType: 'touch' });
+      return g.timers.clearedTimeouts.length === 0;
+    })());
+
+  check('moving onto a DIFFERENT cell cancels the long-press without flagging',
     (function() {
       var g = mountGame('en');
       var cell = cellAt(g, 8, 8);
       cell.handlers.pointerdown({ pointerType: 'touch', preventDefault: function() {} });
-      cell.handlers.pointermove({ pointerType: 'touch' });
+      cellAt(g, 7, 7).handlers.pointermove({ pointerType: 'touch' });
       return g.timers.clearedTimeouts.length === 1 &&
-        !cell.classList.contains('is-flagged');
+        !cell.classList.contains('is-flagged') &&
+        !cellAt(g, 7, 7).classList.contains('is-flagged');
+    })());
+
+  check('a pointerup on another cell still releases the pressed face',
+    (function() {
+      var g = mountGame('en');
+      var s = g.ctl.minesSurface;
+      cellAt(g, 8, 8).handlers.pointerdown({ pointerType: 'mouse', preventDefault: function() {} });
+      var held = s.smileyEl.getAttribute('data-ms-face') === 'pressed';
+      cellAt(g, 7, 7).handlers.pointerup({ pointerType: 'mouse' });
+      return held && s.smileyEl.getAttribute('data-ms-face') === 'smile';
+    })());
+
+  check('pointerdown captures the pointer when the element supports it (guarded)',
+    (function() {
+      var g = mountGame('en');
+      var cell = cellAt(g, 8, 8);
+      var captured = [];
+      cell.setPointerCapture = function(id) { captured.push(id); };
+      cell.handlers.pointerdown({ pointerType: 'mouse', pointerId: 3, preventDefault: function() {} });
+      return captured.length === 1 && captured[0] === 3;
     })());
 
   check('the smiley doubles as the restart button: a fresh board in place',
@@ -576,7 +685,7 @@ exports.run = function() {
       });
       return s.engine().status() === 'ready' &&
         s.counterEl.textContent === '010' && s.timerEl.textContent === '000' &&
-        s.smileyEl.getAttribute('data-face') === 'smile' &&
+        s.smileyEl.getAttribute('data-ms-face') === 'smile' &&
         covered && g.timers.intervalFns.length === 1;   // no second clock
     })());
 
@@ -591,7 +700,7 @@ exports.run = function() {
       return g.ctl.isMinesOpen() &&
         s.counterEl.textContent === '010' && s.timerEl.textContent === '000' &&
         s.engine().status() === 'ready' &&
-        s.smileyEl.getAttribute('data-face') === 'smile' &&
+        s.smileyEl.getAttribute('data-ms-face') === 'smile' &&
         s.cellEls.every(function(c) { return c.className === 'ms-cell'; });
     })());
 
