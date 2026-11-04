@@ -21,9 +21,13 @@
    *
    * Input (spec stories 8–9, 12): left-click reveals, right-click toggles
    * a flag (the contextmenu default is guarded), a touch long-press flags
-   * and a tap reveals. The long-press suppresses the click that follows
-   * it, so a flag is never revealed. While a cell is held the smiley wears
-   * its pressed face (story 12); the smiley doubles as the restart button
+   * and a tap reveals. The long-press suppresses only the click of the
+   * SAME gesture — the flag is armed when the timer fires and disarmed at
+   * the next pointerdown — so a long-press that emits no click (the norm
+   * on real browsers) can never eat the following tap. Movement slop: the
+   * long-press survives small jitter and dies only when the pointer
+   * leaves the pressed cell. While a cell is held the smiley wears its
+   * pressed face (story 12); the smiley doubles as the restart button
    * (story 13).
    *
    * No display text is hardcoded: every label resolves from the mines.*
@@ -31,6 +35,8 @@
    * Swap, exactly like the shell's refreshLang). Glyphs — flag, mine and
    * the four faces — are drawn inline SVG, currentColor/flat fills, so no
    * new codepoint enters either dictionary and the CJK subset stays put.
+   * The board's usage hint rides aria-describedby (a visually hidden node),
+   * and every cell carries its own state label for screen readers.
    */
 
   /** Touch long-press duration (ms) before a press becomes a flag. */
@@ -152,6 +158,14 @@
     var boardEl = doc.createElement('div');
     boardEl.className = 'ms-board';
     boardEl.setAttribute('role', 'grid');
+    // The usage hint rides the standard described-by relation, not the
+    // (unsupported) aria-description attribute: a visually hidden node
+    // carries the text so screen readers read the same string.
+    boardEl.setAttribute('aria-describedby', 'ms-board-hint');
+
+    var hintEl = doc.createElement('p');
+    hintEl.className = 'ms-visually-hidden';
+    hintEl.setAttribute('id', 'ms-board-hint');
 
     var cellEls = [];
     for (var y = 0; y < ROWS; y++) {
@@ -173,18 +187,19 @@
 
     bodyEl.appendChild(panel);
     bodyEl.appendChild(boardEl);
+    bodyEl.appendChild(hintEl);
 
     // ── Labels (Chrome Strings; refresh() re-resolves after a swap) ─────
-    function label(id) {
+    function label(id, vars) {
       var I18n = app.I18n;
-      return I18n ? I18n.t(id) : id;
+      return I18n ? I18n.t(id, vars) : id;
     }
 
     function paintLabels() {
       counterEl.setAttribute('aria-label', label('mines.counterLabel'));
       timerEl.setAttribute('aria-label', label('mines.timerLabel'));
       boardEl.setAttribute('aria-label', label('mines.boardLabel'));
-      boardEl.setAttribute('aria-description', label('mines.boardHint'));
+      hintEl.textContent = label('mines.boardHint');
       smileyEl.setAttribute('aria-label', label('mines.smileyRestart'));
     }
     paintLabels();
@@ -206,10 +221,13 @@
       if (pressedCell && status !== 'won' && status !== 'lost') {
         face = GLYPHS.pressed;
       }
-      if (smileyEl.getAttribute('data-face') !== faceName(face)) {
+      // ONE attribute carries the face — data-ms-face, the same name the
+      // SVG markup itself uses — so there is no parallel scheme to keep
+      // in step.
+      if (smileyEl.getAttribute('data-ms-face') !== faceName(face)) {
         smileyEl.innerHTML = face;
       }
-      smileyEl.setAttribute('data-face', faceName(face));
+      smileyEl.setAttribute('data-ms-face', faceName(face));
     }
 
     function faceName(svg) {
@@ -217,18 +235,45 @@
       return m ? m[1] : 'smile';
     }
 
-    function paintCell(x, y) {
+    /** The accessible state of one cell: where it sits, then what it is,
+     *  resolved from the mines.* Chrome Strings (per-cell screen-reader
+     *  labels). Rebuilt in paintCell from state the paint already holds. */
+    function cellLabel(x, y, c, lost, wrongSet, detonated) {
+      var pos = label('mines.cellPosition', { row: y + 1, column: x + 1 });
+      var state;
+      if (c.revealed) {
+        if (c.mine) {
+          state = detonated && detonated[0] === x && detonated[1] === y
+            ? label('mines.cellDetonated')
+            : label('mines.cellMine');
+        } else if (c.adjacent > 0) {
+          state = label('mines.cellAdjacent', { n: c.adjacent });
+        } else {
+          state = label('mines.cellClear');
+        }
+      } else if (c.flagged) {
+        state = lost && wrongSet[y * COLS + x]
+          ? label('mines.cellWrongFlag')
+          : label('mines.cellFlagged');
+      } else if (lost && c.mine) {
+        // Loss shows EVERY mine, revealed or not (spec story 14).
+        state = label('mines.cellMine');
+      } else {
+        state = label('mines.cellUnrevealed');
+      }
+      return pos + ', ' + state;
+    }
+
+    function paintCell(x, y, lost, wrongSet, detonated) {
       var el = cellEls[y * COLS + x];
       var c = engine.cell(x, y);
-      var lost = engine.status() === 'lost';
       var cls = 'ms-cell';
       var content = '';
       if (c.revealed) {
         cls += ' is-revealed';
         if (c.mine) {
           cls += ' is-mine';
-          if (engine.detonated() && engine.detonated()[0] === x &&
-              engine.detonated()[1] === y) {
+          if (detonated && detonated[0] === x && detonated[1] === y) {
             cls += ' is-detonated';
           }
           content = GLYPHS.mine;
@@ -238,7 +283,7 @@
         }
       } else if (c.flagged) {
         cls += ' is-flagged';
-        if (lost && !c.mine) cls += ' is-wrong';
+        if (lost && wrongSet[y * COLS + x]) cls += ' is-wrong';
         content = GLYPHS.flag;
       } else if (lost && c.mine) {
         // Loss shows EVERY mine, revealed or not (spec story 14).
@@ -247,13 +292,27 @@
       }
       el.className = cls;
       el.innerHTML = content;
+      el.setAttribute('aria-label', cellLabel(x, y, c, lost, wrongSet, detonated));
     }
 
     function paint() {
       paintLEDs();
       paintFace();
+      // The loss bookkeeping is the ENGINE's rule, not the surface's: the
+      // wrong flags and the detonated cell are queried once per paint and
+      // handed to every cell, so "which flag is wrong" lives in one place
+      // (js/minesweeper.js wrongFlags()/detonated()).
+      var lost = engine.status() === 'lost';
+      var wrongSet = {};
+      var detonated = null;
+      if (lost) {
+        engine.wrongFlags().forEach(function(w) {
+          wrongSet[w[1] * COLS + w[0]] = true;
+        });
+        detonated = engine.detonated();
+      }
       for (var y = 0; y < ROWS; y++) {
-        for (var x = 0; x < COLS; x++) paintCell(x, y);
+        for (var x = 0; x < COLS; x++) paintCell(x, y, lost, wrongSet, detonated);
       }
     }
 
@@ -301,7 +360,7 @@
 
     function wireCell(cell, x, y) {
       cell.addEventListener('click', function() {
-        if (suppressClick) {          // the tap after a long-press flag
+        if (suppressClick) {          // the tap of the long-press gesture itself
           suppressClick = false;
           return;
         }
@@ -315,11 +374,23 @@
         toggleFlagAt(x, y);
       });
       cell.addEventListener('pointerdown', function(ev) {
+        // A new gesture never inherits a stale flag: on real browsers a
+        // long-press usually emits no click, so the arm set when the timer
+        // fired would otherwise eat the NEXT tap on an unrelated cell.
+        suppressClick = false;
         var type = ev && ev.pointerType;
         if (engine.status() === 'won' || engine.status() === 'lost') return;
         if (engine.cell(x, y).revealed) return;
         pressedCell = cell;
         paintFace();
+        // Keep the pointer talking to this cell even when the finger
+        // drifts: the pointerup that ends the gesture lands here, off-cell
+        // included, and still releases the pressed face. ES5-guarded: the
+        // stub documents in tests carry no capture API.
+        if (typeof cell.setPointerCapture === 'function' && ev &&
+            typeof ev.pointerId === 'number') {
+          try { cell.setPointerCapture(ev.pointerId); } catch (e) { /* inert */ }
+        }
         if (type === 'touch' && timeoutFn && !longPress) {
           var id = timeoutFn(function() {
             longPress = null;
@@ -330,7 +401,16 @@
         }
         if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
       });
-      ['pointerup', 'pointermove', 'pointercancel'].forEach(function(evt) {
+      // Movement slop: the long-press survives jitter WITHIN the pressed
+      // cell and dies only when the pointer moves onto a different cell.
+      cell.addEventListener('pointermove', function() {
+        if (pressedCell && pressedCell !== cell) {
+          clearLongPress();
+          releaseFace();
+        }
+      });
+      // Lifting or cancelling ANYWHERE ends the press: no stuck face.
+      ['pointerup', 'pointercancel'].forEach(function(evt) {
         cell.addEventListener(evt, function() {
           clearLongPress();
           releaseFace();
@@ -357,9 +437,12 @@
       paint();
     }
 
-    /** Re-resolve every label after an in-place language switch. */
+    /** Re-resolve every label after an in-place language switch: the
+     *  panel labels AND every cell's state label (paint() re-resolves
+     *  those from the same engine state). */
     function refresh() {
       paintLabels();
+      paint();
     }
 
     /** Stop the clock and release handlers' transient state (close). */
@@ -379,6 +462,7 @@
       counterEl: counterEl,
       timerEl: timerEl,
       boardEl: boardEl,
+      hintEl: hintEl,
       smileyEl: smileyEl,
       cellEls: cellEls,
       engine: function() { return engine; }

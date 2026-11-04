@@ -138,6 +138,16 @@
     'mines.boardLabel': 'Minefield',
     'mines.boardHint': 'Click to reveal a square. Right-click or long-press to flag one.',
     'mines.smileyRestart': 'New game',
+    // Per-cell accessible state (each gridcell announces where it sits and
+    // what it shows, resolved in paintCell).
+    'mines.cellPosition': 'Row {row}, column {column}',
+    'mines.cellUnrevealed': 'unrevealed',
+    'mines.cellFlagged': 'flagged',
+    'mines.cellClear': 'no adjacent mines',
+    'mines.cellAdjacent': '{n} adjacent mines',
+    'mines.cellMine': 'mine',
+    'mines.cellDetonated': 'detonated mine',
+    'mines.cellWrongFlag': 'wrongly flagged',
 
     /* ── Wizard Row (ticket #40, ADR 0020) ── */
     'wizard.back': '< Back',

@@ -133,6 +133,15 @@
     'mines.boardLabel': '雷区',
     'mines.boardHint': '左键或点按翻开格子，右键或长按插旗。',
     'mines.smileyRestart': '新开一局',
+    // 逐格无障碍状态：每个格子说明位置和当前内容（paintCell 里解析）。
+    'mines.cellPosition': '第{row}行，第{column}列',
+    'mines.cellUnrevealed': '未翻开',
+    'mines.cellFlagged': '已插旗',
+    'mines.cellClear': '周围没有雷',
+    'mines.cellAdjacent': '周围有{n}颗雷',
+    'mines.cellMine': '地雷',
+    'mines.cellDetonated': '被引爆的地雷',
+    'mines.cellWrongFlag': '插错的旗',
 
     /* ── 向导按钮行（ticket #40，ADR 0020） ── */
     'wizard.back': '< 上一步',
