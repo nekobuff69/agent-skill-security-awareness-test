@@ -536,7 +536,6 @@
     var menuOpen = false;
     var aboutOpen = false;
     var minesOpen = false;
-    var minesSurface = null;
 
     var controller = {
       windowEl: windowEl,
@@ -589,8 +588,9 @@
         minesItem.textContent = I18n.t('mines.menuItem');
         minesTitle.textContent = I18n.t('mines.windowTitle');
         minesCloseBtn.setAttribute('aria-label', I18n.t('shell.close'));
-        if (minesSurface && typeof minesSurface.refresh === 'function') {
-          minesSurface.refresh();
+        if (controller.minesSurface &&
+            typeof controller.minesSurface.refresh === 'function') {
+          controller.minesSurface.refresh();
         }
         aboutTitle.textContent = I18n.t('shell.aboutTitle');
         aboutApp.textContent = I18n.t('shell.windowTitle');
@@ -683,17 +683,20 @@
        * surface on the FIRST open (a fresh board by construction). Purely
        * additive: nothing here touches a Program Window, the stage, the
        * Session or the Desktop Record — the dialog just floats above.
+       * The floating surfaces are mutually exclusive (the topmost-surface
+       * story): opening Mines puts About away first, mirroring how every
+       * menu entry closes the menu on its way to its surface.
        */
       openMines: function() {
+        if (aboutOpen) controller.closeAbout();
         minesOpen = true;
         minesBackdrop.classList.add('open');
-        if (!minesSurface && app.MinesweeperUI) {
-          minesSurface = app.MinesweeperUI.create({
+        if (!controller.minesSurface && app.MinesweeperUI) {
+          controller.minesSurface = app.MinesweeperUI.create({
             doc: doc,
             bodyEl: minesBody,
             timers: deps.minesTimers || null
           });
-          controller.minesSurface = minesSurface;
         }
         if (typeof minesCloseBtn.focus === 'function') minesCloseBtn.focus();
         return minesOpen;
@@ -704,7 +707,7 @@
       closeMines: function() {
         minesOpen = false;
         minesBackdrop.classList.remove('open');
-        if (minesSurface) minesSurface.restart();
+        if (controller.minesSurface) controller.minesSurface.restart();
         return minesOpen;
       },
 
@@ -733,16 +736,21 @@
        *  above it had nothing to close, and it is the LAST consumer:
        *  nothing is intercepted on Alt+Tab, no focus trap is added. */
       handleKeydown: function(key) {
-        if (key !== 'Escape') return { menu: menuOpen, about: aboutOpen, mines: minesOpen };
+        // One report shape, built once: every return answers with the
+        // same snapshot of the three floating surfaces.
+        function escapeState() {
+          return { menu: menuOpen, about: aboutOpen, mines: minesOpen };
+        }
+        if (key !== 'Escape') return escapeState();
         if (app.Windows && app.Windows.isDialogOpen &&
             app.Windows.isDialogOpen()) {
-          return { menu: menuOpen, about: aboutOpen, mines: minesOpen };
+          return escapeState();
         }
         if (minesOpen) controller.closeMines();
         else if (aboutOpen) controller.closeAbout();
         else if (menuOpen) controller.closeMenu(true);
         else if (typeof deps.onWindowEscape === 'function') deps.onWindowEscape();
-        return { menu: menuOpen, about: aboutOpen, mines: minesOpen };
+        return escapeState();
       },
 
       /** Tear the shell DOM down (test cleanup). */
@@ -760,8 +768,9 @@
         }
         if (aboutBackdrop.parentNode) aboutBackdrop.parentNode.removeChild(aboutBackdrop);
         if (minesBackdrop.parentNode) minesBackdrop.parentNode.removeChild(minesBackdrop);
-        if (minesSurface && typeof minesSurface.destroy === 'function') {
-          minesSurface.destroy();
+        if (controller.minesSurface &&
+            typeof controller.minesSurface.destroy === 'function') {
+          controller.minesSurface.destroy();
         }
       }
     };
