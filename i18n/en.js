@@ -126,6 +126,19 @@
     /* ── Start-menu sound toggle (ticket #41) ── */
     'sound.menuItem': 'Sound',
 
+    /* ── Minesweeper easter egg (ticket #81, spec #79) ──
+       The Start menu's game entry and every label of the game dialog:
+       window title, the LED counters' and board's accessible names, the
+       input hint for assistive tech, and the smiley button's name (it
+       doubles as the restart control). */
+    'mines.menuItem': 'Minesweeper…',
+    'mines.windowTitle': 'Minesweeper',
+    'mines.counterLabel': 'Mines remaining',
+    'mines.timerLabel': 'Timer',
+    'mines.boardLabel': 'Minefield',
+    'mines.boardHint': 'Click to reveal a square. Right-click or long-press to flag one.',
+    'mines.smileyRestart': 'New game',
+
     /* ── Wizard Row (ticket #40, ADR 0020) ── */
     'wizard.back': '< Back',
     'wizard.next': 'Next >',

@@ -12,7 +12,9 @@
        <  .os-window (200 + the core's stack number — the window base is
          the floor js/windows.js paints, never a bare stack number)
        <  .os-taskbar (1000)  <  .os-start-menu (1100)
-       <  .os-about-backdrop (1200)
+       <  .os-about-backdrop (1200)  <  .os-mines-backdrop (1200, painted
+         above About by DOM order — the dialogs are siblings, and the one
+         appended later wins the rung; ticket #81)
        <  .os-dialog-backdrop (1300)
    ─────────────────────────────────────────────────────────────────── */
 
@@ -611,6 +613,175 @@ body:has(#quiz-view:not([hidden])) .os-shortcuts {
   margin: 0 var(--space-3) var(--space-3) auto;
   padding: var(--space-1) var(--space-3);
   font-family: var(--font-heading);
+}
+
+/* ── Minesweeper game dialog (ticket #81) ──────────────────────────────
+
+   A sibling of the About window (ADR 0024): same dimmed backdrop rung
+   (1200), same bevel idiom, no Window Record anywhere. The surface inside
+   is the classic Beginner board: an LED panel (mine counter, smiley,
+   timer) over a 9×9 sunken grid. All colours come from the classic
+   palette — the one place the era's own game colours are reproduced,
+   exactly like the title bar reproduces the era's navy gradient. */
+
+.os-mines-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1200;               /* the About rung; DOM order lifts it above */
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.os-mines-backdrop.open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The window hugs its content on the desktop (the era's game window) and
+   falls short of the screen edges on a phone. --ms-cell is the whole
+   mobile story: 9 columns + the sunken board padding (2 × 3px) + the
+   window bevel (2 × 3px) + the body padding (2 × var(--space-2), 16px)
+   must fit 320px with no horizontal scroll — (320 − 88) / 9 ≈ 25px, so
+   the clamp lands at ~25px on the smallest screens and caps at 28px once
+   the viewport has room. One rule serves every viewport; no media query
+   to keep in step. */
+.os-mines-window {
+  --ms-cell: clamp(20px, calc((100vw - 88px) / 9), 28px);
+  width: max-content;
+  max-width: calc(100vw - 2 * var(--space-2));
+  background: var(--color-face);
+  box-shadow: var(--bevel-raised);
+  padding: 3px;
+  box-sizing: border-box;
+  font-family: var(--font-heading);
+}
+
+.os-mines-window .os-titlebar {
+  padding-left: var(--space-2);
+}
+
+.os-mines-body {
+  padding: var(--space-2);
+}
+
+.ms-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-1);
+  margin-bottom: var(--space-2);
+  box-shadow: var(--bevel-sunken);
+  background: var(--color-face);
+}
+
+/* The LED readouts: black field, red digits, sunken into the panel. */
+.ms-led {
+  min-width: 3.6em;
+  padding: 1px var(--space-1);
+  background: #000000;
+  color: #FF0000;
+  font-family: var(--font-heading);
+  font-size: 16px;
+  letter-spacing: 1px;
+  text-align: center;
+  box-shadow: inset 1px 1px var(--color-secondary),
+              inset -1px -1px var(--color-surface);
+}
+
+/* The smiley: a small raised command button; its glyph is drawn inline
+   SVG (js/minesweeper-ui.js GLYPHS), never text. */
+.ms-smiley {
+  width: 30px;
+  height: 30px;
+  padding: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.ms-smiley:active {
+  box-shadow: var(--bevel-sunken);
+}
+
+.ms-smiley .ms-face {
+  display: block;
+}
+
+/* The board: a sunken field of 9 columns; every cell is a drawn control. */
+.ms-board {
+  display: grid;
+  grid-template-columns: repeat(9, var(--ms-cell));
+  grid-auto-rows: var(--ms-cell);
+  padding: 3px;
+  box-shadow: var(--bevel-sunken);
+  background: var(--color-face);
+  user-select: none;
+  touch-action: manipulation;   /* taps never become double-tap zooms */
+}
+
+.ms-row {
+  display: contents;
+}
+
+.ms-cell {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-face);
+  box-shadow: var(--bevel-raised);      /* covered: raised like the era */
+  font-family: var(--font-heading);
+  font-weight: bold;
+  font-size: calc(var(--ms-cell) * 0.55);
+  line-height: 1;
+  cursor: default;
+}
+
+.ms-cell.is-revealed {
+  box-shadow: inset 1px 1px var(--color-secondary),
+              inset -1px -1px var(--color-surface);  /* flat, sunken field */
+}
+
+.ms-cell .ms-glyph {
+  display: block;
+}
+
+/* The classic per-number palette: 1 blue … 8 gray. */
+.ms-cell.ms-n1 { color: #0000FF; }
+.ms-cell.ms-n2 { color: #008000; }
+.ms-cell.ms-n3 { color: #FF0000; }
+.ms-cell.ms-n4 { color: #000080; }
+.ms-cell.ms-n5 { color: #800000; }
+.ms-cell.ms-n6 { color: #008080; }
+.ms-cell.ms-n7 { color: #000000; }
+.ms-cell.ms-n8 { color: #808080; }
+
+/* The mine you hit: red field, white glyph. */
+.ms-cell.is-detonated {
+  background: #FF0000;
+  color: #FFFFFF;
+}
+
+/* A wrongly placed flag on a loss: the flag fades and takes the red
+   strike-through; correctly flagged mines keep their full flag. */
+.ms-cell.is-wrong .ms-glyph {
+  opacity: 0.45;
+}
+
+.ms-cell.is-wrong::after {
+  content: "";
+  position: absolute;
+  width: 70%;
+  height: 2px;
+  background: #FF0000;
+  transform: rotate(-45deg);
+}
+
+.ms-cell.is-wrong {
+  position: relative;
 }
 
 /* ── Window controls (ticket #43) ───────────────────────────────────────

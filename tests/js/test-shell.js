@@ -775,10 +775,10 @@ exports.run = function() {
 
   var q = quitPage('en');
   var quitItem = q.ctl.menu.children[q.ctl.menu.children.length - 1];
-  check('the Start menu keeps About and adds Quit beneath it',
-    q.ctl.menu.children.length === 2 &&
+  check('the Start menu keeps About, adds Minesweeper (#81) and Quit beneath it',
+    q.ctl.menu.children.length === 3 &&
     q.ctl.menu.children[0].textContent === I18n.t('shell.menuAbout') &&
-    quitItem.textContent === I18n.t('shell.menuQuit'));
+    q.ctl.menu.children[2].textContent === I18n.t('shell.menuQuit'));
 
   q.ctl.openMenu();
   quitItem.click();
@@ -847,7 +847,7 @@ exports.run = function() {
   });
   globalThis.App.Windows = undefined;
   noWinCtl.openMenu();
-  noWinCtl.menu.children[1].click();
+  noWinCtl.menu.children[noWinCtl.menu.children.length - 1].click();
   check('without a dialog tier Quit asks nothing and destroys nothing',
     seenNoWin.length === 0 && Windows66.isDialogOpen() === false);
 

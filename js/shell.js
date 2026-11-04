@@ -262,6 +262,10 @@
    *   deps.onWindowEscape - optional (ticket #67); the Escape stack's
    *                   window tier, called only when no dialog, About or
    *                   Start menu had anything to close
+   *   deps.minesTimers - optional (ticket #81); { interval, clearInterval,
+   *                   timeout, clearTimeout } handed to the game surface,
+   *                   whose 1-second clock and long-press timer default to
+   *                   the globals — injectable so tests run with fake time
    */
   function build(deps) {
     var doc = deps.doc;
@@ -299,7 +303,20 @@
     var aboutItem = createEl(doc, 'button', 'os-start-menu-item', strings['shell.menuAbout']);
     aboutItem.type = 'button';
     aboutItem.setAttribute('role', 'menuitem');
+    aboutItem.setAttribute('data-os-menu', 'about');
     menu.appendChild(aboutItem);
+
+    // The easter egg (ticket #81, spec #79): a plain Minesweeper… item —
+    // the era-authentic hiding place was the menu itself, and a visible
+    // item keeps the feature testable. It sits between About and Quit,
+    // opens the game dialog (a self-contained overlay, NOT a fourth
+    // Program Window — ADR 0024), and closes the menu first like every
+    // other entry.
+    var minesItem = createEl(doc, 'button', 'os-start-menu-item', strings['mines.menuItem']);
+    minesItem.type = 'button';
+    minesItem.setAttribute('role', 'menuitem');
+    minesItem.setAttribute('data-os-menu', 'mines');
+    menu.appendChild(minesItem);
 
     // The destructive exit (ticket #66): Quit sits under About — the era
     // kept the shutdown command at the bottom of the Start menu — and
@@ -439,6 +456,41 @@
     aboutEl.appendChild(okBtn);
     aboutBackdrop.appendChild(aboutEl);
 
+    // ── Minesweeper game dialog (ticket #81, spec #79) ──────────────────
+    // A SIBLING of the About window, not a fourth Program Window (ADR
+    // 0024): no Window Record, no taskbar entry, no shortcut, no drag or
+    // resize, no Keyboard Floor, no Desktop Record presence. It floats
+    // over its own dimmed backdrop — appended to the body AFTER the About
+    // backdrop so, at the same z rung, it paints above it — and owns its
+    // open/close state like About does. The game surface itself is built
+    // lazily on the first open by App.MinesweeperUI (js/minesweeper-ui.js,
+    // loaded after this module); headless and module-less, the dialog
+    // still opens, just with an empty body.
+    var minesBackdrop = createEl(doc, 'div', 'os-mines-backdrop');
+    var minesEl = createEl(doc, 'div', 'os-mines-window');
+    minesEl.setAttribute('role', 'dialog');
+    minesEl.setAttribute('aria-modal', 'true');
+    minesEl.setAttribute('aria-labelledby', 'os-mines-title');
+
+    var minesTitleBar = createEl(doc, 'div', 'os-titlebar');
+    // Named because refreshLang() re-resolves it after an in-place
+    // language switch, exactly like aboutTitle.
+    var minesTitle = createEl(doc, 'span', 'os-titlebar-title', strings['mines.windowTitle']);
+    minesTitleBar.appendChild(minesTitle);
+    var minesTitleButtons = createEl(doc, 'div', 'os-titlebar-buttons');
+    var minesCloseBtn = createEl(doc, 'button', 'os-titlebar-btn');
+    minesCloseBtn.type = 'button';
+    minesCloseBtn.setAttribute('data-os-button', 'close');
+    minesCloseBtn.setAttribute('aria-label', strings['shell.close']);
+    minesCloseBtn.innerHTML = TITLE_BAR_GLYPHS.close;
+    minesTitleButtons.appendChild(minesCloseBtn);
+    minesTitleBar.appendChild(minesTitleButtons);
+    minesEl.appendChild(minesTitleBar);
+
+    var minesBody = createEl(doc, 'div', 'os-mines-body');
+    minesEl.appendChild(minesBody);
+    minesBackdrop.appendChild(minesEl);
+
     // ── Program frames (ticket #61) ──────────────────────────────────────
     // The Action Plan and the Deep-Dive Prompt each get a real window: the
     // same chrome as the Quiz frame, and a body that IS the section's
@@ -477,11 +529,14 @@
       body.insertBefore(programFrames[spec.id].windowEl, taskbar);
     });
     body.appendChild(aboutBackdrop);
+    body.appendChild(minesBackdrop);
     windowEl.insertBefore(appEl, resizeGrip);
 
     // ── Controller (pure state + thin DOM ops) ───────────────────────────
     var menuOpen = false;
     var aboutOpen = false;
+    var minesOpen = false;
+    var minesSurface = null;
 
     var controller = {
       windowEl: windowEl,
@@ -529,6 +584,14 @@
         startLabel.textContent = I18n.t('shell.start');
         aboutItem.textContent = I18n.t('shell.menuAbout');
         quitItem.textContent = I18n.t('shell.menuQuit');
+        // The game dialog (ticket #81): its entry, its title, its close
+        // control, and — when the surface exists — every surface label.
+        minesItem.textContent = I18n.t('mines.menuItem');
+        minesTitle.textContent = I18n.t('mines.windowTitle');
+        minesCloseBtn.setAttribute('aria-label', I18n.t('shell.close'));
+        if (minesSurface && typeof minesSurface.refresh === 'function') {
+          minesSurface.refresh();
+        }
         aboutTitle.textContent = I18n.t('shell.aboutTitle');
         aboutApp.textContent = I18n.t('shell.windowTitle');
         aboutDesc.textContent = I18n.t('shell.aboutBody');
@@ -571,9 +634,18 @@
       aboutBackdrop: aboutBackdrop,
       aboutEl: aboutEl,
       okBtn: okBtn,
+      // The easter egg (ticket #81): menu item, dialog and its controls.
+      minesItem: minesItem,
+      minesBackdrop: minesBackdrop,
+      minesEl: minesEl,
+      minesTitle: minesTitle,
+      minesCloseBtn: minesCloseBtn,
+      minesBody: minesBody,
+      minesSurface: null,
 
       isMenuOpen: function() { return menuOpen; },
       isAboutOpen: function() { return aboutOpen; },
+      isMinesOpen: function() { return minesOpen; },
 
       openMenu: function() {
         menuOpen = true;
@@ -606,6 +678,36 @@
         return aboutOpen;
       },
 
+      /**
+       * The easter egg (ticket #81): open the game dialog and build its
+       * surface on the FIRST open (a fresh board by construction). Purely
+       * additive: nothing here touches a Program Window, the stage, the
+       * Session or the Desktop Record — the dialog just floats above.
+       */
+      openMines: function() {
+        minesOpen = true;
+        minesBackdrop.classList.add('open');
+        if (!minesSurface && app.MinesweeperUI) {
+          minesSurface = app.MinesweeperUI.create({
+            doc: doc,
+            bodyEl: minesBody,
+            timers: deps.minesTimers || null
+          });
+          controller.minesSurface = minesSurface;
+        }
+        if (typeof minesCloseBtn.focus === 'function') minesCloseBtn.focus();
+        return minesOpen;
+      },
+      /** Closing DISCARDS the in-progress game: the surface's reset puts a
+       *  fresh ready board behind the dialog for the next open (the engine
+       *  restarts in place, so the reference stays valid). */
+      closeMines: function() {
+        minesOpen = false;
+        minesBackdrop.classList.remove('open');
+        if (minesSurface) minesSurface.restart();
+        return minesOpen;
+      },
+
       /** Document-level outside click: closes the menu (focus stays put). */
       handleOutsideClick: function(target) {
         if (!menuOpen) return menuOpen;
@@ -622,6 +724,8 @@
       /** Document-level keydown. Escape runs the fixed stack, outermost
        *  owner first: a system dialog owns Escape while it is open (its own
        *  keydown handler cancels it, so every tier below steps aside), then
+       *  — ticket #81 — the GAME DIALOG, the topmost floating surface
+       *  (above About: whichever dialog opened last is the one on top), then
        *  About, then the Start menu, then — ticket #67 — the WINDOW TIER:
        *  deps.onWindowEscape hides the focused window through the desktop
        *  core and hands focus back to its taskbar button or the shortcut
@@ -629,15 +733,16 @@
        *  above it had nothing to close, and it is the LAST consumer:
        *  nothing is intercepted on Alt+Tab, no focus trap is added. */
       handleKeydown: function(key) {
-        if (key !== 'Escape') return { menu: menuOpen, about: aboutOpen };
+        if (key !== 'Escape') return { menu: menuOpen, about: aboutOpen, mines: minesOpen };
         if (app.Windows && app.Windows.isDialogOpen &&
             app.Windows.isDialogOpen()) {
-          return { menu: menuOpen, about: aboutOpen };
+          return { menu: menuOpen, about: aboutOpen, mines: minesOpen };
         }
-        if (aboutOpen) controller.closeAbout();
+        if (minesOpen) controller.closeMines();
+        else if (aboutOpen) controller.closeAbout();
         else if (menuOpen) controller.closeMenu(true);
         else if (typeof deps.onWindowEscape === 'function') deps.onWindowEscape();
-        return { menu: menuOpen, about: aboutOpen };
+        return { menu: menuOpen, about: aboutOpen, mines: minesOpen };
       },
 
       /** Tear the shell DOM down (test cleanup). */
@@ -654,6 +759,10 @@
           shortcutBar.parentNode.removeChild(shortcutBar);
         }
         if (aboutBackdrop.parentNode) aboutBackdrop.parentNode.removeChild(aboutBackdrop);
+        if (minesBackdrop.parentNode) minesBackdrop.parentNode.removeChild(minesBackdrop);
+        if (minesSurface && typeof minesSurface.destroy === 'function') {
+          minesSurface.destroy();
+        }
       }
     };
 
@@ -668,6 +777,13 @@
       controller.closeMenu(false);
       controller.openAbout();
     });
+    // The easter egg (ticket #81): the menu closes, then the game dialog
+    // floats over whatever stage is visible — strictly additive.
+    on(minesItem, 'click', function() {
+      controller.closeMenu(false);
+      controller.openMines();
+    });
+    on(minesCloseBtn, 'click', function() { controller.closeMines(); });
     on(quitItem, 'click', function() {
       controller.closeMenu(false);
       if (typeof deps.onQuit === 'function') deps.onQuit(quitItem);
@@ -802,6 +918,10 @@
     'shell.aboutCredits', 'shell.ok',
     // The three-program desktop (ticket #61).
     'shell.actionPlanWindow', 'shell.deepDiveWindow', 'shell.programs',
+    // The Minesweeper easter egg (ticket #81): the shell resolves the menu
+    // item and the game title at build time; the surface resolves its own
+    // mines.* labels through I18n at paint time.
+    'mines.menuItem', 'mines.windowTitle',
     'windows.endProgramTitle', 'windows.endProgramMessage',
     'windows.yes', 'windows.no'
   ];

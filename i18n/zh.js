@@ -122,6 +122,18 @@
     /* ── 开始菜单声音开关（ticket #41） ── */
     'sound.menuItem': '声音',
 
+    /* ── 扫雷彩蛋（ticket #81，spec #79） ──
+       开始菜单里的游戏入口与游戏对话框的每处文案：窗口标题、两个 LED
+       计数器和棋盘的无障碍名称、输入方式提示，以及笑脸按钮的名称
+       （它同时是重开一局的按钮）。 */
+    'mines.menuItem': '扫雷……',
+    'mines.windowTitle': '扫雷',
+    'mines.counterLabel': '剩余雷数',
+    'mines.timerLabel': '计时',
+    'mines.boardLabel': '雷区',
+    'mines.boardHint': '左键或点按翻开格子，右键或长按插旗。',
+    'mines.smileyRestart': '新开一局',
+
     /* ── 向导按钮行（ticket #40，ADR 0020） ── */
     'wizard.back': '< 上一步',
     'wizard.next': '下一步 >',
