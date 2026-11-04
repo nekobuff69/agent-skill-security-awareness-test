@@ -765,23 +765,51 @@ body:has(#quiz-view:not([hidden])) .os-shortcuts {
   color: #FFFFFF;
 }
 
-/* A wrongly placed flag on a loss: the flag fades and takes the red
-   strike-through; correctly flagged mines keep their full flag. */
+/* A wrongly placed flag on a loss: the flag fades and takes the classic
+   red cross (two diagonals); correctly flagged mines keep their full
+   flag. */
 .ms-cell.is-wrong .ms-glyph {
   opacity: 0.45;
 }
 
+.ms-cell.is-wrong::before,
 .ms-cell.is-wrong::after {
   content: "";
   position: absolute;
+  top: 50%;
+  left: 50%;
   width: 70%;
   height: 2px;
+  margin: -1px 0 0 -35%;
   background: #FF0000;
+}
+
+.ms-cell.is-wrong::before {
+  transform: rotate(45deg);
+}
+
+.ms-cell.is-wrong::after {
   transform: rotate(-45deg);
 }
 
 .ms-cell.is-wrong {
   position: relative;
+}
+
+/* The game board's usage hint: real text for assistive tech, invisible
+   on canvas (the classic sr-only clip idiom; the board points here via
+   aria-describedby). */
+.ms-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* ── Window controls (ticket #43) ───────────────────────────────────────
