@@ -18,11 +18,16 @@ exports.run = function() {
   function mockReport() {
     return {
       percentage: 42,
-      title: {
-        name: 'Aware',
-        emoji: '🔍',
-        threshold: 30
+      type: {
+        id: 'T3',
+        weakAxis: 'EXPOSURE',
+        strongAxis: 'INTAKE'
       },
+      axisRanked: [
+        { id: 'EXPOSURE', earned: 15, possible: 30, percentage: 50 },
+        { id: 'UPKEEP', earned: 23, possible: 30, percentage: 76.7 },
+        { id: 'INTAKE', earned: 9, possible: 30, percentage: 30 }
+      ],
       astScores: {
         'AST01': { earned: 3, possible: 12, percentage: 25 },
         'AST02': { earned: 1, possible: 9, percentage: 11.1 },
@@ -135,11 +140,19 @@ exports.run = function() {
     result1.indexOf('https://owasp.github.io/www-project-agentic-skills-top-10/ast03.html') !== -1,
     'missing content in prompt');
 
-  // --- Test 5: Progression Title and percentage in Profile ---
-  check('Title + percentage in Profile',
-    result1.indexOf('🔍 Aware') !== -1 &&
-    result1.indexOf('Overall: 42%') !== -1,
-    'missing title or percentage');
+  // --- Test 5: The attention type leads the Profile; no title, no grade ---
+  check('Type in Profile, no title and no overall percentage',
+    result1.indexOf('The Candid Courier') !== -1 &&
+    result1.indexOf('Overall') === -1 &&
+    result1.indexOf('42%') === -1,
+    'missing type or a grade leaked in');
+
+  // --- Test 5b: Axis lines carry earned/possible counts, no percentages ---
+  check('Axis lines carry counts only',
+    result1.indexOf('- Input & Trust: 9 of 30') !== -1 &&
+    result1.indexOf('- Permissions & Exposure: 15 of 30') !== -1 &&
+    result1.indexOf('- Upkeep & Renewal: 23 of 30') !== -1,
+    'missing axis lines');
 
   // --- Test 6: Per-AST scores sorted weakest-first ---
   // AST02 (11.1%) before AST04 (16.7%) before AST01 (25%) before AST03 (55.6%)
@@ -151,8 +164,8 @@ exports.run = function() {
     pos02 < pos04 && pos04 < pos01 && pos01 < pos03,
     'AST02=' + pos02 + ' AST04=' + pos04 + ' AST01=' + pos01 + ' AST03=' + pos03);
 
-  // --- Test 7: Scored choice line and stronger-answer line render when the
-  // report carries the fields (real reports do via scoring.js) ---
+  // --- Test 7: The choice renders plain — no per-choice score line — and
+  // the stronger-answer line renders with its reason ---
   var report7 = mockReport();
   report7.weakestQuestions[0].optionScore = 0;
   report7.weakestQuestions[0].maxScore = 3;
@@ -162,9 +175,10 @@ exports.run = function() {
     feedback: 'Allowlisted commands keep the blast radius known and small.'
   };
   var result7 = PromptBuilder.build(report7);
-  check('Scored choice line renders (scored 0 out of 3)',
-    result7.indexOf('(scored 0 out of 3)') !== -1,
-    'missing scored choice');
+  check('The choice line carries NO score figure (no grade framing)',
+    result7.indexOf('scored 0 out of 3') === -1 &&
+    result7.indexOf('I chose: Allow all shell commands to streamline workflows') !== -1,
+    'a score leaked into the choice line');
   check('Stronger-answer line renders with its reason',
     result7.indexOf('A stronger answer: Restrict shell execution to an allowlist') !== -1 &&
     result7.indexOf('Allowlisted commands keep the blast radius known and small.') !== -1,

@@ -103,13 +103,22 @@ exports.run = async function() {
 
   // Retro-skin ids resolve in BOTH locales (ADR 0015).
   I18n.use('en');
-  var overallEn = I18n.t('results.overall');
+  var typeEn = I18n.t('results.typeCaption');
   I18n.use('zh');
-  var overallZh = I18n.t('results.overall');
+  var typeZh = I18n.t('results.typeCaption');
   I18n.use('en');
   check('results.* retro ids resolve in en and zh',
-    overallEn === 'Overall' && overallZh === '总分',
-    overallEn + '/' + overallZh);
+    typeEn === 'Your attention type' && typeZh === '你的注意力类型',
+    typeEn + '/' + typeZh);
+  // The grade surface is gone: the old Overall caption id must be missing
+  // from BOTH dictionaries, exactly like the retired Title Card buttons.
+  var overallGone = 0;
+  ['en', 'zh'].forEach(function(locale) {
+    I18n.use(locale);
+    try { I18n.t('results.overall'); } catch (e) { overallGone++; }
+  });
+  check('the Overall caption id is gone from both dictionaries (no grade surface)',
+    overallGone === 2, String(overallGone));
   // Ticket #60: the fake Title Card's [—][□][×] aria-labels left with the
   // fake chrome; asking for one must throw in BOTH dictionaries.
   var btnGone = 0;
@@ -132,7 +141,8 @@ exports.run = async function() {
   }
   var report = {
     percentage: 62,
-    title: { emoji: 'X', name: 'Sentinel' },
+    type: { id: 'T3', weakAxis: 'EXPOSURE', strongAxis: 'INTAKE' },
+    blindSpotIds: ['AST01', 'AST02', 'AST03'],
     astScores: astScores,
     astRanked: astRanked,
     weakestQuestions: []
@@ -182,71 +192,87 @@ exports.run = async function() {
     poly.attrs.fill);
 
   var patterns = walk(svg, 'pattern');
-  check('dither pattern exists with a white tile and dark band cells',
+  check('dither pattern exists with a white tile',
     patterns.length === 1 && patterns[0].attrs.id === 'results-radar-dither',
     patterns.length ? patterns[0].attrs.id : 'none');
   var patRects = patterns.length ? walk(patterns[0], 'rect') : [];
-  var bandColor = internals.scoreColor(report.percentage); // 62 → olive
   var whiteTiles = patRects.filter(function(r) { return r.attrs.fill === '#FFFFFF'; });
-  var bandCells = patRects.filter(function(r) { return r.attrs.fill === bandColor; });
-  check('pattern tile is #FFFFFF and both band cells use the score-band colour',
-    whiteTiles.length === 1 && bandCells.length === 2,
-    'white=' + whiteTiles.length + ' band=' + bandCells.length + '/' + bandColor);
+  var neutralCells = patRects.filter(function(r) { return r.attrs.fill === '#808080'; });
+  check('pattern tile is #FFFFFF and both cells use the one neutral dither colour',
+    whiteTiles.length === 1 && neutralCells.length === 2,
+    'white=' + whiteTiles.length + ' neutral=' + neutralCells.length);
 
   var tspans = walk(svg, 'tspan');
   var ids = tspans.filter(function(t) { return /^AST\d\d$/.test(t.textContent); });
-  var pctsT = tspans.filter(function(t) { return /^\d+%$/.test(t.textContent); });
-  check('ten AST-ID labels and ten percentage labels present (ADR 0005)',
-    ids.length === 10 && pctsT.length === 10,
+  var pctsT = tspans.filter(function(t) { return /%/.test(t.textContent); });
+  check('ten AST-ID labels and NO percentage labels on the map',
+    ids.length === 10 && pctsT.length === 0,
     'ids=' + ids.length + ' pct=' + pctsT.length);
   check('labels render on the W95 chrome face from the heading token',
-    ids.every(function(t) { return String(t.attrs['font-family']).indexOf('W95FA') >= 0; }) &&
-    pctsT.every(function(t) { return String(t.attrs['font-family']).indexOf('W95FA') >= 0; }));
+    ids.every(function(t) { return String(t.attrs['font-family']).indexOf('W95FA') >= 0; }));
   check('AST-ID labels are black, weight 400 (pixel face carries no bold)',
     ids.every(function(t) { return t.attrs.fill === '#000000' && t.attrs['font-weight'] === '400'; }));
-  check('percentage labels carry the score-band colour per axis',
-    pctsT.every(function(t) {
-      var v = parseInt(t.textContent, 10);
-      return t.attrs.fill === internals.scoreColor(v);
-    }));
   check('headingFont() resolves the W95FA stack headless (token fallback)',
     internals.headingFont().indexOf('W95FA') >= 0,
     internals.headingFont());
 
   var svgText = allText(svg).join(' ');
-  check('radar carries no severity chips or severity words (ADR 0005 amendment)',
-    svgText.indexOf('%') >= 0 &&
+  check('the map carries no numbers and no severity words',
+    svgText.indexOf('%') < 0 &&
     !/critical|high|medium|low|严重|高危|中危|低危/i.test(svgText),
     svgText.slice(0, 60));
   var chipEls = walk(svg, 'span').concat(walk(svg, 'div'));
   check('radar SVG contains no chip elements', chipEls.length === 0,
     'spans/divs=' + chipEls.length);
 
-  // Dots keep the per-axis score-band colours (graphics on the white field).
+  // Markers read by SHAPE, not colour: solid ink dots on the profile, an
+  // open white ring on every axis inside the report's blind-spot list.
+  // The markers paint ONCE, above the polygon.
   var dots = walk(svg, 'circle');
-  var dotFills = dots.filter(function(d) { return d.attrs.r === 3.5; });
-  check('score dots keep per-axis band fills',
-    dotFills.length === 20 && // 10 initial + 10 re-appended above the polygon
-    dotFills.slice(10).every(function(d, idx) {
-      return d.attrs.fill === internals.scoreColor(pcts[idx]);
+  var profileDots = dots.filter(function(d) { return d.attrs.r === 3.5; });
+  var blindRings = dots.filter(function(d) { return d.attrs.r === 4.5; });
+  check('profile dots are solid ink, one per non-blind axis',
+    profileDots.length === 7 &&
+    profileDots.every(function(d) { return d.attrs.fill === '#000000'; }),
+    'dots=' + profileDots.length);
+  check('blind-spot axes carry open rings instead of dots (shape, not colour)',
+    blindRings.length === 3 &&
+    blindRings.every(function(d) {
+      return d.attrs.fill === '#FFFFFF' && d.attrs.stroke === '#000000';
     }),
-    'dots=' + dotFills.length);
+    'rings=' + blindRings.length);
 
-  // ══ Results header panel (ticket #60: the window's first body panel) ═══
+  // ══ Results type card (the window's first body panel) ══════════════════
 
   var header = internals.buildResultsHeader(report);
-  check('the header is the sunken client field itself — no fake window frame',
-    classOf(header) === 'results-title-card', classOf(header));
-  check('the Progression Title (emoji + name) leads the body panel',
-    classOf(header.children[0]).indexOf('results-title-name') >= 0 &&
-    header.children[0].textContent === 'X Sentinel',
-    classOf(header.children[0]) + '/' + header.children[0].textContent);
-  check('the Overall caption + percentage follow with the band class',
-    header.children[1].textContent === 'Overall' &&
-    header.children[2].textContent === '62%' &&
-    classOf(header.children[2]).indexOf(internals.scoreClass(report.percentage)) >= 0,
-    header.children[1].textContent + '/' + header.children[2].textContent +
-    '/' + classOf(header.children[2]));
+  var headerAll = allText(header).join(' ');
+  check('the header is a results-header wrapper around a sunken client field',
+    classOf(header) === 'results-header' &&
+    walk(header, 'div').some(function(n) { return classOf(n) === 'results-title-card'; }),
+    classOf(header));
+  check('the type card leads with the MBTI-style code and the type name — no tier, no grade',
+    headerAll.indexOf('IUE · The Candid Courier') >= 0 &&
+    headerAll.indexOf('62%') < 0 && headerAll.indexOf('Sentinel') < 0 &&
+    headerAll.indexOf('Overall') < 0,
+    headerAll.slice(0, 90));
+  check('the type caption and the motto follow the name',
+    headerAll.indexOf(I18n.t('results.typeCaption')) >= 0 &&
+    headerAll.indexOf(I18n.t('type.T3.motto')) >= 0);
+  check('the two defining axes appear with letter markers, roles and descriptions',
+    headerAll.indexOf(I18n.t('results.attentionStrong')) >= 0 &&
+    headerAll.indexOf(I18n.t('axis.INTAKE.code') + ' · ' + I18n.t('axis.INTAKE')) >= 0 &&
+    headerAll.indexOf(I18n.t('axis.INTAKE.desc')) >= 0 &&
+    headerAll.indexOf(I18n.t('results.attentionWeak')) >= 0 &&
+    headerAll.indexOf(I18n.t('axis.EXPOSURE.code') + ' · ' + I18n.t('axis.EXPOSURE')) >= 0 &&
+    headerAll.indexOf(I18n.t('axis.EXPOSURE.desc')) >= 0);
+  check('the weak axis carries its factual risk note — and no comparative ranking',
+    headerAll.indexOf(I18n.t('axis.EXPOSURE.risk')) >= 0 &&
+    headerAll.indexOf(I18n.t('axis.INTAKE.risk')) < 0,
+    I18n.t('axis.EXPOSURE.risk').slice(0, 50));
+  check('the blind-spot AST names appear as the concrete places to look first',
+    headerAll.indexOf(I18n.t('results.typeBlindList', {
+      names: I18n.astName('AST01') + ', ' + I18n.astName('AST02') + ', ' + I18n.astName('AST03')
+    })) >= 0);
   // The fake chrome is gone: no title-bar row, no reuse of the shell's
   // .os-titlebar* classes, no second set of [—][□][×] anywhere. These
   // assertions REPLACE the ones that pinned the three disabled glyphs —
@@ -256,10 +282,10 @@ exports.run = async function() {
       String(n.attrs['data-os-button'] || '').length > 0;
   });
   check('the header renders no title bar and no title-bar buttons',
-    barNodes.length === 0 && header.children.length === 3,
+    barNodes.length === 0,
     'chrome nodes=' + barNodes.length);
 
-  // ══ Blind-Spot Bars: weakest-first, full localized names ════════════════
+  // ══ Attention Distribution bars: weakest-first, no numbers, no bands ═══
 
   var bars = internals.buildBars(report);
   var rows = bars.children;
@@ -270,10 +296,13 @@ exports.run = async function() {
     firstLabel === I18n.astName(astRanked[0].id),
     rows.length + ' rows, first=' + firstLabel);
   var fill0 = rows[0].children[1].children[0];
-  check('bar fill keeps the width-driven behaviour and band class',
+  check('bar fill keeps the width-driven behaviour and carries NO band class',
     fill0.attrs.style === 'width:33%' &&
-    classOf(fill0).indexOf(internals.scoreClass(33)) >= 0,
+    classOf(fill0) === 'results-bar-fill',
     fill0.attrs.style + '/' + classOf(fill0));
+  check('bar rows carry no percentage figure anywhere',
+    allText(bars).join(' ').indexOf('%') < 0 &&
+    rows.every(function(r) { return r.children.length === 2; }));
 
   // ══ Review: no scores/percentages, tree structure intact ════════════════
 
@@ -368,10 +397,8 @@ exports.run = async function() {
   };
 
   var shownZh56 = internals.localizedReport(report56, zhBank56, enBank56);
-  check('the Progression Title re-anchors at the same Title Ladder threshold',
-    shownZh56.title.name === '实干者' &&
-    shownZh56.title.emoji === 'P' &&
-    shownZh56.title.threshold === 50,
+  check('no title is re-anchored — the report carries no tier, only facts',
+    shownZh56.title === report56.title,
     JSON.stringify(shownZh56.title));
   check('Weakest Question prose re-anchors by Question id',
     shownZh56.weakestQuestions[0].scenario === '中文情景' &&
@@ -402,8 +429,7 @@ exports.run = async function() {
   check('re-anchoring against the scoring Bank Variant is a no-op for its own prose',
     (function() {
       var same = internals.localizedReport(report56, enBank56, enBank56);
-      return same.title.name === 'Practitioner' &&
-        same.weakestQuestions[0].scenario === 'EN scenario' &&
+      return same.weakestQuestions[0].scenario === 'EN scenario' &&
         same.weakestQuestions[0].selectedOption.text === 'EN option B';
     })());
 
@@ -581,8 +607,11 @@ exports.run = async function() {
     else globalThis.document = prev.document;
   })();
   menuBtns[1].click();
-  check('Share hands the Web Share dialog this Completion\'s score',
-    shareCalls.length === 1 && String(shareCalls[0].text).indexOf('62') >= 0,
+  check('Share hands the Web Share dialog this Completion\'s attention type — no score',
+    shareCalls.length === 1 &&
+    String(shareCalls[0].text).indexOf('IUE') >= 0 &&
+    String(shareCalls[0].text).indexOf('The Candid Courier') >= 0 &&
+    String(shareCalls[0].text).indexOf('62') < 0,
     JSON.stringify(shareCalls));
 
   // Without Web Share the command is not offered — the capability rule the
@@ -962,7 +991,7 @@ exports.run = async function() {
   function planText(node) { return allText(node).join(' '); }
   function planReport(pct) {
     return {
-      percentage: pct, title: { emoji: 'X', name: 'Sentinel' },
+      percentage: pct, type: { id: 'T1', weakAxis: 'INTAKE', strongAxis: 'EXPOSURE' },
       astScores: {}, astRanked: [], weakestQuestions: []
     };
   }

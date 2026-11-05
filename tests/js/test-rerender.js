@@ -461,10 +461,11 @@ exports.run = function() {
   flushTimers(); // the designed FINISH beat → results hand-off
 
   var reportRef = App.resultsState() && App.resultsState().report;
-  check('the results hand-off renders the score report',
+  check('the results hand-off renders the score report as a type card',
     App.currentView() === 'results-view' &&
     !!reportRef && reportRef.percentage === 62 &&
-    viewText('results-view').indexOf('62%') >= 0);
+    viewText('results-view').indexOf('62%') < 0 &&
+    viewText('results-view').indexOf(I18n.t('results.typeCaption')) >= 0);
 
   // ══ 4. Results / Review re-render from the SAME report ════════════════
 
@@ -472,11 +473,11 @@ exports.run = function() {
     App.activateBank(bankZh) === 'results-view' &&
     App.resultsState().report === reportRef &&
     App.resultsState().bank === bankZh &&
-    viewText('results-view').indexOf('62%') >= 0);
+    viewText('results-view').indexOf('62%') < 0);
   check('rerenderResults rebuilds the cached report verbatim (never recomputed)',
     App.rerenderResults() === true &&
     App.resultsState().report === reportRef &&
-    viewText('results-view').indexOf('62%') >= 0);
+    viewText('results-view').indexOf(I18n.t('results.typeCaption')) >= 0);
 
   var reviewBtn = walk(byIdMap['results-view'], 'button').filter(function(b) {
     return String(b.className || '').indexOf('results-review-btn') >= 0;

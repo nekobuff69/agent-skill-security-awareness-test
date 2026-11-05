@@ -25,23 +25,37 @@
     var framing = t('prompt.framing');
 
     // --- Section 2: Profile ---
-    var title = report.title || {
-      name: t('prompt.titleFallback'),
-      emoji: t('prompt.titleFallbackEmoji')
-    };
-    var percentage = report.percentage != null ? report.percentage : 0;
+    // The tutor sees the type and the raw earned/possible counts — the
+    // same objective data as before, framed as attention shares rather
+    // than grades. No title, no overall percentage: the profile starts
+    // from where attention lives.
+    var typeName = (report.type && report.type.id)
+      ? t('type.' + report.type.id + '.name')
+      : t('prompt.typeFallback');
 
     var profile = t('prompt.profile.heading') + '\n' +
-      t('prompt.profile.title', { title: title.emoji + ' ' + title.name }) + '\n' +
-      t('prompt.profile.overall', { percentage: percentage }) + '\n' +
+      t('prompt.profile.type', { type: typeName }) + '\n' +
       '\n' +
-      t('prompt.profile.astScores');
+      t('prompt.profile.axes');
+
+    // Weakest-first order comes from the report — the Scoring Engine owns ranking.
+    var axisRanked = (report && report.axisRanked) || [];
+    for (var a = 0; a < axisRanked.length; a++) {
+      var ax = axisRanked[a];
+      profile += '\n' + t('prompt.profile.axisLine', {
+        axis: t('axis.' + ax.id),
+        earned: ax.earned,
+        possible: ax.possible
+      });
+    }
+
+    profile += '\n\n' + t('prompt.profile.astScores');
 
     // Weakest-first order comes from the report — the Scoring Engine owns ranking.
     var astRanked = (report && report.astRanked) || [];
     for (var i = 0; i < astRanked.length; i++) {
       var r = astRanked[i];
-      profile += '\n- ' + r.id + ': ' + r.percentage + '% (' + r.earned + '/' + r.possible + ')';
+      profile += '\n' + t('prompt.profile.astLine', { id: r.id, earned: r.earned, possible: r.possible });
     }
 
     // --- Section 3: Choices ---
@@ -57,18 +71,10 @@
         }
         choices += '\n\n### ' + wq.id + ': ' + (wq.astRisks || []).join(', ');
         choices += '\n' + t('prompt.item.scenario', { text: scenario });
-        // Scored choice line when the report carries the numbers; plain
-        // line otherwise (older reports and test fixtures).
+        // The choice itself is the material — no per-choice score line:
+        // the tutor teaches from the choice and the stronger answer.
         if (wq.selectedOption && wq.selectedOption.text) {
-          if (wq.optionScore != null && wq.maxScore != null) {
-            choices += '\n' + t('prompt.item.choseScored', {
-              text: wq.selectedOption.text,
-              score: wq.optionScore,
-              max: wq.maxScore
-            });
-          } else {
-            choices += '\n' + t('prompt.item.chose', { text: wq.selectedOption.text });
-          }
+          choices += '\n' + t('prompt.item.chose', { text: wq.selectedOption.text });
         }
         // The stronger answer with its reason — the tutor's first teaching
         // material. Only rendered when the report carries a best option.

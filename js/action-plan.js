@@ -197,11 +197,9 @@
    */
   function buildLlmPrompt(report, bank, excerpts) {
     var AST = global.App.AST || { severity: {} };
-    var title = report.title || {
-      name: t('llm.titleFallback'),
-      emoji: t('llm.titleFallbackEmoji')
-    };
-    var percentage = report.percentage != null ? report.percentage : 0;
+    var typeName = (report.type && report.type.id)
+      ? t('type.' + report.type.id + '.name')
+      : t('llm.typeFallback');
 
     // --- System Instruction (load-bearing: survives every trim step) ---
     var head = t('llm.system', {
@@ -227,8 +225,7 @@
       // so the newlines are reproduced here.
       middle += '\n' +
         t('llm.participant.heading') + '\n\n' +
-        t('llm.participant.title', { title: title.emoji + ' ' + title.name }) + '\n' +
-        t('llm.participant.overall', { percentage: percentage }) + '\n\n';
+        t('llm.participant.type', { type: typeName }) + '\n\n';
 
       // Per-AST scores, weakest first (order owned by the Scoring report)
       var astRanked = report.astRanked || [];

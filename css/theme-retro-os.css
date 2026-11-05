@@ -433,11 +433,10 @@ button:disabled {
 
 .results-title-card {
   text-align: left;
-  /* The editorial skin restored a dark gradient here because the base rule
-     painted white text over whatever background survived. This skin keeps
-     the text dark and puts it on a sunken white field instead: the score
-     colours are text, and the dark 16-colour variants only clear their
-     contrast floor on white (see the Score colours block above). */
+  /* The type card sits on the skin's sunken white field with dark text —
+     the same treatment every other client field gets. No score colours
+     exist in the results any more: the type name and the axes are the
+     whole message. */
   background: var(--color-surface);
   color: var(--color-text);
   border: 0;
@@ -446,15 +445,16 @@ button:disabled {
   padding: var(--space-6) var(--space-5);
 }
 
-.results-title-pct {
-  font-family: var(--font-heading);   /* digits on the pixel face        */
-  color: var(--color-accent);
-  letter-spacing: normal;
-}
-
 .results-title-name {
   font-family: var(--font-heading);
   color: var(--color-text);
+  letter-spacing: normal;
+}
+
+.results-type-caption,
+.results-axis-line,
+.results-type-blind {
+  font-family: var(--font-heading);
   letter-spacing: normal;
 }
 
@@ -463,8 +463,8 @@ button:disabled {
   letter-spacing: normal;
 }
 
-/* Blind-Spot Bars: sunken track, dithered (graphic fill — no text sits on
-   it), square dark-variant fills. */
+/* Attention Distribution bars: sunken track, dithered (graphic fill — no
+   text sits on it), one neutral navy fill for every row. */
 .results-bar-track {
   background: var(--dither);
   background-size: var(--dither-size);
@@ -779,7 +779,6 @@ html[lang^="zh"] h5,
 html[lang^="zh"] h6,
 html[lang^="zh"] #landing-view h1,
 html[lang^="zh"] .results-title-name,
-html[lang^="zh"] .results-title-pct,
 html[lang^="zh"] .results-section-title {
   letter-spacing: normal;
 }

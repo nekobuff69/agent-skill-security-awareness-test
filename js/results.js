@@ -16,23 +16,6 @@
 
   /* ── helpers ── */
 
-  function scoreColor(pct) {
-    /* Classic 16-colour system set, dark variants: these values render both
-       as SVG text (the per-axis percentages) and as graphic fills (the score
-       dots), and the text role is the binding one — dark variants clear the
-       contrast floor on the radar's white field, bright tints do not. Same
-       rationale as the Score colours block in css/theme-retro-os.css. */
-    if (pct < 50) return '#800000';
-    if (pct < 70) return '#808000';
-    return '#008000';
-  }
-
-  function scoreClass(pct) {
-    if (pct < 50) return 'results-red';
-    if (pct < 70) return 'results-amber';
-    return 'results-green';
-  }
-
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
     if (attrs) {
@@ -73,42 +56,79 @@
   /* ── Results header panel ── */
 
   /**
-   * The window's first content panel under the menu bar (tickets #60, #65):
-   * the Progression Title and the Overall Percentage merged into one
-   * sunken-white client field. The fake Title Card window of #45 is gone —
-   * the shell frame IS the window now, its navy title bar carries the
-   * program title, so the tier name rides the body panel again via
-   * .results-title-name (css/
-   * theme-retro-os.css keeps its rule) and no second title bar exists.
-   *
-   * The tier data path (title.emoji / title.name / percentage) and the
-   * score-band colouring are unchanged from #45: the percentage is the
-   * most eye-catching element on the surface, so it carries scoreClass()
-   * — without it a perfect score and a failing one rendered identically
-   * in --color-accent while green bars sat beside them saying the opposite.
-   * The band rules in css/results.css resolve to the --color-score-* TEXT
-   * tokens (css/theme-retro-os.css), not the graphic fills, because the
-   * fill values do not meet the contrast floor for text on white.
+   * The window's first content panel under the menu bar: the participant's
+   * ATTENTION TYPE — the diversity framing that replaced the tier ladder
+   * and the overall percentage. One type card, no grade:
+   *   - the type caption, then the type name and its motto;
+   *   - the two axes that define the type — where attention mostly lives
+   *     (strongest axis) and where it visits least (weakest axis);
+   *   - when AST-level blind spots exist, their localized names as the
+   *     concrete places to look first.
+   * Type/axis names are Chrome Strings resolved at render time; the
+   * classifier only ships stable ids. No number appears anywhere: the
+   * map and the bars below carry the shape.
    */
   function buildResultsHeader(report) {
-    var title = report.title;
+    var type = report.type || { id: '', weakAxis: '', strongAxis: '' };
+    var typeName = type.id ? t('type.' + type.id + '.name') : t('prompt.typeFallback');
+    var emoji = type.id ? t('type.' + type.id + '.emoji') : '';
+    var motto = type.id ? t('type.' + type.id + '.motto') : '';
+    var typeCode = type.id ? t('type.' + type.id + '.code') : '';
 
-    /* .results-title-card keeps its class, so the skin's sunken-white rule
-       (css/theme-retro-os.css) paints the Win95 field. */
-    return el('div', { className: 'results-title-card' }, [
+    var children = [
       el('div', {
-        className: 'results-title-name results-title-caption',
-        textContent: title.emoji + ' ' + title.name
-      }),
-      el('div', { className: 'results-overall-caption', textContent: t('results.overall') }),
-      el('div', {
-        className: 'results-title-pct ' + scoreClass(report.percentage),
-        textContent: report.percentage + '%'
-      })
-    ]);
+        className: 'results-title-card',
+        'aria-label': t('results.typeCaption')
+      }, [
+        el('div', {
+          className: 'results-title-name results-title-caption',
+          textContent: (emoji ? emoji + ' ' : '') +
+            (typeCode ? typeCode + ' · ' : '') + typeName
+        }),
+        el('div', { className: 'results-type-caption', textContent: t('results.typeCaption') }),
+        motto ? el('p', { className: 'results-type-motto', textContent: motto }) : null
+      ])
+    ];
+
+    if (type.strongAxis) {
+      var strongLetter = t('axis.' + type.strongAxis + '.code');
+      var weakLetter = t('axis.' + type.weakAxis + '.code');
+      children.push(el('div', { className: 'results-axis-block' }, [
+        el('div', { className: 'results-axis-line' }, [
+          el('span', { className: 'results-axis-role', textContent: t('results.attentionStrong') }),
+          document.createTextNode(strongLetter + ' · ' + t('axis.' + type.strongAxis))
+        ]),
+        el('div', { className: 'results-axis-desc', textContent: t('axis.' + type.strongAxis + '.desc') }),
+        el('div', { className: 'results-axis-line' }, [
+          el('span', { className: 'results-axis-role', textContent: t('results.attentionWeak') }),
+          document.createTextNode(weakLetter + ' · ' + t('axis.' + type.weakAxis))
+        ]),
+        el('div', { className: 'results-axis-desc', textContent: t('axis.' + type.weakAxis + '.desc') }),
+        /* The risk note rides the weak axis only: what OWASP rates the
+           family's risks, stated factually for THIS axis. It never
+           compares types — a danger ranking would rebuild the very
+           hierarchy the type system removed. */
+        el('p', { className: 'results-axis-risk', textContent: t('axis.' + type.weakAxis + '.risk') })
+      ]));
+    }
+
+    var blindIds = report.blindSpotIds || [];
+    if (blindIds.length > 0) {
+      var names = [];
+      for (var b = 0; b < blindIds.length; b++) {
+        names.push(app.I18n.astName(blindIds[b]));
+      }
+      children.push(el('p', {
+        className: 'results-type-blind',
+        textContent: t('results.typeBlindList', { names: names.join(t('fallback.listSep')) })
+      }));
+    }
+
+    var wrap = el('div', { className: 'results-header' }, children);
+    return wrap;
   }
 
-  /* ── Risk Radar (hand-rolled SVG) ── */
+  /* ── Attention Map (hand-rolled SVG) ── */
 
   /* Chrome typeface for the axis labels. The W95 skin declares the heading
      token ('W95FA' first) in css/theme-retro-os.css; SVG text cannot inherit
@@ -116,7 +136,8 @@
      is written as a font-family attribute. Read from the computed token at
      render time (falls back to the token's declared stack when headless,
      where there is no document.defaultView). Same palette-constant pattern
-     as scoreColor(): the constant exists so the chart stays self-contained. */
+     as RADAR_DITHER_COLOR: the constant exists so the chart stays
+     self-contained. */
   var HEADING_STACK = "'W95FA', 'Segoe UI', Tahoma, 'SimSun', sans-serif";
 
   function headingFont() {
@@ -131,10 +152,13 @@
     return HEADING_STACK;
   }
 
-  /* Score-band dither: a 2×2 userSpace pattern — two dark-tint pixels on a
-     white tile (the 1px checkerboard the skin uses for graphic fills). The
-     fill colour is the band of the Participant's Overall Percentage; the
-     polygon outline is black vector linework, no shadows, square joins. */
+  /* Radar dither: a 2×2 userSpace pattern — two neutral-grey pixels on a
+     white tile (the 1px checkerboard the skin uses for graphic fills).
+     One fill for every participant: the polygon's SHAPE is the message,
+     so no score-band colour exists any more. The polygon outline is black
+     vector linework, no shadows, square joins. */
+  var RADAR_DITHER_COLOR = '#808080';
+
   function buildRadarFillPattern(color) {
     var ns = 'http://www.w3.org/2000/svg';
     var defs = document.createElementNS(ns, 'defs');
@@ -173,7 +197,13 @@
     var svg = svgEl || document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', '0 0 400 400');
     svg.setAttribute('class', 'results-radar-svg');
-    var font = headingFont();   // chrome face for AST-ID + percentage labels
+    var font = headingFont();   // chrome face for the AST-ID labels
+
+    // The AST ids sitting below the 70% internal threshold — marked by
+    // SHAPE (a ring instead of a dot), never by a judging colour.
+    var blindSet = {};
+    var blindIds = report.blindSpotIds || [];
+    for (var b = 0; b < blindIds.length; b++) blindSet[blindIds[b]] = true;
 
     // background circle
     var bg = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -218,7 +248,7 @@
       line.setAttribute('stroke-width', '0.75');
       svg.appendChild(line);
 
-      // score point on axis
+      // profile point on axis — the same neutral ink everywhere
       var astId = astIds[i];
       var pct = (astScores[astId] && astScores[astId].percentage != null) ? astScores[astId].percentage : 0;
       var valR = (pct / 100) * maxR;
@@ -226,17 +256,7 @@
       var py = cy + valR * Math.sin(angle);
       points.push({ x: px, y: py });
 
-      // score dot
-      var dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      dot.setAttribute('cx', px);
-      dot.setAttribute('cy', py);
-      dot.setAttribute('r', 3.5);
-      dot.setAttribute('fill', scoreColor(pct));
-      dot.setAttribute('stroke', '#fff');
-      dot.setAttribute('stroke-width', '1');
-      svg.appendChild(dot);
-
-      // axis label — two lines: AST ID + percentage (no severity)
+      // axis label — the AST id only: no number on the map
       // labelR=125 keeps all text inside 0..400 viewBox
       // At worst case (angle=18deg, cos=0.951): start-anchored right edge = 125*0.951+200+42 = 358.9 < 400
       // At left (cos=-0.951): end-anchored left edge = 125*(-0.951)+200-42 = 60.9 > 0
@@ -251,7 +271,7 @@
 
       var tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
       tspan.setAttribute('x', lx);
-      tspan.setAttribute('y', ly - 8);
+      tspan.setAttribute('y', ly);
       tspan.setAttribute('text-anchor', anchor);
       tspan.setAttribute('font-size', '14');
       tspan.setAttribute('font-family', font);
@@ -259,23 +279,12 @@
       tspan.setAttribute('fill', '#000000');
       tspan.textContent = astId;
 
-      var tspan2 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
-      tspan2.setAttribute('x', lx);
-      tspan2.setAttribute('y', ly + 8);
-      tspan2.setAttribute('text-anchor', anchor);
-      tspan2.setAttribute('font-size', '13');
-      tspan2.setAttribute('font-family', font);
-      tspan2.setAttribute('font-weight', '400');
-      tspan2.setAttribute('fill', scoreColor(pct));
-      tspan2.textContent = pct + '%';
-
       var lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       lbl.appendChild(tspan);
-      lbl.appendChild(tspan2);
       svg.appendChild(lbl);
     }
 
-    // polygon fill: score-band dither pattern (overall percentage band)
+    // polygon fill: the one neutral dither, for everyone
     var polyPts = points.map(function(p) { return p.x + ',' + p.y; }).join(' ');
     var poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
     poly.setAttribute('points', polyPts);
@@ -284,30 +293,42 @@
     poly.setAttribute('stroke-width', '2');
     poly.setAttribute('stroke-linejoin', 'miter');
     svg.appendChild(poly);
-    svg.appendChild(buildRadarFillPattern(scoreColor(report.percentage)));
+    svg.appendChild(buildRadarFillPattern(RADAR_DITHER_COLOR));
 
-    // re-append dots on top of polygon
-    for (var i = 0; i < points.length; i++) {
+    // re-append the markers on top of the polygon: a solid ink dot on the
+    // profile, an open ring where the AST sits below the internal
+    // attention threshold (shape, not colour — the ring reads as "look
+    // here first", the same message the type card's blind list carries).
+    for (var i2 = 0; i2 < points.length; i2++) {
+      var isBlind = !!blindSet[astIds[i2]];
       var dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      dot.setAttribute('cx', points[i].x);
-      dot.setAttribute('cy', points[i].y);
-      dot.setAttribute('r', 3.5);
-      dot.setAttribute('fill', scoreColor((astScores[astIds[i]] && astScores[astIds[i]].percentage != null) ? astScores[astIds[i]].percentage : 0));
-      dot.setAttribute('stroke', '#fff');
-      dot.setAttribute('stroke-width', '1');
+      dot.setAttribute('cx', points[i2].x);
+      dot.setAttribute('cy', points[i2].y);
+      dot.setAttribute('r', isBlind ? 4.5 : 3.5);
+      if (isBlind) {
+        dot.setAttribute('fill', '#FFFFFF');
+        dot.setAttribute('stroke', '#000000');
+        dot.setAttribute('stroke-width', '2');
+      } else {
+        dot.setAttribute('fill', '#000000');
+        dot.setAttribute('stroke', '#fff');
+        dot.setAttribute('stroke-width', '1');
+      }
       svg.appendChild(dot);
     }
 
     return svg;
   }
 
-  /* ── Blind-Spot Bars ── */
+  /* ── Attention Distribution Bars ── */
   function buildBars(report) {
     var wrap = el('div', { className: 'results-bars' });
 
     // weakest-first order comes from the report (Scoring Engine owns ranking);
     // labels are the full localized AST display names (Chrome Strings via
-    // App.I18n.astName — ADR 0015), never the short IDs used on the radar.
+    // App.I18n.astName — ADR 0015), never the short IDs used on the map.
+    // No number rides the row and no band colour exists: the bar's width
+    // alone shows where attention sits — a distribution, not a ranking.
     var astRanked = report.astRanked || [];
 
     for (var i = 0; i < astRanked.length; i++) {
@@ -319,11 +340,10 @@
         ]),
         el('div', { className: 'results-bar-track' }, [
           el('div', {
-            className: 'results-bar-fill ' + scoreClass(pct),
+            className: 'results-bar-fill',
             style: 'width:' + pct + '%'
           })
-        ]),
-        el('div', { className: 'results-bar-pct', textContent: pct + '%' })
+        ])
       ]);
       wrap.appendChild(row);
     }
@@ -334,16 +354,15 @@
   /* ── Report re-anchoring (issue #56) ────────────────────────────────────
 
      A Completion's score report is scored once against one Bank Variant
-     (ADR 0002) and its numeric fields — the Overall Percentage, every AST
-     Score, Total Earned/Possible — are facts, never recomputed. Two fields
-     are authored prose carried across a Bank Variant swap though: the
-     Progression Title (read from the scoring Bank's Title Ladder at
-     scoring time) and the Weakest Questions' text (Scenario, Question,
-     chosen Option, Best Practice, OWASP link — captured from the scoring
-     Bank at computeScores time). Both are re-anchored here by structural
-     identity (ADR 0015): the same Title Ladder threshold, the same
-     Question id, the same chosen Option index. A missing structural
-     anchor leaves the field untouched — a re-anchor never invents text. */
+     (ADR 0002) and its numeric fields — the axis profile, every AST
+     Score, Total Earned/Possible — are facts, never recomputed. One
+     field is authored prose carried across a Bank Variant swap: the
+     Weakest Questions' text (Scenario, Question, chosen Option, Best
+     Practice, OWASP link — captured from the scoring Bank at
+     computeScores time). It is re-anchored here by structural identity
+     (ADR 0015): the same Question id, the same chosen Option index. A
+     missing structural anchor leaves the field untouched — a re-anchor
+     never invents text. */
 
   function questionById(bank, id) {
     var questions = (bank && bank.questions) || [];
@@ -353,18 +372,9 @@
     return null;
   }
 
-  function reanchorTitle(report, bank) {
-    var ladder = bank.meta && bank.meta.scoring && bank.meta.scoring.titles;
-    if (!Array.isArray(ladder) || !ladder.length) return report.title;
-    var title = ladder[0];   // same rule as the Scoring Engine (ADR 0004)
-    for (var i = 0; i < ladder.length; i++) {
-      if (report.percentage >= ladder[i].threshold) {
-        title = ladder[i];
-        break;
-      }
-    }
-    return { name: title.name, emoji: title.emoji, threshold: title.threshold };
-  }
+  /* The type and the axis profile are DERIVED from the report's own
+     numbers — never authored prose — so a Bank Variant swap cannot drift
+     them: only the weakest questions' text re-anchors here. */
 
   function reanchorWeakest(report, bank, scoringBank) {
     var weakest = report.weakestQuestions;
@@ -417,7 +427,6 @@
     for (var key in report) {
       if (Object.prototype.hasOwnProperty.call(report, key)) shown[key] = report[key];
     }
-    shown.title = reanchorTitle(report, bank);
     shown.weakestQuestions = reanchorWeakest(report, bank, scoringBank);
     return shown;
   }
@@ -1233,12 +1242,13 @@
       role: 'menuitem'
     });
     btn.addEventListener('click', function() {
+      var type = report.type || {};
       navigator.share({
         title: t('results.shareTitle'),
         text: t('results.shareText', {
-          percentage: report.percentage,
-          emoji: report.title.emoji,
-          name: report.title.name,
+          emoji: type.id ? t('type.' + type.id + '.emoji') : '',
+          code: type.id ? t('type.' + type.id + '.code') : '',
+          name: type.id ? t('type.' + type.id + '.name') : t('prompt.typeFallback'),
           app: t('doc.title')
         })
       }).catch(function() { /* user cancelled */ });
@@ -1549,25 +1559,34 @@
     var shown = localizedReport(report, bank, scoringBank);
 
     // The window menu bar owns the four commands (ticket #65); the body
-    // under it is the score header, the Risk Radar and the Blind-Spot Bars.
+    // under it is the type card, the Attention Map and the Attention
+    // Distribution bars.
     view.appendChild(buildMenuBar(shown));
 
-    // Results header panel (ticket #60)
+    // Results header panel: the attention type card (no grade anywhere)
     view.appendChild(buildResultsHeader(shown));
 
-    // Section: Risk Radar
+    // Section: Attention Map
     var radarSection = el('div', { className: 'results-section' });
     radarSection.appendChild(el('h2', { className: 'results-section-title', textContent: t('results.radarTitle') }));
     var radarWrap = el('div', { className: 'results-radar-wrap' });
     var svg = buildRadar(report);
     radarWrap.appendChild(svg);
     radarSection.appendChild(radarWrap);
+    radarSection.appendChild(el('p', {
+      className: 'results-section-note',
+      textContent: t('results.radarNote')
+    }));
     view.appendChild(radarSection);
 
-    // Blind-Spot Bars
+    // Attention Distribution bars
     var barsSection = el('div', { className: 'results-section' });
     barsSection.appendChild(el('h2', { className: 'results-section-title', textContent: t('results.barsTitle') }));
     barsSection.appendChild(buildBars(report));
+    barsSection.appendChild(el('p', {
+      className: 'results-section-note',
+      textContent: t('results.barsNote')
+    }));
     view.appendChild(barsSection);
 
     // Action Plan — mounted on its stable section host. The host is the
@@ -1699,8 +1718,6 @@
      builder — its request/cache behaviour is asserted through it. Not
      used by the page. */
   app.resultsInternals = {
-    scoreColor: scoreColor,
-    scoreClass: scoreClass,
     headingFont: headingFont,
     buildResultsHeader: buildResultsHeader,
     buildRadar: buildRadar,

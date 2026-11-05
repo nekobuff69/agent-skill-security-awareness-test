@@ -113,13 +113,17 @@
    * Build the narrative string: one short paragraph per weak risk that
    * has a specific answer to point at; risks without one are merged
    * into a single closing line so the paragraph shapes never repeat.
+   *
+   * The objective anchor is a COUNT of situations (matched weak choices
+   * out of every bank question touching the risk) — never a percentage
+   * or a score: the narrative describes where attention went, not how
+   * the participant graded.
    */
-  function buildNarrative(weakIds, astScores, bank, weakQuestions) {
+  function buildNarrative(weakIds, bank, weakQuestions) {
     var parts = [];
     var quietIds = [];
     for (var i = 0; i < weakIds.length; i++) {
       var astId = weakIds[i];
-      var pct = astScores[astId].percentage;
       var risk = riskName(astId);
       var matched = matchedWeakQuestions(weakQuestions, astId);
       var hasChoice = matched.some(function(wq) {
@@ -131,7 +135,8 @@
       }
       parts.push(t('fallback.narrative.item', {
         risk: risk,
-        percentage: pct,
+        count: matched.length,
+        total: questionsForRisk(bank, astId).length,
         behavior: summarizeBehavior(weakQuestions, astId)
       }));
     }
@@ -168,7 +173,7 @@
   /**
    * Assemble a deterministic fallback action plan from a scoring report and question bank.
    *
-   * @param {object} report - Scoring report with astScores, weakestQuestions, percentage, etc.
+   * @param {object} report - Scoring report with astScores, weakestQuestions, type, etc.
    * @param {object} bank   - Parsed questions.json
    * @returns {{ narrative: string, actions: Array }}
    */
@@ -181,13 +186,13 @@
 
     if (weakIds.length === 0) {
       return {
-        narrative: t('fallback.narrative.clear', { percentage: report.percentage || 0 }),
+        narrative: t('fallback.narrative.clear'),
         actions: []
       };
     }
 
     var weakQuestions = report.weakestQuestions || [];
-    var narrative = buildNarrative(weakIds, report.astScores, bank, weakQuestions);
+    var narrative = buildNarrative(weakIds, bank, weakQuestions);
     var actions = buildActions(weakIds, bank, weakQuestions);
 
     return { narrative: narrative, actions: actions };

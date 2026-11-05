@@ -12,7 +12,7 @@ touching `questions*.json`, `i18n/*.js`, `js/fallback.js`,
 | **Narrative** (Action Plan, `js/fallback.js` buildNarrative) | Answer analysis: the participant's own choices quoted **in full**, which area is weak, what it means | To-do lists; best practices (they duplicate the actions); judgment labels |
 | **Actions** (Action Plan rows, `js/fallback.js` buildActions) | Concrete advice only: one mapped best practice per action | Quotes of the participant's answers; backstory ("why you scored this"); boilerplate tails (the per-action "Refer to OWASP…" line is retired) |
 | **Action titles** (i18n `action.AST01`…`action.AST10`) | Curated per-risk imperative labels that **paraphrase** the practice | Verbatim prefixes of the description's first sentence — the title must never repeat the description's opening words |
-| **Deep-Dive Prompt** (`js/prompt-builder.js`) | Teaching material per weakest question: scored choice (`scored X out of Y`), the stronger answer with its feedback reason, best practice, OWASP link | — |
+| **Deep-Dive Prompt** (`js/prompt-builder.js`) | Teaching material per weakest question: the chosen answer (plain, no score figure — ADR 0025), the stronger answer with its feedback reason, best practice, OWASP link | — |
 
 Best practices live in the actions; answer analysis lives in the narrative;
 never blend the two. Risks without a standout miss merge into one closing
@@ -25,12 +25,17 @@ narrative line (`fallback.narrative.others`) so paragraph shapes never repeat.
   Describe the choice and where it lands ("the option that lands exactly
   where attackers aim first" / 「攻击者最希望你就这么选」), never the person.
 - Quote the participant verbatim and in full — the 60-char quote truncation
-  is retired on purpose.
-- One point per paragraph. Percentages stay: they are the only objective
-  anchor in the narrative.
+  is retired on the EN side; keep quotes intact in ZH too.
+- One point per paragraph. **Percentages are retired from user-facing copy
+  (ADR 0025): the narrative's objective anchor is a COUNT of situations**
+  ("in 3 of the 6 situations touching…"), never a score or a grade. The
+  prompt-side objective data is earned/possible counts.
 - EN and ZH copy change together, same tone. zh avoids 「请注意」「建议您」
   register; en avoids corporate filler ("reduce your exposure" survived only
   where it states a fact, not as filler).
+- No type, tier or axis copy may compare participants or rank types
+  (ADR 0025): per-axis risk notes state OWASP severity ratings factually,
+  never as a "more dangerous type" ordering.
 
 ## 3. Factual grounding rules
 

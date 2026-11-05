@@ -644,13 +644,6 @@ exports.run = function() {
       App.renderResults(enBank, report);
 
       // ── helpers over the rendered results/review trees ──
-      function tierOf(bank, pct) {
-        var ladder = bank.meta.scoring.titles;
-        for (var i = 0; i < ladder.length; i++) {
-          if (pct >= ladder[i].threshold) return ladder[i];
-        }
-        return ladder[ladder.length - 1];
-      }
       function qById(bank, id) {
         for (var i = 0; i < bank.questions.length; i++) {
           if (bank.questions[i].id === id) return bank.questions[i];
@@ -667,17 +660,17 @@ exports.run = function() {
         }
         return out;
       }
+      // The grade surface is gone: no .results-title-pct node may exist.
       function titlePct() {
-        var nodes = classedNodes('results-view', 'div', 'results-title-pct');
-        return nodes.length ? nodes[0].textContent : null;
+        return classedNodes('results-view', 'div', 'results-title-pct').length || null;
       }
       function titleCaption() {
         var nodes = classedNodes('results-view', 'div', 'results-title-caption');
         return nodes.length ? nodes[0].textContent : null;
       }
-      function barPcts() {
-        return classedNodes('results-view', 'div', 'results-bar-pct')
-          .map(function(n) { return n.textContent; });
+      function barWidths() {
+        return classedNodes('results-view', 'div', 'results-bar-fill')
+          .map(function(n) { return n.getAttribute('style'); });
       }
       function narrativeText(viewId) {
         var nodes = walk(byIdMap[viewId], 'p');
@@ -699,23 +692,23 @@ exports.run = function() {
         return btns.length ? btns[0] : null;
       }
 
-      var tierEn = tierOf(enBank, report.percentage);
-      var tierZh = tierOf(zhBank, report.percentage);
+      // The type card is the identity now: code + name in the live locale.
+      var typeEnCode = I18n.t('type.' + report.type.id + '.code');
+      var typeEnName = I18n.t('type.' + report.type.id + '.name');
       var pctText = report.percentage + '%';
-      var enPct = titlePct();
       var enCaption = titleCaption();
-      var enBars = barPcts();
+      var enBars = barWidths();
       var wq0 = report.weakestQuestions[0];
       var wq0En = qById(enBank, wq0.id);
       var wq0Zh = qById(zhBank, wq0.id);
 
       check('the results view renders the Completion report in English',
         App.currentView() === 'results-view' &&
-        enPct === pctText &&
-        enCaption === tierEn.emoji + ' ' + tierEn.name &&
+        titlePct() === null &&
+        enCaption === I18n.t('type.' + report.type.id + '.emoji') + ' ' + typeEnCode + ' · ' + typeEnName &&
         enBars.length === report.astRanked.length &&
         viewText('results-view').indexOf(planLoadingEn) >= 0,
-        'pct=' + enPct + ' caption=' + enCaption + ' bars=' + enBars.length);
+        'caption=' + enCaption + ' bars=' + enBars.length);
 
       /* — the tray toggle on the results screen — */
       ctl.langButton.click();   // en → zh, in place
@@ -734,16 +727,17 @@ exports.run = function() {
         ' href=' + location.href + ' entries=' + historyEntries.length +
         ' lang=' + document.documentElement.getAttribute('lang'));
 
-      check('the Overall Percentage and every per-risk value are unchanged',
+      check('the type card and every bar width are unchanged — and no percentage renders',
         App.resultsState().report === report &&
-        titlePct() === pctText &&
-        JSON.stringify(barPcts()) === JSON.stringify(enBars) &&
-        viewText('results-view').indexOf(pctText) >= 0,
-        'pct=' + titlePct() + ' bars=' + barPcts().join(','));
+        titlePct() === null &&
+        viewText('results-view').indexOf(pctText) < 0 &&
+        JSON.stringify(barWidths()) === JSON.stringify(enBars),
+        'bars=' + barWidths().join(','));
 
       check('the report prose re-renders in Chinese',
-        titleCaption() === tierZh.emoji + ' ' + tierZh.name &&
-        viewText('results-view').indexOf(tierEn.name) < 0 &&
+        titleCaption() === I18n.t('type.' + report.type.id + '.emoji') + ' ' + I18n.t('type.' + report.type.id + '.code') + ' · ' +
+          I18n.t('type.' + report.type.id + '.name') &&
+        viewText('results-view').indexOf(typeEnName) < 0 &&
         viewText('results-view').indexOf(I18n.astName('AST01')) >= 0 &&
         viewText('results-view').indexOf(I18n.t('results.barsTitle')) >= 0,
         'caption=' + titleCaption());
@@ -763,9 +757,7 @@ exports.run = function() {
         planCalls[0].locale === 'en' &&
         planCalls[1].locale === 'zh' &&
         planCalls[1].report !== report &&
-        planCalls[1].report.percentage === report.percentage &&
-        planCalls[1].report.title.name === tierZh.name &&
-        planCalls[0].report.title.name === tierEn.name &&
+        planCalls[1].report.type.id === report.type.id &&
         planCalls[1].report.weakestQuestions[0].scenario === wq0Zh.scenario &&
         planCalls[1].report.weakestQuestions[0].selectedOption ===
           wq0Zh.options[wq0En.options.indexOf(wq0.selectedOption)],
@@ -809,11 +801,11 @@ exports.run = function() {
         historyEntries[historyEntries.length - 1].state.ls === 'en' &&
         document.documentElement.getAttribute('lang') === 'en' &&
         fakeDoc.title === 'Agent Security Awareness Quiz' &&
-        titlePct() === pctText &&
-        JSON.stringify(barPcts()) === JSON.stringify(enBars) &&
-        titleCaption() === tierEn.emoji + ' ' + tierEn.name &&
+        titlePct() === null &&
+        JSON.stringify(barWidths()) === JSON.stringify(enBars) &&
+        titleCaption() === I18n.t('type.' + report.type.id + '.emoji') + ' ' + typeEnCode + ' · ' + typeEnName &&
         viewText('results-view').indexOf('EN NARRATIVE MARKER') >= 0,
-        'locale=' + I18n.locale + ' pct=' + titlePct() + ' caption=' + titleCaption());
+        'locale=' + I18n.locale + ' caption=' + titleCaption());
 
       check('the English Narrative came from its slot: no third generation',
         planCalls.length === 2, String(planCalls.length));
@@ -824,8 +816,8 @@ exports.run = function() {
       check('a repeated switch re-renders from the slots, values identical',
         I18n.locale === 'zh' &&
         App.currentView() === 'results-view' &&
-        titlePct() === pctText &&
-        JSON.stringify(barPcts()) === JSON.stringify(enBars) &&
+        titlePct() === null &&
+        JSON.stringify(barWidths()) === JSON.stringify(enBars) &&
         viewText('results-view').indexOf('ZH NARRATIVE MARKER') >= 0 &&
         planCalls.length === 2 &&
         historyEntries.length === entriesBeforeResults + 3,
@@ -842,7 +834,7 @@ exports.run = function() {
         document.documentElement.getAttribute('lang') === 'en' &&
         App.currentView() === 'results-view' &&
         historyEntries.length === entriesBeforeResults + 3 &&
-        titlePct() === pctText &&
+        titlePct() === null &&
         viewText('results-view').indexOf('EN NARRATIVE MARKER') >= 0,
         'locale=' + I18n.locale + ' entries=' + historyEntries.length);
 
@@ -856,7 +848,7 @@ exports.run = function() {
         document.documentElement.getAttribute('lang') === 'zh-Hans' &&
         App.currentView() === 'results-view' &&
         historyEntries.length === entriesBeforeResults + 3 &&
-        titlePct() === pctText &&
+        titlePct() === null &&
         viewText('results-view').indexOf('ZH NARRATIVE MARKER') >= 0,
         'locale=' + I18n.locale);
 
@@ -917,8 +909,8 @@ exports.run = function() {
       await settle();
       check('the back control returns to the results view with the report intact',
         App.currentView() === 'results-view' &&
-        titlePct() === pctText &&
-        JSON.stringify(barPcts()) === JSON.stringify(enBars) &&
+        titlePct() === null &&
+        JSON.stringify(barWidths()) === JSON.stringify(enBars) &&
         viewText('results-view').indexOf('ZH NARRATIVE MARKER') >= 0);
 
       check('the whole results and review swap run refetched nothing',
@@ -934,7 +926,7 @@ exports.run = function() {
       check('back on the English results view, Narrative still from the slot',
         I18n.locale === 'en' &&
         App.currentView() === 'results-view' &&
-        titlePct() === pctText &&
+        titlePct() === null &&
         viewText('results-view').indexOf('EN NARRATIVE MARKER') >= 0 &&
         planCalls.length === 2,
         'planCalls=' + planCalls.length);
@@ -965,13 +957,13 @@ exports.run = function() {
 
       var pct2 = report2.percentage + '%';
       var enPct2 = titlePct();
-      var enBars2 = barPcts();
+      var enBars2 = barWidths();
       var enNarrative2 = narrativeText('results-view');
 
       check('the Deterministic Fallback assembles the English Narrative once',
         assembleCalls === 1 &&
         enNarrative2.length > 0 &&
-        enPct2 === pct2 &&
+        enPct2 === null &&
         viewText('results-view').indexOf(planLoadingEn) < 0,
         'calls=' + assembleCalls + ' narrative=' + enNarrative2.slice(0, 80));
 
@@ -981,8 +973,8 @@ exports.run = function() {
       check('the swap re-renders the Action Plan in Chinese with identical numbers',
         App.currentView() === 'results-view' &&
         I18n.locale === 'zh' &&
-        titlePct() === pct2 &&
-        JSON.stringify(barPcts()) === JSON.stringify(enBars2) &&
+        titlePct() === null &&
+        JSON.stringify(barWidths()) === JSON.stringify(enBars2) &&
         zhNarrative2.length > 0 &&
         zhNarrative2 !== enNarrative2 &&
         assembleCalls === 2,
@@ -992,8 +984,8 @@ exports.run = function() {
       await settle();
       check('switching back restores the English Narrative without re-assembling',
         I18n.locale === 'en' &&
-        titlePct() === pct2 &&
-        JSON.stringify(barPcts()) === JSON.stringify(enBars2) &&
+        titlePct() === null &&
+        JSON.stringify(barWidths()) === JSON.stringify(enBars2) &&
         narrativeText('results-view') === enNarrative2 &&
         assembleCalls === 2,
         'calls=' + assembleCalls);

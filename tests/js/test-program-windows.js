@@ -465,9 +465,11 @@ exports.run = function() {
       check('Back returns to the results stage',
         views['results-view'].hidden === false && views['review-view'].hidden === true);
       commands[1].click();
-      check('Share hands the Web Share dialog this Completion\'s score',
+      check('Share hands the Web Share dialog this Completion\'s attention type — no score',
         shareCalls.length === 1 &&
-        String(shareCalls[0].text).indexOf(scored.report.percentage + '%') >= 0,
+        String(shareCalls[0].text).indexOf(scored.report.percentage + '%') < 0 &&
+        String(shareCalls[0].text).indexOf(
+          App.I18n.t('type.' + scored.report.type.id + '.code')) >= 0,
         JSON.stringify(shareCalls));
 
       // ── Switching programs from the taskbar ───────────────────────────

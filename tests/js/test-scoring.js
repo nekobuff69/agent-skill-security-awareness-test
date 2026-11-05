@@ -21,9 +21,14 @@ exports.run = function() {
   var r0 = Scoring.computeScores(bank, allZeroCase.answers);
   check('all-zero: ok is true', r0.ok, r0.error);
   check('all-zero: totalPossible is 108', r0.ok && r0.report.totalPossible === 108);
-  check('all-zero: title matches bank expected_title',
-    r0.ok && r0.report.title.name === allZeroCase.expected_title,
-    'got ' + (r0.ok ? r0.report.title.name : r0.error));
+  check('all-zero: report carries NO tier title (no grade surface)',
+    r0.ok && r0.report.title === undefined);
+  // The all-zero picks are not a flat tie: UPKEEP lands lowest (0%),
+  // INTAKE highest (6.3%) → type T5. Assert the shape-derived pair.
+  check('all-zero: type is T5 with axes UPKEEP→INTAKE, matching its own profile',
+    r0.ok && r0.report.type.id === 'T5' &&
+    r0.report.type.weakAxis === 'UPKEEP' && r0.report.type.strongAxis === 'INTAKE',
+    'got ' + (r0.ok ? JSON.stringify(r0.report.type) : r0.error));
   check('all-zero: percentage matches bank expected_percentage',
     r0.ok && Math.abs(r0.report.percentage - allZeroCase.expected_percentage) < 0.05,
     'got ' + (r0.ok ? r0.report.percentage : r0.error) + ', expected ' + allZeroCase.expected_percentage);
@@ -39,27 +44,43 @@ exports.run = function() {
   check('all-best: percentage is 100',
     r1.ok && r1.report.percentage === 100,
     'got ' + (r1.ok ? r1.report.percentage : r1.error));
-  check('all-best: title is Sentinel',
-    r1.ok && r1.report.title.name === 'Sentinel',
-    'got ' + (r1.ok ? r1.report.title.name : r1.error));
+  check('all-best: type is T2 — a perfect profile ties the same flat way',
+    r1.ok && r1.report.type.id === 'T2' &&
+    r1.report.type.weakAxis === 'INTAKE' && r1.report.type.strongAxis === 'UPKEEP',
+    'got ' + (r1.ok ? JSON.stringify(r1.report.type) : r1.error));
 
   // ── 3. common-user fixture ──
   var commonUser = bank.test_fixtures.scoring_cases.find(function(c) { return c.id === 'common-user'; });
   var r2 = Scoring.computeScores(bank, commonUser.answers);
-  var commonTitles = ['Uncharted', 'Newcomer'];
+  var TYPE_IDS = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6'];
+  var AXIS_IDS = ['INTAKE', 'EXPOSURE', 'UPKEEP'];
   check('common-user: ok is true', r2.ok, r2.error);
-  check('common-user: title in [Uncharted, Newcomer]',
-    r2.ok && commonTitles.indexOf(r2.report.title.name) !== -1,
-    'got ' + (r2.ok ? r2.report.title.name : r2.error));
+  check('common-user: type is one of the six, with distinct defining axes',
+    r2.ok && TYPE_IDS.indexOf(r2.report.type.id) !== -1 &&
+    r2.report.type.weakAxis !== r2.report.type.strongAxis &&
+    AXIS_IDS.indexOf(r2.report.type.weakAxis) !== -1 &&
+    AXIS_IDS.indexOf(r2.report.type.strongAxis) !== -1,
+    'got ' + (r2.ok ? JSON.stringify(r2.report.type) : r2.error));
+  check('common-user: the weak axis really has the lowest axis percentage',
+    r2.ok && r2.report.axisRanked.length === 3 &&
+    r2.report.axisScores[r2.report.type.weakAxis].percentage <=
+      Math.min(
+        r2.report.axisScores[AXIS_IDS[0]].percentage,
+        r2.report.axisScores[AXIS_IDS[1]].percentage,
+        r2.report.axisScores[AXIS_IDS[2]].percentage),
+    JSON.stringify(r2.ok ? r2.report.axisScores : r2.error));
 
   // ── 4. security-aware fixture ──
   var secAware = bank.test_fixtures.scoring_cases.find(function(c) { return c.id === 'security-aware'; });
   var r3 = Scoring.computeScores(bank, secAware.answers);
-  var awareTitles = ['Aware', 'Practitioner'];
   check('security-aware: ok is true', r3.ok, r3.error);
-  check('security-aware: title in [Aware, Practitioner]',
-    r3.ok && awareTitles.indexOf(r3.report.title.name) !== -1,
-    'got ' + (r3.ok ? r3.report.title.name : r3.error));
+  check('security-aware: the strong axis really has the highest axis percentage',
+    r3.ok && r3.report.axisScores[r3.report.type.strongAxis].percentage >=
+      Math.max(
+        r3.report.axisScores[AXIS_IDS[0]].percentage,
+        r3.report.axisScores[AXIS_IDS[1]].percentage,
+        r3.report.axisScores[AXIS_IDS[2]].percentage),
+    JSON.stringify(r3.ok ? r3.report.axisScores : r3.error));
 
   // ── 5. totalPossible === 108 invariant ──
   check('totalPossible is 108 for all-zero',

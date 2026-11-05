@@ -6,6 +6,12 @@
   /**
    * Compute scores for a quiz session.
    *
+   * The report carries no tier or grade for presentation: `percentage`
+   * and the score numbers are internal anchors (blind-spot thresholds,
+   * the tutor prompts), while the user-facing identity of a result is
+   * `type` — one of six attention types derived from the SHAPE of the
+   * three-axis profile, never its level.
+   *
    * @param {object} bank      - Parsed questions.json (questions[], phases[], meta.scoring)
    * @param {Array}  selections - Array of 20 option indices (0-3), one per question in bank.questions order.
    *                               null → resolve to highest-score option (ties → lowest index)
@@ -25,7 +31,6 @@
 
     var questions = bank.questions;
     var severityValues = bank.meta.scoring.severity_values;
-    var titles = bank.meta.scoring.titles;
 
     for (var i = 0; i < selections.length; i++) {
       var sel = selections[i];
@@ -104,17 +109,9 @@
       );
     }
 
-    // --- Percentage ---
+    // --- Percentage (internal anchor: drives blind-spot thresholds and
+    //     the axis profile; never rendered as a headline grade) ---
     var percentage = Math.round((totalEarned / totalPossible) * 1000) / 10;
-
-    // --- Title lookup ---
-    var title = titles[0]; // default to first (Sentinel)
-    for (var t = 0; t < titles.length; t++) {
-      if (percentage >= titles[t].threshold) {
-        title = titles[t];
-        break;
-      }
-    }
 
     // --- AST Scores ---
     var astAggregates = {};
@@ -199,14 +196,77 @@
       if (astRanked[k3].percentage < 70) blindSpotIds.push(astRanked[k3].id);
     }
 
+    // --- Attention Axes ---
+    // The ten AST Scores aggregate into three behavioral axes (registry:
+    // js/ast.js). A question mapped to risks from two axes feeds both —
+    // the same earned/possible pair, exactly like the AST aggregation
+    // above. Axis display names are Chrome Strings ('axis.*').
+    var ASTReg = (typeof globalThis.App === 'object' && globalThis.App && globalThis.App.AST) || {};
+    var axisOrder = (ASTReg.axisOrder) || ['INTAKE', 'EXPOSURE', 'UPKEEP'];
+    var axisOf = ASTReg.axisOf || {};
+    var axisAggregates = {};
+    for (var ax = 0; ax < axisOrder.length; ax++) {
+      axisAggregates[axisOrder[ax]] = { earned: 0, possible: 0 };
+    }
+    for (var i2 = 0; i2 < questionResults.length; i2++) {
+      var qr2 = questionResults[i2];
+      var seenAxis = {};
+      for (var r2 = 0; r2 < qr2.astRisks.length; r2++) {
+        var axis = axisOf[qr2.astRisks[r2]];
+        if (!axis || seenAxis[axis]) continue;
+        seenAxis[axis] = true;
+        axisAggregates[axis].earned += qr2.weightedScore;
+        axisAggregates[axis].possible += qr2.maxPossible;
+      }
+    }
+    var axisScores = {};
+    var axisRanked = [];
+    for (var ax2 = 0; ax2 < axisOrder.length; ax2++) {
+      var axisId = axisOrder[ax2];
+      var axisAgg = axisAggregates[axisId];
+      var axisPct = axisAgg.possible > 0
+        ? Math.round((axisAgg.earned / axisAgg.possible) * 1000) / 10
+        : 0;
+      axisScores[axisId] = {
+        earned: axisAgg.earned,
+        possible: axisAgg.possible,
+        percentage: axisPct
+      };
+      axisRanked.push({ id: axisId, earned: axisAgg.earned, possible: axisAgg.possible, percentage: axisPct });
+    }
+
+    // --- Type ---
+    // The type reads the SHAPE of the axis profile, never its level:
+    // the weakest axis is where attention rarely goes, the strongest is
+    // where it lives. Ties break by canonical axis order (first wins for
+    // weakest, first among the remaining wins for strongest) — fully
+    // deterministic. Six (weak, strong) pairings exist with three axes;
+    // the pair can never collapse because weak != strong.
+    var rankedByPct = axisRanked.slice().sort(function(a, b) {
+      return (a.percentage - b.percentage) ||
+        (axisOrder.indexOf(a.id) - axisOrder.indexOf(b.id));
+    });
+    var weakAxis = rankedByPct[0].id;
+    var strongAxis = rankedByPct[rankedByPct.length - 1].id;
+    if (strongAxis === weakAxis) {
+      // Degenerate only if fewer than two axes carry weight — fall back
+      // to canonical neighbour order rather than emitting an invalid pair.
+      for (var ax3 = 0; ax3 < axisOrder.length; ax3++) {
+        if (axisOrder[ax3] !== weakAxis) { strongAxis = axisOrder[ax3]; break; }
+      }
+    }
+    var typeId = classifyType(weakAxis, strongAxis);
+
     // --- Build report ---
     var report = {
-      percentage: percentage,
-      title: {
-        name: title.name,
-        emoji: title.emoji,
-        threshold: title.threshold
+      percentage: percentage,           // internal anchor, never rendered
+      type: {
+        id: typeId,
+        weakAxis: weakAxis,
+        strongAxis: strongAxis
       },
+      axisScores: axisScores,
+      axisRanked: axisRanked,
       astScores: astScores,
       astRanked: astRanked,
       blindSpotIds: blindSpotIds,
@@ -216,6 +276,29 @@
     };
 
     return { ok: true, report: report };
+  }
+
+  /**
+   * The six attention types — one per (weakest axis, strongest axis)
+   * pairing of the three Attention Axes. Type ids are stable structure;
+   * the MBTI-style letter code, type names, emojis and mottos are Chrome
+   * Strings ('type.T1.code'…) owned by the dictionaries. No type ranks
+   * above another: each describes where the participant's attention
+   * lives and where it rarely goes.
+   */
+  var TYPE_IDS = {
+    'INTAKE>EXPOSURE': 'T1',     // attention on exposure, rarely on intake
+    'INTAKE>UPKEEP': 'T2',
+    'EXPOSURE>INTAKE': 'T3',
+    'EXPOSURE>UPKEEP': 'T4',
+    'UPKEEP>INTAKE': 'T5',
+    'UPKEEP>EXPOSURE': 'T6'
+  };
+
+  function classifyType(weakAxis, strongAxis) {
+    var id = TYPE_IDS[weakAxis + '>' + strongAxis];
+    if (!id) throw new Error('classifyType: unknown axis pair ' + weakAxis + '>' + strongAxis);
+    return id;
   }
 
   // --- Exports ---
