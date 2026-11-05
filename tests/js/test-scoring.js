@@ -23,12 +23,17 @@ exports.run = function() {
   check('all-zero: totalPossible is 108', r0.ok && r0.report.totalPossible === 108);
   check('all-zero: report carries NO tier title (no grade surface)',
     r0.ok && r0.report.title === undefined);
-  // The all-zero picks are not a flat tie: UPKEEP lands lowest (0%),
-  // INTAKE highest (6.3%) → type T5. Assert the shape-derived pair.
-  check('all-zero: type is T5 with axes UPKEEP→INTAKE, matching its own profile',
-    r0.ok && r0.report.type.id === 'T5' &&
-    r0.report.type.weakAxis === 'UPKEEP' && r0.report.type.strongAxis === 'INTAKE',
-    'got ' + (r0.ok ? JSON.stringify(r0.report.type) : r0.error));
+  // The all-zero picks are not a flat profile: UPKEEP... rather, the
+  // trait dimensions land at VETTING 6.3% / PRIVILEGE 6.1% / HYGIENE
+  // 9.1% / CURRENT 0% / MAPPED 0% — every dimension below 50%, so all
+  // five poles are the drifting ('lo') picks.
+  check('all-zero: every dimension picks the drifting pole',
+    r0.ok && r0.report.profile.length === 5 &&
+    r0.report.profile.every(function(p) { return p.pole === 'lo'; }),
+    'got ' + (r0.ok ? JSON.stringify(r0.report.profile) : r0.error));
+  check('all-zero: profile order follows the registry (VETTING first)',
+    r0.ok && r0.report.profile[0].trait === 'VETTING' &&
+    r0.report.profile[r0.report.profile.length - 1].trait === 'MAPPED');
   check('all-zero: percentage matches bank expected_percentage',
     r0.ok && Math.abs(r0.report.percentage - allZeroCase.expected_percentage) < 0.05,
     'got ' + (r0.ok ? r0.report.percentage : r0.error) + ', expected ' + allZeroCase.expected_percentage);
@@ -44,43 +49,42 @@ exports.run = function() {
   check('all-best: percentage is 100',
     r1.ok && r1.report.percentage === 100,
     'got ' + (r1.ok ? r1.report.percentage : r1.error));
-  check('all-best: type is T2 — a perfect profile ties the same flat way',
-    r1.ok && r1.report.type.id === 'T2' &&
-    r1.report.type.weakAxis === 'INTAKE' && r1.report.type.strongAxis === 'UPKEEP',
-    'got ' + (r1.ok ? JSON.stringify(r1.report.type) : r1.error));
+  check('all-best: every dimension picks the attentive pole (all at 100%)',
+    r1.ok && r1.report.profile.length === 5 &&
+    r1.report.profile.every(function(p) { return p.pole === 'hi' && p.percentage === 100; }),
+    'got ' + (r1.ok ? JSON.stringify(r1.report.profile) : r1.error));
 
   // ── 3. common-user fixture ──
   var commonUser = bank.test_fixtures.scoring_cases.find(function(c) { return c.id === 'common-user'; });
   var r2 = Scoring.computeScores(bank, commonUser.answers);
-  var TYPE_IDS = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6'];
-  var AXIS_IDS = ['INTAKE', 'EXPOSURE', 'UPKEEP'];
+  var POLES = ['hi', 'lo'];
+  var TRAIT_IDS = ['VETTING', 'PRIVILEGE', 'HYGIENE', 'CURRENT', 'MAPPED'];
   check('common-user: ok is true', r2.ok, r2.error);
-  check('common-user: type is one of the six, with distinct defining axes',
-    r2.ok && TYPE_IDS.indexOf(r2.report.type.id) !== -1 &&
-    r2.report.type.weakAxis !== r2.report.type.strongAxis &&
-    AXIS_IDS.indexOf(r2.report.type.weakAxis) !== -1 &&
-    AXIS_IDS.indexOf(r2.report.type.strongAxis) !== -1,
-    'got ' + (r2.ok ? JSON.stringify(r2.report.type) : r2.error));
-  check('common-user: the weak axis really has the lowest axis percentage',
-    r2.ok && r2.report.axisRanked.length === 3 &&
-    r2.report.axisScores[r2.report.type.weakAxis].percentage <=
-      Math.min(
-        r2.report.axisScores[AXIS_IDS[0]].percentage,
-        r2.report.axisScores[AXIS_IDS[1]].percentage,
-        r2.report.axisScores[AXIS_IDS[2]].percentage),
-    JSON.stringify(r2.ok ? r2.report.axisScores : r2.error));
+  check('common-user: profile has five picks, one per registry dimension',
+    r2.ok && r2.report.profile.length === 5 &&
+    JSON.stringify(r2.report.profile.map(function(p) { return p.trait; })) ===
+      JSON.stringify(TRAIT_IDS),
+    'got ' + (r2.ok ? JSON.stringify(r2.report.profile.map(function(p) { return p.trait; })) : r2.error));
+  check('common-user: every pick matches its dimension percentage against the 50% pole line',
+    r2.ok && r2.report.profile.every(function(p) {
+      var pct = r2.report.traitScores[p.trait].percentage;
+      return p.pole === (pct >= 50 ? 'hi' : 'lo') &&
+        POLES.indexOf(p.pole) !== -1 && pct === p.percentage;
+    }),
+    JSON.stringify(r2.ok ? r2.report.profile : r2.error));
 
   // ── 4. security-aware fixture ──
   var secAware = bank.test_fixtures.scoring_cases.find(function(c) { return c.id === 'security-aware'; });
   var r3 = Scoring.computeScores(bank, secAware.answers);
   check('security-aware: ok is true', r3.ok, r3.error);
-  check('security-aware: the strong axis really has the highest axis percentage',
-    r3.ok && r3.report.axisScores[r3.report.type.strongAxis].percentage >=
-      Math.max(
-        r3.report.axisScores[AXIS_IDS[0]].percentage,
-        r3.report.axisScores[AXIS_IDS[1]].percentage,
-        r3.report.axisScores[AXIS_IDS[2]].percentage),
-    JSON.stringify(r3.ok ? r3.report.axisScores : r3.error));
+  check('security-aware: traitScores aggregates agree with traitRanked',
+    r3.ok && r3.report.traitRanked.length === 5 &&
+    r3.report.traitRanked.every(function(tr) {
+      var agg = r3.report.traitScores[tr.id];
+      return agg && agg.earned === tr.earned && agg.possible === tr.possible &&
+        agg.percentage === tr.percentage;
+    }),
+    JSON.stringify(r3.ok ? r3.report.traitScores : r3.error));
 
   // ── 5. totalPossible === 108 invariant ──
   check('totalPossible is 108 for all-zero',

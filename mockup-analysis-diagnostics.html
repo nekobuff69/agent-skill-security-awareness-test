@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MOCKUP — Analysis page redesign (Diagnostics + Defrag direction)</title>
+<style>
+  @font-face {
+    font-family: 'W95FA';
+    src: url('fonts/w95fa.woff2') format('woff2');
+  }
+  :root {
+    --bevel-raised: inset -1px -1px #000000, inset 1px 1px #FFFFFF,
+                    inset -2px -2px #808080, inset 2px 2px #DFDFDF;
+    --bevel-sunken: inset -1px -1px #FFFFFF, inset 1px 1px #000000,
+                    inset -2px -2px #DFDFDF, inset 2px 2px #808080;
+    --bevel-field: inset 1px 1px #808080, inset -1px -1px #FFFFFF;
+    --score-green: #008000;
+    --score-amber: #808000;
+    --score-red: #800000;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #008080;
+    font-family: Tahoma, 'Segoe UI', sans-serif;
+    color: #000000;
+    padding: 32px 16px 64px;
+  }
+
+  /* ── Review tooling (NOT part of the design) ── */
+  .review-tools {
+    position: fixed; left: 12px; top: 12px; z-index: 9000;
+    background: #C0C0C0; box-shadow: var(--bevel-raised);
+    padding: 10px 12px; width: 210px; font-size: 12px;
+  }
+  .review-tools h2 { margin: 0 0 6px; font-size: 12px; font-family: 'W95FA', monospace; font-weight: 400; }
+  .review-tools .tag {
+    display: inline-block; background: #000080; color: #fff;
+    padding: 1px 6px; font-size: 10px; letter-spacing: .08em; margin-bottom: 8px;
+  }
+  .review-tools button {
+    display: block; width: 100%; margin: 4px 0; padding: 4px 6px;
+    background: #C0C0C0; border: 0; box-shadow: var(--bevel-raised);
+    font-size: 12px; cursor: pointer; text-align: left;
+  }
+  .review-tools button:active { box-shadow: var(--bevel-sunken); }
+  .review-tools button.on { box-shadow: var(--bevel-sunken); background: #DFDFDF; }
+  .review-tools p { margin: 8px 0 0; line-height: 1.4; color: #404040; }
+
+  /* ── Window chrome ── */
+  .os-window {
+    max-width: 720px; margin: 24px auto 0;
+    background: #C0C0C0; box-shadow: var(--bevel-raised); padding: 3px;
+  }
+  .os-titlebar {
+    display: flex; align-items: center; min-height: 30px;
+    background: linear-gradient(90deg, #000080, #1084D0);
+    color: #FFFFFF; padding: 0 4px 0 8px;
+    font-family: 'W95FA', monospace; font-size: 14px;
+  }
+  .os-titlebar .spacer { flex: 1; }
+  .os-tbtn {
+    width: 16px; height: 14px; margin-left: 2px;
+    background: #C0C0C0; box-shadow: var(--bevel-raised);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10px; color: #000;
+  }
+  .os-body { background: #C0C0C0; padding: 8px; }
+
+  /* ── Menu bar ── */
+  .menu-bar {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    padding: 8px 12px; margin-bottom: 8px;
+    background: #C0C0C0; box-shadow: var(--bevel-raised);
+  }
+  .menu-bar button {
+    border: 0; background: #C0C0C0; box-shadow: var(--bevel-raised);
+    padding: 6px 14px; font-size: 13px; cursor: pointer;
+  }
+  .menu-bar button:active { box-shadow: var(--bevel-sunken); }
+
+  /* ── Header: clearance + overall (production layout, score colours) ── */
+  .title-card {
+    background: #FFFFFF; box-shadow: var(--bevel-sunken);
+    padding: 12px 16px; margin-bottom: 8px;
+    display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  }
+  .clearance-caption {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #404040;
+    margin-bottom: 2px;
+  }
+  .title-name { font-family: 'W95FA', monospace; font-size: 24px; color: #000; }
+  .overall-col { text-align: right; }
+  .overall-caption {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #404040;
+    margin-bottom: 2px;
+  }
+  .overall-pct { font-family: 'W95FA', monospace; font-size: 40px; line-height: 1; }
+  .overall-pct.green { color: var(--score-green); }
+  .overall-pct.amber { color: var(--score-amber); }
+  .overall-pct.red   { color: var(--score-red); }
+
+  /* ── Diagnostics framing ── */
+  .section-title { font-family: 'W95FA', monospace; font-size: 18px; margin: 12px 0 4px; font-weight: 400; }
+  .diag-status {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px; color: #404040; margin: 0 0 6px; min-height: 1.4em;
+    white-space: pre-wrap;
+  }
+  .diag-status .caret {
+    display: inline-block; width: 7px; height: 12px; background: #404040;
+    vertical-align: -2px; margin-left: 1px;
+  }
+  .radar-wrap {
+    background: #FFFFFF; box-shadow: var(--bevel-sunken);
+    max-width: 240px; margin: 0 auto 8px; padding: 6px; display: flex; justify-content: center;
+  }
+  .radar-wrap svg { width: 100%; height: auto; }
+
+  /* ── Fragment report (defrag.exe block grid) ── */
+  .frag-rows { display: flex; flex-direction: column; gap: 6px; }
+  .frag-row { display: grid; grid-template-columns: minmax(120px, 1fr) 3fr auto; align-items: center; gap: 8px; }
+  .frag-label { font-size: 12px; color: #404040; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .frag-track {
+    box-shadow: var(--bevel-field);
+    background: #FFFFFF;
+    padding: 2px;
+    display: grid;
+    grid-template-columns: repeat(25, 1fr);
+    gap: 1px;
+  }
+  .frag-block {
+    aspect-ratio: 1 / 1;
+    min-width: 3px;
+    background: repeating-conic-gradient(#DFDFDF 0% 25%, #FFFFFF 0% 50%) 0 0 / 2px 2px;
+    visibility: hidden;   /* revealed in stepped sequence by JS */
+  }
+  .frag-block.fill-g { background: var(--score-green); }
+  .frag-block.fill-a { background: var(--score-amber); }
+  .frag-block.fill-r { background: var(--score-red); }
+  .frag-pct { font-size: 12px; color: #404040; min-width: 3em; text-align: right; }
+
+  /* defrag.exe-style legend */
+  .frag-legend {
+    margin-top: 8px; padding: 6px 10px;
+    background: #C0C0C0; box-shadow: var(--bevel-raised);
+    display: flex; flex-wrap: wrap; gap: 6px 18px;
+    font-size: 11px; color: #404040;
+  }
+  .frag-legend .swatch {
+    display: inline-block; width: 9px; height: 9px; margin-right: 5px;
+    vertical-align: -1px; background: #FFFFFF; box-shadow: var(--bevel-field);
+  }
+  .frag-legend .sw.g { background: var(--score-green); }
+  .frag-legend .sw.a { background: var(--score-amber); }
+  .frag-legend .sw.r { background: var(--score-red); }
+  .frag-legend .sw.free { background: repeating-conic-gradient(#DFDFDF 0% 25%, #FFFFFF 0% 50%) 0 0 / 2px 2px; }
+
+  /* ── Window status bar (era flavour strip) ── */
+  .status-bar {
+    margin-top: 8px; padding: 4px 8px;
+    background: #C0C0C0; box-shadow: var(--bevel-field);
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px; color: #404040;
+    display: flex; justify-content: space-between; gap: 8px;
+  }
+
+  .note { font-size: 11px; color: #004040; text-align: center; margin-top: 20px; }
+
+  /* ── Easter egg: "safe to turn off" screen ── */
+  .egg-shutdown {
+    position: fixed; inset: 0; z-index: 9600;
+    background: #000000; display: none;
+    align-items: center; justify-content: center; text-align: center;
+    cursor: pointer; padding: 24px;
+  }
+  .egg-shutdown.open { display: flex; }
+  .egg-shutdown p {
+    color: #FFA500;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 18px; line-height: 1.8; margin: 0; max-width: 34em;
+  }
+  .egg-shutdown .dismiss { font-size: 12px; color: #808080; margin-top: 24px; }
+
+  @media (max-width: 480px) {
+    .frag-row { grid-template-columns: 1fr; gap: 2px; }
+    .frag-label, .frag-pct { white-space: normal; }
+    .review-tools { width: 170px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="review-tools">
+  <span class="tag">MOCKUP — REVIEW ONLY</span>
+  <h2>Score band</h2>
+  <button data-band="5">Perfect (100%) + egg</button>
+  <button data-band="0">Sentinel (96%)</button>
+  <button data-band="1">Practitioner (78%)</button>
+  <button data-band="2" class="on">Aware (62%)</button>
+  <button data-band="3">Newcomer (41%)</button>
+  <button data-band="4">Uncharted (18%)</button>
+  <h2 style="margin-top:10px">Controls</h2>
+  <button id="replay-btn">Replay scan + fill animation</button>
+  <button id="egg-btn">Preview "safe to turn off" egg</button>
+  <p>Diagnostics status line types in steps; defrag blocks fill in a stepped sequence. Both render instantly under prefers-reduced-motion.</p>
+</div>
+
+<div class="os-window">
+  <div class="os-titlebar">
+    <span>Agent Security Awareness Quiz</span>
+    <span class="spacer"></span>
+    <span class="os-tbtn">—</span><span class="os-tbtn">□</span><span class="os-tbtn">×</span>
+  </div>
+  <div class="os-body">
+
+    <div class="menu-bar">
+      <button>Download PNG</button><button>Share Results</button>
+      <button>Review your answers →</button><button>Retake Assessment</button>
+    </div>
+
+    <div class="title-card">
+      <div>
+        <div class="clearance-caption">Clearance Level</div>
+        <div class="title-name" id="title-name">🔍 Aware</div>
+      </div>
+      <div class="overall-col">
+        <div class="overall-caption">Overall</div>
+        <div class="overall-pct amber" id="overall-pct">62%</div>
+      </div>
+    </div>
+
+    <h2 class="section-title">System Monitor</h2>
+    <div class="radar-wrap" id="radar"></div>
+
+    <h2 class="section-title">Fragment Report</h2>
+    <p class="diag-status" id="diag-status"></p>
+    <div class="frag-rows" id="frag-rows"></div>
+    <div class="frag-legend">
+      <span><span class="swatch sw g"></span>Solid — 70% and above</span>
+      <span><span class="swatch sw a"></span>Fragmented — below 70%</span>
+      <span><span class="swatch sw r"></span>Bad sectors — below 50%</span>
+      <span><span class="swatch free"></span>Uncompromised capacity</span>
+    </div>
+
+    <div class="status-bar">
+      <span id="status-left">AST Diagnostics v1.0 — 10 modules inspected</span>
+      <span id="status-right"></span>
+    </div>
+
+  </div>
+</div>
+
+<p class="note">Mockup of the Analysis view redesign — Diagnostics framing + defrag.exe Fragment Report + 100% "safe to turn off" easter egg. Not wired to real data; fixtures only. Block counts approximate percentages (25 blocks per row, ~4% per block).</p>
+
+<div class="egg-shutdown" id="egg" role="dialog" aria-modal="true" aria-label="Easter egg screen">
+  <div>
+    <p>It is now safe to turn off<br>your computer.</p>
+    <p class="dismiss">(Not really — keep it on. Click anywhere to return to your report.)</p>
+  </div>
+</div>
+
+<script>
+var REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ── bands (fixture data) ── */
+var AXES = [
+  'Malicious Skills', 'Supply Chain Compromise', 'Over-Privileged Skills',
+  'Insecure Metadata', 'Untrusted External Instructions', 'Weak Isolation',
+  'Update Drift', 'Poor Scanning', 'No Governance', 'Cross-Platform Reuse'
+];
+var BASE = [33, 50, 62, 70, 74, 81, 88, 92, 96, 100]; // Aware (62%) fixture
+var BANDS = [
+  { name: '🛡️ Sentinel',     pct: 96,  mood: 'green' },
+  { name: '🛠️ Practitioner', pct: 78,  mood: 'green' },
+  { name: '🔍 Aware',         pct: 62,  mood: 'amber' },
+  { name: '🌱 Newcomer',      pct: 41,  mood: 'red'   },
+  { name: '🧭 Uncharted',     pct: 18,  mood: 'red'   },
+  { name: '🏆 Perfect',       pct: 100, mood: 'green' }
+];
+
+function clamp(v) { return Math.max(0, Math.min(100, v)); }
+function axisPcts(pct) {
+  return BASE.map(function(b) { return clamp(Math.round(b * pct / 62)); });
+}
+function bandOf(p) {
+  if (p < 50) return 'r';
+  if (p < 70) return 'a';
+  return 'g';
+}
+
+/* ── radar (reused fixture renderer) ── */
+function renderRadar(pcts) {
+  var cx = 200, cy = 200, maxR = 140;
+  var svg = '<svg viewBox="0 0 400 400">';
+  svg += '<defs><pattern id="dith" width="2" height="2" patternUnits="userSpaceOnUse">' +
+         '<rect width="2" height="2" fill="#fff"/><rect width="1" height="1" fill="#808000"/><rect x="1" y="1" width="1" height="1" fill="#808000"/></pattern></defs>';
+  svg += '<circle cx="200" cy="200" r="140" fill="#fff" stroke="#e0e0e0"/>';
+  for (var lv = 1; lv <= 4; lv++) svg += '<circle cx="200" cy="200" r="' + (35 * lv) + '" fill="none" stroke="#e0e0e0" stroke-width="0.75"/>';
+  var pts = [];
+  for (var i = 0; i < 10; i++) {
+    var ang = (36 * i - 90) * Math.PI / 180;
+    var x = cx + maxR * Math.cos(ang), y = cy + maxR * Math.sin(ang);
+    svg += '<line x1="200" y1="200" x2="' + x + '" y2="' + y + '" stroke="#ccc" stroke-width="0.75"/>';
+    var vr = pcts[i] / 100 * maxR;
+    pts.push((cx + vr * Math.cos(ang)) + ',' + (cy + vr * Math.sin(ang)));
+    var lx = cx + 125 * Math.cos(ang), ly = cy + 125 * Math.sin(ang);
+    var anchor = Math.cos(ang) > 0.3 ? 'start' : (Math.cos(ang) < -0.3 ? 'end' : 'middle');
+    svg += '<text x="' + lx + '" y="' + (ly - 4) + '" text-anchor="' + anchor + '" font-size="14" font-family="W95FA,monospace">AST' + String(i + 1).padStart(2, '0') + '</text>';
+    var col = bandOf(pcts[i]) === 'r' ? '#800000' : (bandOf(pcts[i]) === 'a' ? '#808000' : '#008000');
+    svg += '<text x="' + lx + '" y="' + (ly + 12) + '" text-anchor="' + anchor + '" font-size="13" font-family="W95FA,monospace" fill="' + col + '">' + pcts[i] + '%</text>';
+  }
+  svg += '<polygon points="' + pts.join(' ') + '" fill="url(#dith)" stroke="#000" stroke-width="2" stroke-linejoin="miter"/>';
+  document.getElementById('radar').innerHTML = svg + '</svg>';
+}
+
+/* ── fragment report ── */
+var BLOCKS_PER_ROW = 25;
+var fragTimers = [];
+function clearFragTimers() {
+  fragTimers.forEach(clearTimeout);
+  fragTimers = [];
+}
+function buildFragRows(pcts) {
+  var html = '';
+  pcts.forEach(function(p, i) {
+    var filled = Math.round(p / 100 * BLOCKS_PER_ROW);
+    var cls = bandOf(p);
+    html += '<div class="frag-row">' +
+      '<div class="frag-label">' + AXES[i] + '</div>' +
+      '<div class="frag-track" data-index="' + i + '" role="img" aria-label="' + AXES[i] + ': ' + p + ' percent">';
+    for (var b = 0; b < BLOCKS_PER_ROW; b++) {
+      html += '<span class="frag-block' + (b < filled ? ' fill-' + cls : '') + '"></span>';
+    }
+    html += '</div><div class="frag-pct">' + p + '%</div></div>';
+  });
+  document.getElementById('frag-rows').innerHTML = html;
+}
+function revealBlocks(step) {
+  var tracks = document.querySelectorAll('.frag-track');
+  var order = [];
+  tracks.forEach(function(track) {
+    var blocks = track.querySelectorAll('.frag-block');
+    for (var i = 0; i < blocks.length; i++) order.push(blocks[i]);
+  });
+  order.forEach(function(block, i) {
+    if (REDUCED || !step) { block.style.visibility = 'visible'; return; }
+    fragTimers.push(setTimeout(function() { block.style.visibility = 'visible'; }, i * step));
+  });
+}
+
+/* ── diagnostics status line (typed in steps) ── */
+var statusTimer = null;
+function typeStatus(pcts) {
+  var el = document.getElementById('diag-status');
+  if (statusTimer) { clearInterval(statusTimer); statusTimer = null; }
+  var below = pcts.filter(function(p) { return p < 70; }).length;
+  var bad = pcts.filter(function(p) { return p < 50; }).length;
+  var text = 'Scanning AST modules .. 10/10 complete. ' +
+    below + ' below the 70% line' + (bad ? ' — ' + bad + ' critical.' : '.');
+  el.innerHTML = '';
+  if (REDUCED) { el.textContent = text; return; }
+  var i = 0;
+  statusTimer = setInterval(function() {
+    i += 3; /* ~3 chars per tick: stepped feel without a long wait */
+    el.textContent = text.slice(0, i);
+    if (i >= text.length) {
+      clearInterval(statusTimer); statusTimer = null;
+      el.innerHTML = text + '<span class="caret"></span>';
+    }
+  }, 24);
+}
+
+/* ── band switching ── */
+var currentIdx = 2;
+function setBand(idx, animate) {
+  currentIdx = idx;
+  var b = BANDS[idx];
+  var pcts = axisPcts(b.pct);
+
+  document.getElementById('title-name').textContent = b.name;
+  var pctEl = document.getElementById('overall-pct');
+  pctEl.textContent = b.pct + '%';
+  pctEl.className = 'overall-pct ' + b.mood;
+  document.getElementById('status-right').textContent = 'Overall integrity: ' + b.pct + '%';
+
+  clearFragTimers();
+  renderRadar(pcts);
+  buildFragRows(pcts);
+  typeStatus(pcts);
+  revealBlocks(animate ? 14 : 0);
+
+  var btns = document.querySelectorAll('.review-tools button[data-band]');
+  btns.forEach(function(btn, i) { btn.classList.toggle('on', i === idx); });
+
+  if (b.pct >= 100) openEgg();
+}
+
+/* ── easter egg ── */
+function openEgg() { document.getElementById('egg').classList.add('open'); }
+document.getElementById('egg').addEventListener('click', function() {
+  document.getElementById('egg').classList.remove('open');
+});
+document.getElementById('egg-btn').addEventListener('click', openEgg);
+
+/* ── controls ── */
+document.getElementById('replay-btn').addEventListener('click', function() {
+  setBand(currentIdx, true);
+});
+document.querySelectorAll('.review-tools button[data-band]').forEach(function(btn) {
+  btn.addEventListener('click', function() { setBand(Number(btn.getAttribute('data-band')), true); });
+});
+
+/* initial paint: no animation on first load */
+setBand(2, false);
+</script>
+</body>
+</html>

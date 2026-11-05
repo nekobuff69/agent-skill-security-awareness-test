@@ -465,11 +465,18 @@ exports.run = function() {
       check('Back returns to the results stage',
         views['results-view'].hidden === false && views['review-view'].hidden === true);
       commands[1].click();
-      check('Share hands the Web Share dialog this Completion\'s attention type — no score',
+      check('Share hands the Web Share dialog this Completion\'s attention code — no score',
         shareCalls.length === 1 &&
         String(shareCalls[0].text).indexOf(scored.report.percentage + '%') < 0 &&
         String(shareCalls[0].text).indexOf(
-          App.I18n.t('type.' + scored.report.type.id + '.code')) >= 0,
+          (function() {
+            var code = '';
+            for (var i = 0; i < scored.report.profile.length; i++) {
+              code += App.I18n.t('trait.' + scored.report.profile[i].trait + '.' +
+                scored.report.profile[i].pole + '.code');
+            }
+            return code;
+          })()) >= 0,
         JSON.stringify(shareCalls));
 
       // ── Switching programs from the taskbar ───────────────────────────

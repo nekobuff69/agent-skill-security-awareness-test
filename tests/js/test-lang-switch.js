@@ -692,9 +692,16 @@ exports.run = function() {
         return btns.length ? btns[0] : null;
       }
 
-      // The type card is the identity now: code + name in the live locale.
-      var typeEnCode = I18n.t('type.' + report.type.id + '.code');
-      var typeEnName = I18n.t('type.' + report.type.id + '.name');
+      // The profile card is the identity now: the five-letter code in the
+      // live locale, composed from the report's own pole picks.
+      function codeOf(r) {
+        var out = '';
+        for (var i = 0; i < r.profile.length; i++) {
+          out += I18n.t('trait.' + r.profile[i].trait + '.' + r.profile[i].pole + '.code');
+        }
+        return out;
+      }
+      var enCode = codeOf(report);
       var pctText = report.percentage + '%';
       var enCaption = titleCaption();
       var enBars = barWidths();
@@ -705,7 +712,7 @@ exports.run = function() {
       check('the results view renders the Completion report in English',
         App.currentView() === 'results-view' &&
         titlePct() === null &&
-        enCaption === I18n.t('type.' + report.type.id + '.emoji') + ' ' + typeEnCode + ' · ' + typeEnName &&
+        enCaption === enCode &&
         enBars.length === report.astRanked.length &&
         viewText('results-view').indexOf(planLoadingEn) >= 0,
         'caption=' + enCaption + ' bars=' + enBars.length);
@@ -735,9 +742,8 @@ exports.run = function() {
         'bars=' + barWidths().join(','));
 
       check('the report prose re-renders in Chinese',
-        titleCaption() === I18n.t('type.' + report.type.id + '.emoji') + ' ' + I18n.t('type.' + report.type.id + '.code') + ' · ' +
-          I18n.t('type.' + report.type.id + '.name') &&
-        viewText('results-view').indexOf(typeEnName) < 0 &&
+        titleCaption() === codeOf(report) &&
+        viewText('results-view').indexOf('Your attention profile') < 0 &&
         viewText('results-view').indexOf(I18n.astName('AST01')) >= 0 &&
         viewText('results-view').indexOf(I18n.t('results.barsTitle')) >= 0,
         'caption=' + titleCaption());
@@ -757,7 +763,8 @@ exports.run = function() {
         planCalls[0].locale === 'en' &&
         planCalls[1].locale === 'zh' &&
         planCalls[1].report !== report &&
-        planCalls[1].report.type.id === report.type.id &&
+        planCalls[1].report.profile.map(function(p) { return p.trait + ':' + p.pole; }).join(',') ===
+          report.profile.map(function(p) { return p.trait + ':' + p.pole; }).join(',') &&
         planCalls[1].report.weakestQuestions[0].scenario === wq0Zh.scenario &&
         planCalls[1].report.weakestQuestions[0].selectedOption ===
           wq0Zh.options[wq0En.options.indexOf(wq0.selectedOption)],
@@ -803,7 +810,7 @@ exports.run = function() {
         fakeDoc.title === 'Agent Security Awareness Quiz' &&
         titlePct() === null &&
         JSON.stringify(barWidths()) === JSON.stringify(enBars) &&
-        titleCaption() === I18n.t('type.' + report.type.id + '.emoji') + ' ' + typeEnCode + ' · ' + typeEnName &&
+        titleCaption() === codeOf(report) &&
         viewText('results-view').indexOf('EN NARRATIVE MARKER') >= 0,
         'locale=' + I18n.locale + ' caption=' + titleCaption());
 

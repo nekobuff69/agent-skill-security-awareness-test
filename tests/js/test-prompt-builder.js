@@ -18,15 +18,19 @@ exports.run = function() {
   function mockReport() {
     return {
       percentage: 42,
-      type: {
-        id: 'T3',
-        weakAxis: 'EXPOSURE',
-        strongAxis: 'INTAKE'
-      },
-      axisRanked: [
-        { id: 'EXPOSURE', earned: 15, possible: 30, percentage: 50 },
-        { id: 'UPKEEP', earned: 23, possible: 30, percentage: 76.7 },
-        { id: 'INTAKE', earned: 9, possible: 30, percentage: 30 }
+      profile: [
+        { trait: 'VETTING', pole: 'lo', percentage: 16.7 },
+        { trait: 'PRIVILEGE', pole: 'lo', percentage: 33.3 },
+        { trait: 'HYGIENE', pole: 'lo', percentage: 50.0 },
+        { trait: 'CURRENT', pole: 'hi', percentage: 76.7 },
+        { trait: 'MAPPED', pole: 'hi', percentage: 77.8 }
+      ],
+      traitRanked: [
+        { id: 'PRIVILEGE', earned: 4, possible: 21, percentage: 19.0 },
+        { id: 'VETTING', earned: 5, possible: 21, percentage: 23.8 },
+        { id: 'HYGIENE', earned: 13, possible: 21, percentage: 61.9 },
+        { id: 'CURRENT', earned: 12, possible: 15, percentage: 80.0 },
+        { id: 'MAPPED', earned: 16, possible: 21, percentage: 76.2 }
       ],
       astScores: {
         'AST01': { earned: 3, possible: 12, percentage: 25 },
@@ -140,19 +144,21 @@ exports.run = function() {
     result1.indexOf('https://owasp.github.io/www-project-agentic-skills-top-10/ast03.html') !== -1,
     'missing content in prompt');
 
-  // --- Test 5: The attention type leads the Profile; no title, no grade ---
-  check('Type in Profile, no title and no overall percentage',
-    result1.indexOf('The Candid Courier') !== -1 &&
+  // --- Test 5: The composed attention code leads the Profile; no title, no grade ---
+  check('Attention code in Profile, no title and no overall percentage',
+    result1.indexOf('Attention code: TGOCK') !== -1 &&
     result1.indexOf('Overall') === -1 &&
     result1.indexOf('42%') === -1,
-    'missing type or a grade leaked in');
+    'missing code or a grade leaked in');
 
-  // --- Test 5b: Axis lines carry earned/possible counts, no percentages ---
-  check('Axis lines carry counts only',
-    result1.indexOf('- Input & Trust: 9 of 30') !== -1 &&
-    result1.indexOf('- Permissions & Exposure: 15 of 30') !== -1 &&
-    result1.indexOf('- Upkeep & Renewal: 23 of 30') !== -1,
-    'missing axis lines');
+  // --- Test 5b: Trait lines carry earned/possible counts, no percentages ---
+  check('Trait lines carry counts only',
+    result1.indexOf('- Source Vetting: 5 of 21') !== -1 &&
+    result1.indexOf('- Permission Restraint: 4 of 21') !== -1 &&
+    result1.indexOf('- Instruction Hygiene: 13 of 21') !== -1 &&
+    result1.indexOf('- Staying Current: 12 of 15') !== -1 &&
+    result1.indexOf('- Inventory: 16 of 21') !== -1,
+    'missing trait lines');
 
   // --- Test 6: Per-AST scores sorted weakest-first ---
   // AST02 (11.1%) before AST04 (16.7%) before AST01 (25%) before AST03 (55.6%)

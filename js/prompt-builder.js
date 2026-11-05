@@ -25,27 +25,30 @@
     var framing = t('prompt.framing');
 
     // --- Section 2: Profile ---
-    // The tutor sees the type and the raw earned/possible counts — the
-    // same objective data as before, framed as attention shares rather
-    // than grades. No title, no overall percentage: the profile starts
-    // from where attention lives.
-    var typeName = (report.type && report.type.id)
-      ? t('type.' + report.type.id + '.name')
-      : t('prompt.typeFallback');
+    // The tutor sees the five-letter attention code and the raw
+    // earned/possible counts per trait dimension — the same objective
+    // data as before, framed as attention shares rather than grades. No
+    // title, no overall percentage: the profile starts from where
+    // attention lives.
+    var profilePicks = report.profile || [];
+    var code = '';
+    for (var p = 0; p < profilePicks.length; p++) {
+      code += t('trait.' + profilePicks[p].trait + '.' + profilePicks[p].pole + '.code');
+    }
 
     var profile = t('prompt.profile.heading') + '\n' +
-      t('prompt.profile.type', { type: typeName }) + '\n' +
+      t('prompt.profile.type', { type: code }) + '\n' +
       '\n' +
       t('prompt.profile.axes');
 
     // Weakest-first order comes from the report — the Scoring Engine owns ranking.
-    var axisRanked = (report && report.axisRanked) || [];
-    for (var a = 0; a < axisRanked.length; a++) {
-      var ax = axisRanked[a];
+    var traitRanked = (report && report.traitRanked) || [];
+    for (var a = 0; a < traitRanked.length; a++) {
+      var tr = traitRanked[a];
       profile += '\n' + t('prompt.profile.axisLine', {
-        axis: t('axis.' + ax.id),
-        earned: ax.earned,
-        possible: ax.possible
+        axis: t('trait.' + tr.id + '.name'),
+        earned: tr.earned,
+        possible: tr.possible
       });
     }
 

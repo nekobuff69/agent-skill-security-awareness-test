@@ -71,7 +71,7 @@
     'results.downloadPng': 'Download PNG',
     'results.share': 'Share Results',
     'results.shareTitle': 'Agent Security Awareness Quiz',
-    'results.shareText': 'My AI-safety attention type is {emoji} {code} — {name}. Every map is a little different. Find yours on the {app}.',
+    'results.shareText': 'My AI-safety attention code is {code} — five letters, five habits. Find yours on the {app}.',
     'results.retake': 'Retake Assessment',
     'results.reviewBtn': 'Review your answers →',
     'results.reviewTitle': 'Review Your Answers',
@@ -81,9 +81,7 @@
        The window's first body panel: the participant's attention type,
        with the two axes that define it. All type and axis names are
        Chrome Strings; the classifier owns only the stable ids. */
-    'results.typeCaption': 'Your attention type',
-    'results.attentionStrong': 'Your attention mostly lives here',
-    'results.attentionWeak': 'It visits least here',
+    'results.typeCaption': 'Your attention profile',
     'results.typeBlindList': 'Specific areas to look at first: {names}',
 
     /* ── Quiz window menu bar (ticket #65) ──
@@ -185,59 +183,46 @@
     'ast.AST09': 'No Governance',
     'ast.AST10': 'Cross-Platform Reuse',
 
-    /* ── Attention Axes (registry: js/ast.js) ──
-       Display names, one-line descriptions, single-letter MBTI-style
-       codes and per-axis risk notes for the three behavioral families
-       the ten AST Risks group into. Risk notes state what OWASP rates
-       the family's risks — factually, per axis, never comparatively:
-       a ranking of types would rebuild the hierarchy the type system
-       removed. */
-    'axis.INTAKE': 'Input & Trust',
-    'axis.INTAKE.code': 'I',
-    'axis.INTAKE.desc': 'what you let in — skills, sources, instructions',
-    'axis.INTAKE.risk': 'OWASP rates two of its risks — Malicious Skills and Supply Chain Compromise — critical: inattention here carries the highest stakes.',
-    'axis.EXPOSURE': 'Permissions & Exposure',
-    'axis.EXPOSURE.code': 'E',
-    'axis.EXPOSURE.desc': 'what you give out — permissions, metadata, boundaries',
-    'axis.EXPOSURE.risk': 'All three of its risks are rated high by OWASP: leaks tend to happen quietly and surface late.',
-    'axis.UPKEEP': 'Upkeep & Renewal',
-    'axis.UPKEEP.code': 'U',
-    'axis.UPKEEP.desc': 'how you keep up — updates, scans, governance',
-    'axis.UPKEEP.risk': 'All four of its risks are rated medium by OWASP: not urgent, but neglect here slowly widens every gap on the other two axes.',
-
-    /* ── Attention Types ──
-       Six types, one per (least-attended axis, most-attended axis)
-       pairing. The code is the MBTI-style three-letter ordering of the
-       axes from most- to least-attended (I = Input & Trust, E =
-       Permissions & Exposure, U = Upkeep & Renewal); the nickname keeps
-       it memorable. No type ranks above another: every motto describes
-       where attention lives and where it rarely goes, in the same
-       affirming register. Classifier owns the ids; dictionaries own the
-       words. */
-    'type.T1.name': 'The Hospitable Gatekeeper',
-    'type.T1.code': 'EUI',
-    'type.T1.emoji': '🚪',
-    'type.T1.motto': 'You guard well what stays yours — permissions, data, boundaries. At the front door, most arrivals get a nod.',
-    'type.T2.name': 'The Curious Curator',
-    'type.T2.code': 'UEI',
-    'type.T2.emoji': '🧺',
-    'type.T2.motto': 'Your collection is well kept and always current. New arrivals are welcomed on instinct first.',
-    'type.T3.name': 'The Candid Courier',
-    'type.T3.code': 'IUE',
-    'type.T3.emoji': '📮',
-    'type.T3.motto': 'Nothing gets past your front door unexamined — and inside, doors and drawers stand open.',
-    'type.T4.name': 'The Steady Steward',
-    'type.T4.code': 'UIE',
-    'type.T4.emoji': '🗝️',
-    'type.T4.motto': 'Everything runs on schedule — updates, scans, routines. The keys themselves rarely get a second look.',
-    'type.T5.name': 'The Sharp Lookout',
-    'type.T5.code': 'IEU',
-    'type.T5.emoji': '🔭',
-    'type.T5.motto': 'You read what arrives with a careful eye. Long-term upkeep is where your attention rarely wanders.',
-    'type.T6.name': 'The Quiet Archivist',
-    'type.T6.code': 'EIU',
-    'type.T6.emoji': '🗄️',
-    'type.T6.motto': 'You hold your boundaries well. The everyday maintenance behind them gets left for another day.',
+    /* ── Trait Dimensions (registry: js/ast.js, ADR 0026) ──
+       Five fine-grained behavioral families. Each carries a full name
+       (type card), a short label (radar) and TWO poles — an attentive
+       pole (hi) and a drifting pole (lo), each a single-letter code plus
+       one behavioral phrase. The participant's five pole picks compose
+       the whole result: the five letters are the code, the five phrases
+       are the portrait. There is deliberately no per-combination
+       nickname — the traits themselves are the naming. No pole, trait
+       or phrase ranks above another: every phrase states a habit, and
+       the radar carries the continuous shape. */
+    'trait.VETTING.name': 'Source Vetting',
+    'trait.VETTING.short': 'Vetting',
+    'trait.VETTING.hi.code': 'V',
+    'trait.VETTING.hi.text': 'Before installing, you check who made it and where it came from.',
+    'trait.VETTING.lo.code': 'T',
+    'trait.VETTING.lo.text': 'A new skill attracts you by what it does; where it came from is a second look.',
+    'trait.PRIVILEGE.name': 'Permission Restraint',
+    'trait.PRIVILEGE.short': 'Permissions',
+    'trait.PRIVILEGE.hi.code': 'L',
+    'trait.PRIVILEGE.hi.text': 'Permissions get only the sliver a task needs.',
+    'trait.PRIVILEGE.lo.code': 'G',
+    'trait.PRIVILEGE.lo.text': 'When a skill asks for permissions, you tend to grant first and troubleshoot later.',
+    'trait.HYGIENE.name': 'Instruction Hygiene',
+    'trait.HYGIENE.short': 'Hygiene',
+    'trait.HYGIENE.hi.code': 'I',
+    'trait.HYGIENE.hi.text': 'Outside content is data to you, never instructions.',
+    'trait.HYGIENE.lo.code': 'O',
+    'trait.HYGIENE.lo.text': 'When outside content speaks, your skills tend to obey.',
+    'trait.CURRENT.name': 'Staying Current',
+    'trait.CURRENT.short': 'Current',
+    'trait.CURRENT.hi.code': 'C',
+    'trait.CURRENT.hi.text': 'Updates and scans live on your calendar, not on a someday list.',
+    'trait.CURRENT.lo.code': 'D',
+    'trait.CURRENT.lo.text': 'Install, use, move on — updates and re-checks mostly wait for another day.',
+    'trait.MAPPED.name': 'Inventory',
+    'trait.MAPPED.short': 'Inventory',
+    'trait.MAPPED.hi.code': 'K',
+    'trait.MAPPED.hi.text': 'What you installed and where — you keep the ledger.',
+    'trait.MAPPED.lo.code': 'S',
+    'trait.MAPPED.lo.text': 'Tools scatter across platforms; what lives where is from memory.',
 
     /* ── Action Plan titles — curated per-risk labels, deliberately
        paraphrased so a title never repeats its description's opening ── */
@@ -273,8 +258,8 @@
     'prompt.framing': 'I took an agent-skill security self-assessment based on the OWASP Agentic Skills Top 10. Please act as my security educator and help me improve my habits, one area at a time.',
     'prompt.sessionRules': '## How to Teach Me\n- Ground your explanations in the linked OWASP pages\n- For each area: first point out what my chosen answer gets wrong, then give me one concrete habit I can adopt\n- Adapt depth to my level (I\'m learning)\n- Cover one area at a time',
     'prompt.profile.heading': '## My Profile',
-    'prompt.profile.type': 'Attention type: {type}',
-    'prompt.profile.axes': 'Attention axes:',
+    'prompt.profile.type': 'Attention code: {type}',
+    'prompt.profile.axes': 'Trait dimensions:',
     'prompt.profile.axisLine': '- {axis}: {earned} of {possible}',
     'prompt.profile.astScores': 'Per-risk detail:',
     'prompt.profile.astLine': '- {id}: {earned} of {possible}',

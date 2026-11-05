@@ -452,7 +452,8 @@ button:disabled {
 }
 
 .results-type-caption,
-.results-axis-line,
+.results-trait-letter,
+.results-trait-name,
 .results-type-blind {
   font-family: var(--font-heading);
   letter-spacing: normal;

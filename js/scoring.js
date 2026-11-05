@@ -9,8 +9,9 @@
    * The report carries no tier or grade for presentation: `percentage`
    * and the score numbers are internal anchors (blind-spot thresholds,
    * the tutor prompts), while the user-facing identity of a result is
-   * `type` — one of six attention types derived from the SHAPE of the
-   * three-axis profile, never its level.
+   * `profile` — five trait-dimension pole picks that the render layer
+   * composes into a five-letter code plus one trait phrase per
+   * dimension (ADR 0026).
    *
    * @param {object} bank      - Parsed questions.json (questions[], phases[], meta.scoring)
    * @param {Array}  selections - Array of 20 option indices (0-3), one per question in bank.questions order.
@@ -196,77 +197,74 @@
       if (astRanked[k3].percentage < 70) blindSpotIds.push(astRanked[k3].id);
     }
 
-    // --- Attention Axes ---
-    // The ten AST Scores aggregate into three behavioral axes (registry:
-    // js/ast.js). A question mapped to risks from two axes feeds both —
-    // the same earned/possible pair, exactly like the AST aggregation
-    // above. Axis display names are Chrome Strings ('axis.*').
+    // --- Trait Dimensions ---
+    // The ten AST Scores aggregate into five fine-grained behavioral
+    // dimensions (registry: js/ast.js). A question mapped to risks from
+    // two dimensions feeds both — the same earned/possible pair, exactly
+    // like the AST aggregation above. Display names and pole phrases are
+    // Chrome Strings ('trait.*').
     var ASTReg = (typeof globalThis.App === 'object' && globalThis.App && globalThis.App.AST) || {};
-    var axisOrder = (ASTReg.axisOrder) || ['INTAKE', 'EXPOSURE', 'UPKEEP'];
-    var axisOf = ASTReg.axisOf || {};
-    var axisAggregates = {};
-    for (var ax = 0; ax < axisOrder.length; ax++) {
-      axisAggregates[axisOrder[ax]] = { earned: 0, possible: 0 };
+    var traitOrder = (ASTReg.traitOrder) ||
+      ['VETTING', 'PRIVILEGE', 'HYGIENE', 'CURRENT', 'MAPPED'];
+    var traitOf = ASTReg.traitOf || {};
+    var traitAggregates = {};
+    for (var tx = 0; tx < traitOrder.length; tx++) {
+      traitAggregates[traitOrder[tx]] = { earned: 0, possible: 0 };
     }
     for (var i2 = 0; i2 < questionResults.length; i2++) {
       var qr2 = questionResults[i2];
-      var seenAxis = {};
+      var seenTrait = {};
       for (var r2 = 0; r2 < qr2.astRisks.length; r2++) {
-        var axis = axisOf[qr2.astRisks[r2]];
-        if (!axis || seenAxis[axis]) continue;
-        seenAxis[axis] = true;
-        axisAggregates[axis].earned += qr2.weightedScore;
-        axisAggregates[axis].possible += qr2.maxPossible;
+        var trait = traitOf[qr2.astRisks[r2]];
+        if (!trait || seenTrait[trait]) continue;
+        seenTrait[trait] = true;
+        traitAggregates[trait].earned += qr2.weightedScore;
+        traitAggregates[trait].possible += qr2.maxPossible;
       }
     }
-    var axisScores = {};
-    var axisRanked = [];
-    for (var ax2 = 0; ax2 < axisOrder.length; ax2++) {
-      var axisId = axisOrder[ax2];
-      var axisAgg = axisAggregates[axisId];
-      var axisPct = axisAgg.possible > 0
-        ? Math.round((axisAgg.earned / axisAgg.possible) * 1000) / 10
+    var traitScores = {};
+    var traitRanked = [];
+    for (var tx2 = 0; tx2 < traitOrder.length; tx2++) {
+      var traitId = traitOrder[tx2];
+      var traitAgg = traitAggregates[traitId];
+      var traitPct = traitAgg.possible > 0
+        ? Math.round((traitAgg.earned / traitAgg.possible) * 1000) / 10
         : 0;
-      axisScores[axisId] = {
-        earned: axisAgg.earned,
-        possible: axisAgg.possible,
-        percentage: axisPct
+      traitScores[traitId] = {
+        earned: traitAgg.earned,
+        possible: traitAgg.possible,
+        percentage: traitPct
       };
-      axisRanked.push({ id: axisId, earned: axisAgg.earned, possible: axisAgg.possible, percentage: axisPct });
+      traitRanked.push({ id: traitId, earned: traitAgg.earned, possible: traitAgg.possible, percentage: traitPct });
     }
 
-    // --- Type ---
-    // The type reads the SHAPE of the axis profile, never its level:
-    // the weakest axis is where attention rarely goes, the strongest is
-    // where it lives. Ties break by canonical axis order (first wins for
-    // weakest, first among the remaining wins for strongest) — fully
-    // deterministic. Six (weak, strong) pairings exist with three axes;
-    // the pair can never collapse because weak != strong.
-    var rankedByPct = axisRanked.slice().sort(function(a, b) {
-      return (a.percentage - b.percentage) ||
-        (axisOrder.indexOf(a.id) - axisOrder.indexOf(b.id));
-    });
-    var weakAxis = rankedByPct[0].id;
-    var strongAxis = rankedByPct[rankedByPct.length - 1].id;
-    if (strongAxis === weakAxis) {
-      // Degenerate only if fewer than two axes carry weight — fall back
-      // to canonical neighbour order rather than emitting an invalid pair.
-      for (var ax3 = 0; ax3 < axisOrder.length; ax3++) {
-        if (axisOrder[ax3] !== weakAxis) { strongAxis = axisOrder[ax3]; break; }
-      }
+    // --- Profile (the type) ---
+    // MBTI mechanics, honestly derived: each dimension carries two poles
+    // — the attentive pole (≥50% of that dimension's own scale) and the
+    // drifting pole (<50%). The participant's five pole picks compose
+    // into the type: the render layer assembles the five-letter code
+    // (one pole letter per dimension, in registry order) and the one
+    // trait phrase per dimension from the dictionary — the code and the
+    // phrases ARE the type; there is no nickname to translate. Pole
+    // letters and phrases are Chrome Strings ('trait.X.hi.code'…).
+    // Exactly 50% counts as the attentive pole: attention paid wins ties.
+    var profile = [];
+    for (var px = 0; px < traitOrder.length; px++) {
+      var pTrait = traitOrder[px];
+      var pPct = traitScores[pTrait].percentage;
+      profile.push({
+        trait: pTrait,
+        pole: pPct >= 50 ? 'hi' : 'lo',
+        percentage: pPct
+      });
     }
-    var typeId = classifyType(weakAxis, strongAxis);
 
     // --- Build report ---
     var report = {
       percentage: percentage,           // internal anchor, never rendered
-      type: {
-        id: typeId,
-        weakAxis: weakAxis,
-        strongAxis: strongAxis
-      },
-      axisScores: axisScores,
-      axisRanked: axisRanked,
+      profile: profile,                 // [{trait, pole, percentage}] — the type
+      traitScores: traitScores,
+      traitRanked: traitRanked,
       astScores: astScores,
       astRanked: astRanked,
       blindSpotIds: blindSpotIds,
@@ -276,29 +274,6 @@
     };
 
     return { ok: true, report: report };
-  }
-
-  /**
-   * The six attention types — one per (weakest axis, strongest axis)
-   * pairing of the three Attention Axes. Type ids are stable structure;
-   * the MBTI-style letter code, type names, emojis and mottos are Chrome
-   * Strings ('type.T1.code'…) owned by the dictionaries. No type ranks
-   * above another: each describes where the participant's attention
-   * lives and where it rarely goes.
-   */
-  var TYPE_IDS = {
-    'INTAKE>EXPOSURE': 'T1',     // attention on exposure, rarely on intake
-    'INTAKE>UPKEEP': 'T2',
-    'EXPOSURE>INTAKE': 'T3',
-    'EXPOSURE>UPKEEP': 'T4',
-    'UPKEEP>INTAKE': 'T5',
-    'UPKEEP>EXPOSURE': 'T6'
-  };
-
-  function classifyType(weakAxis, strongAxis) {
-    var id = TYPE_IDS[weakAxis + '>' + strongAxis];
-    if (!id) throw new Error('classifyType: unknown axis pair ' + weakAxis + '>' + strongAxis);
-    return id;
   }
 
   // --- Exports ---

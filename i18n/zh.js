@@ -71,7 +71,7 @@
     'results.downloadPng': '下载 PNG',
     'results.share': '分享结果',
     'results.shareTitle': '智能体安全意识测评',
-    'results.shareText': '我的 AI 安全注意力类型是 {emoji} {code}——{name}。每个人的地图都不一样。来{app}找到你的。',
+    'results.shareText': '我的 AI 安全注意力代码是 {code}——五个字母，五个习惯。来{app}找到你的。',
     'results.retake': '重新测评',
     'results.reviewBtn': '回顾我的作答 →',
     'results.reviewTitle': '回顾你的作答',
@@ -80,9 +80,7 @@
     /* ── 结果页类型卡 ──
        窗口正文第一块面板：参与者的注意力类型，以及定义它的两条轴。
        类型名与轴名都是 Chrome Strings；分类器只拥有稳定的 id。 */
-    'results.typeCaption': '你的注意力类型',
-    'results.attentionStrong': '你的注意力大多住在这里',
-    'results.attentionWeak': '它最少走到这里',
+    'results.typeCaption': '你的注意力画像',
     'results.typeBlindList': '可以先从这些具体领域看起：{names}',
 
     /* ── 测验窗口菜单（#65） ──
@@ -175,54 +173,43 @@
     'ast.AST09': '缺乏治理',
     'ast.AST10': '跨平台复用',
 
-    /* ── 注意力三轴（注册表：js/ast.js） ──
-       十个 AST 风险归并成的三个行为家族：名称、一句话说明、MBTI 式
-       单字母代码、逐轴风险说明。风险说明只陈述 OWASP 对该家族风险的
-       定级——逐轴陈述、不做横向比较：给类型排危险度名次，会把类型
-       体系刚拆掉的等级重新建起来。 */
-    'axis.INTAKE': '输入与信任',
-    'axis.INTAKE.code': 'I',
-    'axis.INTAKE.desc': '你放进来的东西——技能、来源、指令',
-    'axis.INTAKE.risk': 'OWASP 把其中的恶意技能、供应链入侵评为 critical 级：在这条轴上失守，代价最高。',
-    'axis.EXPOSURE': '权限与暴露',
-    'axis.EXPOSURE.code': 'E',
-    'axis.EXPOSURE.desc': '你交出去的东西——权限、信息、边界',
-    'axis.EXPOSURE.risk': '三个风险在 OWASP 均为 high 级：泄漏常常安静发生，事后才被发现。',
-    'axis.UPKEEP': '维护与更新',
-    'axis.UPKEEP.code': 'U',
-    'axis.UPKEEP.desc': '你怎么跟上——更新、扫描、治理',
-    'axis.UPKEEP.risk': '四个风险均为 medium 级：不致命，但这里的疏忽会慢慢放大前两条轴上的每一个缺口。',
-
-    /* ── 注意力类型 ──
-       六种类型，对应（最少停留的轴 × 最常停留的轴）的六种组合。
-       code 是 MBTI 式三字母排序，从注意力最常停留的轴到最少停留的轴
-       （I = 输入与信任，E = 权限与暴露，U = 维护与更新）；昵称负责
-       好记。类型之间没有高低：每条定位语都用同样的口吻描述注意力
-       住在哪里、很少去哪里。分类器只拥有 id；词汇由词典拥有。 */
-    'type.T1.name': '好客的守门人',
-    'type.T1.code': 'EUI',
-    'type.T1.emoji': '🚪',
-    'type.T1.motto': '属于自己的部分你守得很稳——权限、数据、边界；而到门口的东西，大多点头放行。',
-    'type.T2.name': '好奇的策展人',
-    'type.T2.code': 'UEI',
-    'type.T2.emoji': '🧺',
-    'type.T2.motto': '你的工具箱收拾得井井有条、常换常新；新成员进门，凭的是第一眼直觉。',
-    'type.T3.name': '坦率的信使',
-    'type.T3.code': 'IUE',
-    'type.T3.emoji': '📮',
-    'type.T3.motto': '进门的东西你样样过目；屋里自己的抽屉和门，却常是敞开的。',
-    'type.T4.name': '稳健的管家',
-    'type.T4.code': 'UIE',
-    'type.T4.emoji': '🗝️',
-    'type.T4.motto': '更新、扫描、日常流程样样按时；唯独钥匙本身，很少被多看一眼。',
-    'type.T5.name': '敏锐的瞭望员',
-    'type.T5.code': 'IEU',
-    'type.T5.emoji': '🔭',
-    'type.T5.motto': '进来的每样东西你都看得仔细；而长远的打理，注意力很少走到那里。',
-    'type.T6.name': '安静的档案员',
-    'type.T6.code': 'EIU',
-    'type.T6.emoji': '🗄️',
-    'type.T6.motto': '边界你守得很好；边界后面的日常维护，常常留给改天。',
+    /* ── 特征维度（注册表：js/ast.js，ADR 0026） ──
+       五个细粒度行为家族。每个维度带全名（画像卡）、短名（雷达）和
+       两极——用心极（hi）与漂移极（lo），各有一个字母代码和一句行为
+       描述。参与者的五个极点选择拼出全部结果：五个字母是代码，五句
+       描述是画像。刻意不设逐组合昵称——特征本身就是命名。任何极点、
+       维度、句子都不分高下：每句只陈述一个习惯，连续的形状由雷达
+       承载。 */
+    'trait.VETTING.name': '来源鉴别',
+    'trait.VETTING.short': '来源',
+    'trait.VETTING.hi.code': 'V',
+    'trait.VETTING.hi.text': '装之前，你会先查发布者和来路。',
+    'trait.VETTING.lo.code': 'T',
+    'trait.VETTING.lo.text': '新技能吸引你的是功能，来路是第二眼的事。',
+    'trait.PRIVILEGE.name': '权限节制',
+    'trait.PRIVILEGE.short': '权限',
+    'trait.PRIVILEGE.hi.code': 'L',
+    'trait.PRIVILEGE.hi.text': '权限只给任务需要的那一小块。',
+    'trait.PRIVILEGE.lo.code': 'G',
+    'trait.PRIVILEGE.lo.text': '技能要什么权限，你倾向先给，回头再调。',
+    'trait.HYGIENE.name': '指令隔离',
+    'trait.HYGIENE.short': '隔离',
+    'trait.HYGIENE.hi.code': 'I',
+    'trait.HYGIENE.hi.text': '外面的内容在你这里是数据，不是指令。',
+    'trait.HYGIENE.lo.code': 'O',
+    'trait.HYGIENE.lo.text': '外部内容说什么，技能就照办什么。',
+    'trait.CURRENT.name': '更新追踪',
+    'trait.CURRENT.short': '更新',
+    'trait.CURRENT.hi.code': 'C',
+    'trait.CURRENT.hi.text': '更新和扫描在你的日历上，不在待办清单里。',
+    'trait.CURRENT.lo.code': 'D',
+    'trait.CURRENT.lo.text': '装完就用，更新和复查大多留给改天。',
+    'trait.MAPPED.name': '家底清单',
+    'trait.MAPPED.short': '家底',
+    'trait.MAPPED.hi.code': 'K',
+    'trait.MAPPED.hi.text': '装过什么、装在哪，你有一本账。',
+    'trait.MAPPED.lo.code': 'S',
+    'trait.MAPPED.lo.text': '工具散在几个平台，哪台装了什么全凭印象。',
 
     /* ── 行动计划标题 —— 逐风险策展短语，刻意改写以免与描述首句重复 ── */
     'action.AST01': '先核实发布者，再谈安装',
@@ -256,8 +243,8 @@
     'prompt.framing': '我参加了一份基于 OWASP Agentic Skills Top 10 的智能体技能安全自评。请充当我的安全导师，帮我一个领域一个领域地改进习惯。',
     'prompt.sessionRules': '## 如何教我\n- 所有解释都要落在所链接的 OWASP 页面上\n- 每个领域：先指出我的选择错在哪，再给我一个能立刻养成的具体习惯\n- 根据我的水平调整深度（我还在学）\n- 一次只讲一个领域',
     'prompt.profile.heading': '## 我的情况',
-    'prompt.profile.type': '注意力类型：{type}',
-    'prompt.profile.axes': '注意力三轴：',
+    'prompt.profile.type': '注意力代码：{type}',
+    'prompt.profile.axes': '特征维度：',
     'prompt.profile.axisLine': '- {axis}：{earned} / {possible}',
     'prompt.profile.astScores': '各风险细项：',
     'prompt.profile.astLine': '- {id}：{earned} / {possible}',

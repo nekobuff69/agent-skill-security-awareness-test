@@ -197,9 +197,12 @@
    */
   function buildLlmPrompt(report, bank, excerpts) {
     var AST = global.App.AST || { severity: {} };
-    var typeName = (report.type && report.type.id)
-      ? t('type.' + report.type.id + '.name')
-      : t('llm.typeFallback');
+    var profile = report.profile || [];
+    var code = '';
+    for (var p = 0; p < profile.length; p++) {
+      code += t('trait.' + profile[p].trait + '.' + profile[p].pole + '.code');
+    }
+    var typeName = code || t('llm.typeFallback');
 
     // --- System Instruction (load-bearing: survives every trim step) ---
     var head = t('llm.system', {

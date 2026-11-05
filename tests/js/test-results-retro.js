@@ -108,7 +108,7 @@ exports.run = async function() {
   var typeZh = I18n.t('results.typeCaption');
   I18n.use('en');
   check('results.* retro ids resolve in en and zh',
-    typeEn === 'Your attention type' && typeZh === '你的注意力类型',
+    typeEn === 'Your attention profile' && typeZh === '你的注意力画像',
     typeEn + '/' + typeZh);
   // The grade surface is gone: the old Overall caption id must be missing
   // from BOTH dictionaries, exactly like the retired Title Card buttons.
@@ -131,6 +131,9 @@ exports.run = async function() {
     btnGone === 2, String(btnGone));
 
   // ── Synthetic report (structure only — scoring fixtures live elsewhere) ─
+  // Per-AST percentages drive the bars; per-trait percentages drive the
+  // radar. Blind spots are AST-level (they mark their dimension on the
+  // map): AST01→VETTING, AST02→VETTING, AST03→PRIVILEGE.
   var pcts = [33, 50, 62, 70, 74, 81, 88, 92, 96, 100];
   var astScores = {};
   var astRanked = [];
@@ -139,10 +142,24 @@ exports.run = async function() {
     astScores[id] = { percentage: pcts[i] };
     astRanked.push({ id: id, percentage: pcts[i], earned: pcts[i], possible: 100 });
   }
+  // Dimension shares chosen so VETTING (blind) and PRIVILEGE (blind) sit
+  // below the 70% attention line and the other three above it.
+  var traitPcts = { VETTING: 44, PRIVILEGE: 61, HYGIENE: 82, CURRENT: 90, MAPPED: 100 };
+  var traitScores = {};
+  var traitRanked = [];
+  for (var ti = 0; ti < AST.traitOrder.length; ti++) {
+    var tid = AST.traitOrder[ti];
+    traitScores[tid] = { percentage: traitPcts[tid], earned: traitPcts[tid], possible: 100 };
+    traitRanked.push({ id: tid, percentage: traitPcts[tid], earned: traitPcts[tid], possible: 100 });
+  }
   var report = {
     percentage: 62,
-    type: { id: 'T3', weakAxis: 'EXPOSURE', strongAxis: 'INTAKE' },
+    profile: AST.traitOrder.map(function(tid) {
+      return { trait: tid, pole: traitPcts[tid] >= 50 ? 'hi' : 'lo', percentage: traitPcts[tid] };
+    }),
     blindSpotIds: ['AST01', 'AST02', 'AST03'],
+    traitScores: traitScores,
+    traitRanked: traitRanked,
     astScores: astScores,
     astRanked: astRanked,
     weakestQuestions: []
@@ -203,15 +220,16 @@ exports.run = async function() {
     'white=' + whiteTiles.length + ' neutral=' + neutralCells.length);
 
   var tspans = walk(svg, 'tspan');
-  var ids = tspans.filter(function(t) { return /^AST\d\d$/.test(t.textContent); });
+  var shortNames = AST.traitOrder.map(function(tid) { return I18n.t('trait.' + tid + '.short'); });
+  var dimLabels = tspans.filter(function(t) { return shortNames.indexOf(t.textContent) >= 0; });
   var pctsT = tspans.filter(function(t) { return /%/.test(t.textContent); });
-  check('ten AST-ID labels and NO percentage labels on the map',
-    ids.length === 10 && pctsT.length === 0,
-    'ids=' + ids.length + ' pct=' + pctsT.length);
+  check('five dimension labels and NO percentage labels on the map',
+    dimLabels.length === 5 && pctsT.length === 0 && tspans.length === 5,
+    'labels=' + dimLabels.length + ' pct=' + pctsT.length);
   check('labels render on the W95 chrome face from the heading token',
-    ids.every(function(t) { return String(t.attrs['font-family']).indexOf('W95FA') >= 0; }));
-  check('AST-ID labels are black, weight 400 (pixel face carries no bold)',
-    ids.every(function(t) { return t.attrs.fill === '#000000' && t.attrs['font-weight'] === '400'; }));
+    dimLabels.every(function(t) { return String(t.attrs['font-family']).indexOf('W95FA') >= 0; }));
+  check('dimension labels are black, weight 400 (pixel face carries no bold)',
+    dimLabels.every(function(t) { return t.attrs.fill === '#000000' && t.attrs['font-weight'] === '400'; }));
   check('headingFont() resolves the W95FA stack headless (token fallback)',
     internals.headingFont().indexOf('W95FA') >= 0,
     internals.headingFont());
@@ -226,49 +244,62 @@ exports.run = async function() {
     'spans/divs=' + chipEls.length);
 
   // Markers read by SHAPE, not colour: solid ink dots on the profile, an
-  // open white ring on every axis inside the report's blind-spot list.
-  // The markers paint ONCE, above the polygon.
+  // open white ring on every dimension below the attention line. A
+  // blind-spot AST marks its DIMENSION on the map — VETTING and
+  // PRIVILEGE here — and the markers paint ONCE, above the polygon.
   var dots = walk(svg, 'circle');
   var profileDots = dots.filter(function(d) { return d.attrs.r === 3.5; });
   var blindRings = dots.filter(function(d) { return d.attrs.r === 4.5; });
-  check('profile dots are solid ink, one per non-blind axis',
-    profileDots.length === 7 &&
+  check('profile dots are solid ink, one per attentive dimension',
+    profileDots.length === 3 &&
     profileDots.every(function(d) { return d.attrs.fill === '#000000'; }),
     'dots=' + profileDots.length);
-  check('blind-spot axes carry open rings instead of dots (shape, not colour)',
-    blindRings.length === 3 &&
+  check('dimensions holding a blind-spot AST carry open rings (shape, not colour)',
+    blindRings.length === 2 &&
     blindRings.every(function(d) {
       return d.attrs.fill === '#FFFFFF' && d.attrs.stroke === '#000000';
     }),
     'rings=' + blindRings.length);
 
-  // ══ Results type card (the window's first body panel) ══════════════════
+  // ══ Results profile card (the window's first body panel) ═══════════════
 
   var header = internals.buildResultsHeader(report);
   var headerAll = allText(header).join(' ');
+  var expectedCode = internals.profileCode(report.profile);
   check('the header is a results-header wrapper around a sunken client field',
     classOf(header) === 'results-header' &&
     walk(header, 'div').some(function(n) { return classOf(n) === 'results-title-card'; }),
     classOf(header));
-  check('the type card leads with the MBTI-style code and the type name — no tier, no grade',
-    headerAll.indexOf('IUE · The Candid Courier') >= 0 &&
+  // Synthetic profile: VETTING 44% (lo), PRIVILEGE 61% (hi), HYGIENE 82%
+  // (hi), CURRENT 90% (hi), MAPPED 100% (hi) → T·L·I·C·K.
+  check('the profile card leads with the composed five-letter code — no tier, no grade',
+    expectedCode === 'TLICK' &&
+    headerAll.indexOf(expectedCode) >= 0 &&
     headerAll.indexOf('62%') < 0 && headerAll.indexOf('Sentinel') < 0 &&
     headerAll.indexOf('Overall') < 0,
     headerAll.slice(0, 90));
-  check('the type caption and the motto follow the name',
-    headerAll.indexOf(I18n.t('results.typeCaption')) >= 0 &&
-    headerAll.indexOf(I18n.t('type.T3.motto')) >= 0);
-  check('the two defining axes appear with letter markers, roles and descriptions',
-    headerAll.indexOf(I18n.t('results.attentionStrong')) >= 0 &&
-    headerAll.indexOf(I18n.t('axis.INTAKE.code') + ' · ' + I18n.t('axis.INTAKE')) >= 0 &&
-    headerAll.indexOf(I18n.t('axis.INTAKE.desc')) >= 0 &&
-    headerAll.indexOf(I18n.t('results.attentionWeak')) >= 0 &&
-    headerAll.indexOf(I18n.t('axis.EXPOSURE.code') + ' · ' + I18n.t('axis.EXPOSURE')) >= 0 &&
-    headerAll.indexOf(I18n.t('axis.EXPOSURE.desc')) >= 0);
-  check('the weak axis carries its factual risk note — and no comparative ranking',
-    headerAll.indexOf(I18n.t('axis.EXPOSURE.risk')) >= 0 &&
-    headerAll.indexOf(I18n.t('axis.INTAKE.risk')) < 0,
-    I18n.t('axis.EXPOSURE.risk').slice(0, 50));
+  check('the profile caption follows the code',
+    headerAll.indexOf(I18n.t('results.typeCaption')) >= 0);
+  check('five trait rows compose the portrait: letter + dimension + phrase',
+    (function() {
+      var rows = walk(header, 'div').filter(function(n) {
+        return classOf(n) === 'results-trait-row';
+      });
+      if (rows.length !== 5) return false;
+      for (var r = 0; r < rows.length; r++) {
+        var picks = rows[r].children;
+        if (picks.length !== 3) return false;
+        var traitId = report.profile[r].trait;
+        var pole = report.profile[r].pole;
+        if (picks[0].textContent !== I18n.t('trait.' + traitId + '.' + pole + '.code')) return false;
+        if (picks[1].textContent !== I18n.t('trait.' + traitId + '.name')) return false;
+        if (picks[2].textContent !== I18n.t('trait.' + traitId + '.' + pole + '.text')) return false;
+      }
+      return true;
+    })());
+  check('each pole carries its own phrase, in the same neutral register',
+    headerAll.indexOf(I18n.t('trait.VETTING.lo.text')) >= 0 &&
+    headerAll.indexOf(I18n.t('trait.MAPPED.hi.text')) >= 0);
   check('the blind-spot AST names appear as the concrete places to look first',
     headerAll.indexOf(I18n.t('results.typeBlindList', {
       names: I18n.astName('AST01') + ', ' + I18n.astName('AST02') + ', ' + I18n.astName('AST03')
@@ -296,10 +327,21 @@ exports.run = async function() {
     firstLabel === I18n.astName(astRanked[0].id),
     rows.length + ' rows, first=' + firstLabel);
   var fill0 = rows[0].children[1].children[0];
-  check('bar fill keeps the width-driven behaviour and carries NO band class',
+  check('bar fill keeps the width-driven behaviour and carries the length-mapped ink step',
     fill0.attrs.style === 'width:33%' &&
-    classOf(fill0) === 'results-bar-fill',
+    classOf(fill0) === 'results-bar-fill results-bar-lv2',
     fill0.attrs.style + '/' + classOf(fill0));
+  check('bar ink deepens with length across the five ramp steps',
+    (function() {
+      for (var ri = 0; ri < rows.length; ri++) {
+        var fill = rows[ri].children[1].children[0];
+        var pct = astRanked[ri].percentage;
+        var want = 'results-bar-lv' + internals.barLevel(pct);
+        if (classOf(fill).indexOf(want) < 0) return false;
+      }
+      return internals.barLevel(5) === 1 && internals.barLevel(95) === 5 &&
+        internals.barLevel(50) === 3;
+    })());
   check('bar rows carry no percentage figure anywhere',
     allText(bars).join(' ').indexOf('%') < 0 &&
     rows.every(function(r) { return r.children.length === 2; }));
@@ -607,10 +649,9 @@ exports.run = async function() {
     else globalThis.document = prev.document;
   })();
   menuBtns[1].click();
-  check('Share hands the Web Share dialog this Completion\'s attention type — no score',
+  check('Share hands the Web Share dialog this Completion\'s attention code — no score',
     shareCalls.length === 1 &&
-    String(shareCalls[0].text).indexOf('IUE') >= 0 &&
-    String(shareCalls[0].text).indexOf('The Candid Courier') >= 0 &&
+    String(shareCalls[0].text).indexOf(expectedCode) >= 0 &&
     String(shareCalls[0].text).indexOf('62') < 0,
     JSON.stringify(shareCalls));
 
@@ -991,8 +1032,15 @@ exports.run = async function() {
   function planText(node) { return allText(node).join(' '); }
   function planReport(pct) {
     return {
-      percentage: pct, type: { id: 'T1', weakAxis: 'INTAKE', strongAxis: 'EXPOSURE' },
-      astScores: {}, astRanked: [], weakestQuestions: []
+      percentage: pct,
+      profile: [
+        { trait: 'VETTING', pole: 'lo', percentage: 30 },
+        { trait: 'PRIVILEGE', pole: 'hi', percentage: 62 },
+        { trait: 'HYGIENE', pole: 'lo', percentage: 41 },
+        { trait: 'CURRENT', pole: 'hi', percentage: 77 },
+        { trait: 'MAPPED', pole: 'hi', percentage: 88 }
+      ],
+      traitScores: {}, traitRanked: [], astScores: {}, astRanked: [], weakestQuestions: []
     };
   }
   // ── restore globals for the sibling test modules ──────────────────────

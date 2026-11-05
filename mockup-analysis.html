@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MOCKUP — Analysis page redesign (Minesweeper scoreboard)</title>
+<style>
+  @font-face {
+    font-family: 'W95FA';
+    src: url('fonts/w95fa.woff2') format('woff2');
+  }
+  :root {
+    --bevel-raised: inset -1px -1px #000000, inset 1px 1px #FFFFFF,
+                    inset -2px -2px #808080, inset 2px 2px #DFDFDF;
+    --bevel-sunken: inset -1px -1px #FFFFFF, inset 1px 1px #000000,
+                    inset -2px -2px #DFDFDF, inset 2px 2px #808080;
+    --bevel-field: inset 1px 1px #808080, inset -1px -1px #FFFFFF;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #008080;
+    font-family: Tahoma, 'Segoe UI', sans-serif;
+    color: #000000;
+    padding: 32px 16px 64px;
+  }
+
+  /* ── Review tooling (NOT part of the design) ── */
+  .review-tools {
+    position: fixed; left: 12px; top: 12px; z-index: 9000;
+    background: #C0C0C0; box-shadow: var(--bevel-raised);
+    padding: 10px 12px; width: 200px; font-size: 12px;
+  }
+  .review-tools h2 { margin: 0 0 6px; font-size: 12px; font-family: 'W95FA', monospace; font-weight: 400; }
+  .review-tools .tag {
+    display: inline-block; background: #000080; color: #fff;
+    padding: 1px 6px; font-size: 10px; letter-spacing: .08em; margin-bottom: 8px;
+  }
+  .review-tools button {
+    display: block; width: 100%; margin: 4px 0; padding: 4px 6px;
+    background: #C0C0C0; border: 0; box-shadow: var(--bevel-raised);
+    font-size: 12px; cursor: pointer; text-align: left;
+  }
+  .review-tools button:active { box-shadow: var(--bevel-sunken); }
+  .review-tools button.on { box-shadow: var(--bevel-sunken); background: #DFDFDF; }
+  .review-tools p { margin: 8px 0 0; line-height: 1.4; color: #404040; }
+
+  /* ── Window chrome ── */
+  .os-window {
+    max-width: 720px; margin: 24px auto 0;
+    background: #C0C0C0; box-shadow: var(--bevel-raised); padding: 3px;
+  }
+  .os-titlebar {
+    display: flex; align-items: center; min-height: 30px;
+    background: linear-gradient(90deg, #000080, #1084D0);
+    color: #FFFFFF; padding: 0 4px 0 8px;
+    font-family: 'W95FA', monospace; font-size: 14px;
+  }
+  .os-titlebar .spacer { flex: 1; }
+  .os-tbtn {
+    width: 16px; height: 14px; margin-left: 2px;
+    background: #C0C0C0; box-shadow: var(--bevel-raised);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10px; color: #000;
+  }
+  .os-body { background: #C0C0C0; padding: 8px; }
+
+  /* ── Menu bar ── */
+  .menu-bar {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    padding: 8px 12px; margin-bottom: 8px;
+    background: #C0C0C0; box-shadow: var(--bevel-raised);
+  }
+  .menu-bar button {
+    border: 0; background: #C0C0C0; box-shadow: var(--bevel-raised);
+    padding: 6px 14px; font-size: 13px; cursor: pointer;
+  }
+  .menu-bar button:active { box-shadow: var(--bevel-sunken); }
+
+  /* ── NEW: Minesweeper scoreboard header ── */
+  .title-card {
+    background: #FFFFFF; box-shadow: var(--bevel-sunken);
+    padding: 12px 16px; margin-bottom: 8px;
+  }
+  .score-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .smiley {
+    width: 48px; height: 48px; flex-shrink: 0;
+    background: #C0C0C0; box-shadow: var(--bevel-raised);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .smiley svg { width: 34px; height: 34px; display: block; }
+  .score-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .clearance-caption {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #404040;
+  }
+  .title-name { font-family: 'W95FA', monospace; font-size: 22px; color: #000; }
+  .score-led-col { margin-left: auto; text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .overall-caption { font-size: 12px; color: #404040; }
+  .led-field {
+    display: inline-flex; gap: 2px; padding: 5px 7px;
+    background: #000000; box-shadow: var(--bevel-sunken);
+  }
+  .led-field svg { display: block; height: 30px; width: auto; }
+
+  /* ── Sections ── */
+  .section-title { font-family: 'W95FA', monospace; font-size: 18px; margin: 12px 0 4px; font-weight: 400; }
+  .scan-status {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px; color: #404040; margin: 0 0 6px;
+  }
+  .radar-wrap {
+    background: #FFFFFF; box-shadow: var(--bevel-sunken);
+    max-width: 240px; margin: 0 auto; padding: 6px; display: flex; justify-content: center;
+  }
+  .radar-wrap svg { width: 100%; height: auto; }
+
+  .bars { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
+  .bar-row { display: grid; grid-template-columns: 1fr 1fr auto; align-items: center; gap: 8px; }
+  .bar-label { font-size: 12px; color: #404040; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar-track {
+    height: 12px; box-shadow: var(--bevel-field); overflow: hidden;
+    background: repeating-conic-gradient(#DFDFDF 0% 25%, #FFFFFF 0% 50%) 0 0 / 2px 2px;
+  }
+  .bar-fill {
+    height: 100%;
+    background-image: repeating-linear-gradient(90deg, transparent 0 6px, #FFFFFF 6px 8px);
+  }
+  .bar-fill.g { background-color: #008000; }
+  .bar-fill.a { background-color: #808000; }
+  .bar-fill.r { background-color: #800000; }
+  .bar-pct { font-size: 12px; color: #404040; min-width: 3em; text-align: right; }
+
+  /* ── Gag dialog (illegal operation) ── */
+  .dialog-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,.25);
+    display: none; align-items: center; justify-content: center; z-index: 9500;
+  }
+  .dialog-backdrop.open { display: flex; }
+  .os-dialog {
+    width: 380px; max-width: 92vw; background: #C0C0C0; box-shadow: var(--bevel-raised); padding: 3px;
+  }
+  .os-dialog-body { display: flex; gap: 12px; padding: 16px 12px; align-items: flex-start; }
+  .os-dialog-icon {
+    width: 32px; height: 32px; flex-shrink: 0; border-radius: 50%;
+    background: #FF0000; position: relative;
+  }
+  .os-dialog-icon::before, .os-dialog-icon::after {
+    content: ''; position: absolute; left: 14px; top: 6px;
+    width: 4px; height: 20px; background: #FFFFFF;
+  }
+  .os-dialog-icon::before { transform: rotate(45deg); }
+  .os-dialog-icon::after { transform: rotate(-45deg); }
+  .os-dialog-message { margin: 0; font-size: 13px; line-height: 1.5; }
+  .os-dialog-buttons { display: flex; justify-content: center; gap: 8px; padding: 0 12px 12px; }
+  .os-dialog-buttons button {
+    min-width: 88px; padding: 5px 12px; border: 0;
+    background: #C0C0C0; box-shadow: var(--bevel-raised); cursor: pointer; font-size: 13px;
+  }
+  .os-dialog-buttons button:active { box-shadow: var(--bevel-sunken); }
+
+  /* ── Quit note strip (shown on the landing view after Quit) ── */
+  .quit-note {
+    display: none; margin: 0 0 8px; padding: 6px 12px;
+    background: #C0C0C0; box-shadow: var(--bevel-raised);
+    font-size: 13px; text-align: center;
+  }
+  .quit-note.show { display: block; }
+
+  .note { font-size: 11px; color: #004040; text-align: center; margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<div class="review-tools">
+  <span class="tag">MOCKUP — REVIEW ONLY</span>
+  <h2>Score band</h2>
+  <button data-band="0">Sentinel (96%)</button>
+  <button data-band="1">Practitioner (78%)</button>
+  <button data-band="2" class="on">Aware (62%)</button>
+  <button data-band="3">Newcomer (41%)</button>
+  <button data-band="4">Uncharted (18%) + gag</button>
+  <h2 style="margin-top:10px">Gags</h2>
+  <button id="gag-btn">Preview illegal-operation dialog</button>
+  <button id="quit-btn">Toggle quit note strip</button>
+  <p>Uncharted auto-fires the gag once. LED counts up in steps on band change.</p>
+</div>
+
+<div class="os-window">
+  <div class="os-titlebar">
+    <span>Agent Security Awareness Quiz</span>
+    <span class="spacer"></span>
+    <span class="os-tbtn">—</span><span class="os-tbtn">□</span><span class="os-tbtn">×</span>
+  </div>
+  <div class="os-body">
+
+    <div class="quit-note" id="quit-note">It is now safe to close this window.</div>
+
+    <div class="menu-bar">
+      <button>Download PNG</button><button>Share Results</button>
+      <button>Review your answers →</button><button>Retake Assessment</button>
+    </div>
+
+    <!-- NEW HEADER -->
+    <div class="title-card">
+      <div class="score-row">
+        <span class="smiley" id="smiley" role="img" aria-label="Score mascot"></span>
+        <div class="score-id">
+          <div class="clearance-caption">Clearance Level</div>
+          <div class="title-name" id="title-name">🔍 Aware</div>
+        </div>
+        <div class="score-led-col">
+          <div class="overall-caption">Overall</div>
+          <div class="led-field" id="led" role="img" aria-label="Overall score 62 percent"></div>
+        </div>
+      </div>
+    </div>
+
+    <h2 class="section-title">System Monitor</h2>
+    <div class="radar-wrap" id="radar"></div>
+
+    <h2 class="section-title">Threat Scan</h2>
+    <p class="scan-status" id="scan-status"></p>
+    <div class="bars" id="bars"></div>
+
+  </div>
+</div>
+
+<p class="note">Mockup of the Analysis view redesign — Minesweeper scoreboard direction. Not wired to real data; bars/radar use fixture values.</p>
+
+<div class="dialog-backdrop" id="gag">
+  <div class="os-dialog" role="dialog" aria-modal="true">
+    <div class="os-titlebar"><span>Agent Security Awareness Quiz</span></div>
+    <div class="os-dialog-body">
+      <span class="os-dialog-icon"></span>
+      <p class="os-dialog-message">This program has performed an illegal operation and will be terminated. (Not really — your score was still recorded, and the Action Plan opens as usual.)</p>
+    </div>
+    <div class="os-dialog-buttons"><button id="gag-ok">OK</button></div>
+  </div>
+</div>
+
+<script>
+/* ── seven-segment LED ── */
+var SEG = {
+  a: '3,1.5 11,1.5 12.5,3 11,4.5 3,4.5 1.5,3',
+  b: '12.5,3 14,4.5 14,11.5 12.5,13 11,11.5 11,4.5',
+  c: '12.5,13 14,14.5 14,21.5 12.5,23 11,21.5 11,14.5',
+  d: '3,21.5 11,21.5 12.5,23 11,24.5 3,24.5 1.5,23',
+  e: '1.5,13 3,14.5 3,21.5 1.5,23 0,21.5 0,14.5',
+  f: '1.5,3 3,4.5 3,11.5 1.5,13 0,11.5 0,4.5',
+  g: '3,11.5 11,11.5 12.5,13 11,14.5 3,14.5 1.5,13'
+};
+var DIGITS = { '0':'abcdef', '1':'bc', '2':'abged', '3':'abgcd', '4':'fgbc',
+               '5':'afgcd', '6':'afgedc', '7':'abc', '8':'abcdefg', '9':'abcdfg' };
+function segSvg(d) {
+  var lit = DIGITS[d] || '';
+  var s = '<svg viewBox="0 0 14 26">';
+  for (var k in SEG) {
+    s += '<polygon points="' + SEG[k] + '" fill="' + (lit.indexOf(k) >= 0 ? '#FF0000' : '#2A0000') + '"/>';
+  }
+  return s + '</svg>';
+}
+var PCT_GLYPH = '<svg viewBox="0 0 19 31"><rect x="0" y="0" width="5" height="5" fill="#FF0000"/>' +
+  '<rect x="10" y="26" width="5" height="5" fill="#FF0000"/>' +
+  '<polygon points="16,0 19,0 3,31 0,31" fill="#FF0000"/></svg>';
+
+function renderLed(pct) {
+  var s = String(Math.max(0, Math.min(100, pct))).padStart(3, '0');
+  document.getElementById('led').innerHTML = segSvg(s[0]) + segSvg(s[1]) + segSvg(s[2]) + PCT_GLYPH;
+  document.getElementById('led').setAttribute('aria-label', 'Overall score ' + pct + ' percent');
+}
+
+/* ── smiley faces ── */
+function face(mood) {
+  var base = '<circle cx="12" cy="12" r="11" fill="#FFFF00" stroke="#000" stroke-width="1"/>';
+  var eyes = '<rect x="7" y="7" width="2.6" height="3.4" fill="#000"/><rect x="14.4" y="7" width="2.6" height="3.4" fill="#000"/>';
+  var parts = {
+    win: '<rect x="4.5" y="6.5" width="6" height="4.4" fill="#000"/><rect x="13.5" y="6.5" width="6" height="4.4" fill="#000"/><rect x="10.5" y="7.8" width="3" height="1.2" fill="#000"/>' +
+         '<path d="M7,15 Q12,19.5 17,15" stroke="#000" stroke-width="1.4" fill="none"/>',
+    happy: eyes + '<path d="M7,14.5 Q12,19 17,14.5" stroke="#000" stroke-width="1.4" fill="none"/>',
+    meh: eyes + '<line x1="8" y1="16" x2="16" y2="16" stroke="#000" stroke-width="1.4"/>',
+    frown: eyes + '<path d="M7,17.5 Q12,13.5 17,17.5" stroke="#000" stroke-width="1.4" fill="none"/>',
+    dead: '<path d="M6.6,6.6 L10.4,10.4 M10.4,6.6 L6.6,10.4" stroke="#000" stroke-width="1.4"/>' +
+          '<path d="M13.6,6.6 L17.4,10.4 M17.4,6.6 L13.6,10.4" stroke="#000" stroke-width="1.4"/>' +
+          '<path d="M7,17.5 Q12,13.5 17,17.5" stroke="#000" stroke-width="1.4" fill="none"/>'
+  };
+  return '<svg viewBox="0 0 24 24">' + base + (parts[mood] || parts.meh) + '</svg>';
+}
+
+/* ── bands ── */
+var BANDS = [
+  { name: '🛡️ Sentinel',     mood: 'win',   pct: 96 },
+  { name: '🛠️ Practitioner', mood: 'happy', pct: 78 },
+  { name: '🔍 Aware',         mood: 'meh',   pct: 62 },
+  { name: '🌱 Newcomer',      mood: 'frown', pct: 41 },
+  { name: '🧭 Uncharted',     mood: 'dead',  pct: 18 }
+];
+var current = 62, gagArmed = true, timer = null;
+
+function countUp(from, to) {
+  if (timer) clearInterval(timer);
+  var steps = 8, i = 0;
+  timer = setInterval(function() {
+    i++;
+    var v = Math.round(from + (to - from) * i / steps);
+    renderLed(v);
+    if (i >= steps) { clearInterval(timer); timer = null; renderLed(to); }
+  }, 75);
+}
+
+function setBand(idx) {
+  var b = BANDS[idx];
+  document.getElementById('title-name').textContent = b.name;
+  document.getElementById('smiley').innerHTML = face(b.mood);
+  countUp(current, b.pct);
+  current = b.pct;
+  var btns = document.querySelectorAll('.review-tools button[data-band]');
+  btns.forEach(function(btn, i) { btn.classList.toggle('on', i === idx); });
+  if (idx === 4 && gagArmed) { gagArmed = false; openGag(); }
+}
+
+/* ── radar (fixture data, simplified) ── */
+(function() {
+  var pcts = [33, 50, 62, 70, 74, 81, 88, 92, 96, 100];
+  var cx = 200, cy = 200, maxR = 140, ns = 'http://www.w3.org/2000/svg';
+  var svg = '<svg viewBox="0 0 400 400">';
+  svg += '<defs><pattern id="dith" width="2" height="2" patternUnits="userSpaceOnUse">' +
+         '<rect width="2" height="2" fill="#fff"/><rect width="1" height="1" fill="#808000"/><rect x="1" y="1" width="1" height="1" fill="#808000"/></pattern></defs>';
+  svg += '<circle cx="200" cy="200" r="140" fill="#fff" stroke="#e0e0e0"/>';
+  for (var lv = 1; lv <= 4; lv++) svg += '<circle cx="200" cy="200" r="' + (35 * lv) + '" fill="none" stroke="#e0e0e0" stroke-width="0.75"/>';
+  var pts = [];
+  for (var i = 0; i < 10; i++) {
+    var ang = (36 * i - 90) * Math.PI / 180;
+    var x = cx + maxR * Math.cos(ang), y = cy + maxR * Math.sin(ang);
+    svg += '<line x1="200" y1="200" x2="' + x + '" y2="' + y + '" stroke="#ccc" stroke-width="0.75"/>';
+    var vr = pcts[i] / 100 * maxR;
+    pts.push((cx + vr * Math.cos(ang)) + ',' + (cy + vr * Math.sin(ang)));
+    var lx = cx + 125 * Math.cos(ang), ly = cy + 125 * Math.sin(ang);
+    var anchor = Math.cos(ang) > 0.3 ? 'start' : (Math.cos(ang) < -0.3 ? 'end' : 'middle');
+    svg += '<text x="' + lx + '" y="' + (ly - 4) + '" text-anchor="' + anchor + '" font-size="14" font-family="W95FA,monospace">AST' + String(i + 1).padStart(2, '0') + '</text>';
+    svg += '<text x="' + lx + '" y="' + (ly + 12) + '" text-anchor="' + anchor + '" font-size="13" font-family="W95FA,monospace" fill="#808000">' + pcts[i] + '%</text>';
+  }
+  svg += '<polygon points="' + pts.join(' ') + '" fill="url(#dith)" stroke="#000" stroke-width="2" stroke-linejoin="miter"/>';
+  document.getElementById('radar').innerHTML = svg + '</svg>';
+})();
+
+/* ── threat scan bars (fixture, weakest first) ── */
+(function() {
+  var rows = [
+    ['Malicious Skills', 33], ['Supply Chain Compromise', 50], ['Over-Privileged Skills', 62],
+    ['Insecure Metadata', 70], ['Untrusted External Instructions', 74], ['Weak Isolation', 81],
+    ['Update Drift', 88], ['Poor Scanning', 92], ['No Governance', 96], ['Cross-Platform Reuse', 100]
+  ];
+  var below = rows.filter(function(r) { return r[1] < 70; }).length;
+  document.getElementById('scan-status').textContent =
+    'Scan complete: ' + rows.length + ' areas checked — ' + below + ' below the 70% line.';
+  var html = '';
+  rows.forEach(function(r) {
+    var cls = r[1] < 50 ? 'r' : (r[1] < 70 ? 'a' : 'g');
+    html += '<div class="bar-row"><div class="bar-label">' + r[0] + '</div>' +
+            '<div class="bar-track"><div class="bar-fill ' + cls + '" style="width:' + r[1] + '%"></div></div>' +
+            '<div class="bar-pct">' + r[1] + '%</div></div>';
+  });
+  document.getElementById('bars').innerHTML = html;
+})();
+
+/* ── gags ── */
+function openGag() { document.getElementById('gag').classList.add('open'); }
+document.getElementById('gag-ok').addEventListener('click', function() {
+  document.getElementById('gag').classList.remove('open');
+});
+document.getElementById('gag-btn').addEventListener('click', openGag);
+document.getElementById('quit-btn').addEventListener('click', function() {
+  document.getElementById('quit-note').classList.toggle('show');
+});
+document.querySelectorAll('.review-tools button[data-band]').forEach(function(btn) {
+  btn.addEventListener('click', function() { setBand(Number(btn.getAttribute('data-band'))); });
+});
+
+/* initial paint */
+document.getElementById('smiley').innerHTML = face('meh');
+renderLed(62);
+</script>
+</body>
+</html>

@@ -48,45 +48,42 @@
   color: var(--color-text-muted);
 }
 
-.results-type-motto {
-  font-size: 0.9375rem;
-  line-height: 1.5;
-  margin: var(--space-1) 0 0;
-  color: var(--color-text);
-}
-
-/* The two defining axes, read as places attention lives / rarely goes. */
-.results-axis-block {
+/* The five composed trait rows: letter + dimension + behavioral phrase.
+   The rows ARE the type — no nickname, no grade. */
+.results-trait-list {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
 }
 
-.results-axis-line {
-  font-family: var(--font-heading);
+.results-trait-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
   font-size: 0.9375rem;
-  color: var(--color-text);
-}
-
-.results-axis-role {
-  display: inline-block;
-  min-width: 11.5em;
-  color: var(--color-text-muted);
-}
-
-.results-axis-desc {
-  font-size: 0.8125rem;
-  color: var(--color-text-muted);
-  padding-left: 0;
-}
-
-/* The weak axis carries a factual risk note: what OWASP rates the
-   family's risks — never a comparison between types. */
-.results-axis-risk {
-  font-size: 0.8125rem;
   line-height: 1.5;
-  margin: var(--space-1) 0 0;
+}
+
+.results-trait-letter {
+  font-family: var(--font-heading);
+  font-weight: 400;
+  min-width: 1.5em;
+  text-align: center;
+  background: var(--color-surface);
+  color: var(--color-primary);
+  box-shadow: inset 1px 1px var(--color-secondary),
+              inset -1px -1px #FFFFFF;
+  padding: 0 var(--space-1);
+}
+
+.results-trait-name {
+  font-family: var(--font-heading);
   color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.results-trait-text {
+  color: var(--color-text);
 }
 
 .results-type-blind {
@@ -253,15 +250,24 @@
   height: 100%;
   border-radius: 0;
   transition: width 0.6s ease;
-  /* One neutral ink for every bar — the navy accent of the skin's
-     selection. Segmented blocks (ticket #45): same 6px-on/2px-off rhythm
-     the skin paints the Progress Fill with; the colour shows through the
-     transparent cells, var(--color-surface) draws the gaps. No band
-     colouring exists any more: the width alone is the message. */
-  background-color: var(--color-accent);
+  /* Ink depth by LENGTH, not judgement (ADR 0026): one single-hue navy
+     ramp in five steps — pale where attention rarely sits, deep where it
+     lives. Segmented blocks (ticket #45): same 6px-on/2px-off rhythm the
+     skin paints the Progress Fill with; the level colour shows through
+     the transparent cells, var(--color-surface) draws the gaps. The
+     .results-bar-lvN classes below carry the step colour. */
+  background-color: #6f93d4;
   background-image: repeating-linear-gradient(
     90deg, transparent 0 6px, var(--color-surface) 6px 8px);
 }
+
+/* The five ramp steps, pale → deep. js/results.js barLevel() maps the
+   bar's own width to a step; no other element uses these classes. */
+.results-bar-lv1 { background-color: #cdd9f0; }
+.results-bar-lv2 { background-color: #a5bbe6; }
+.results-bar-lv3 { background-color: #6f93d4; }
+.results-bar-lv4 { background-color: #4472c4; }
+.results-bar-lv5 { background-color: #2b55a8; }
 
 /* ── Action Plan ──
    One ranked list (ticket #72): the Actions are rows inside a single

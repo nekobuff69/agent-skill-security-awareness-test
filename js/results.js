@@ -55,25 +55,28 @@
 
   /* ── Results header panel ── */
 
+  /** The five-letter attention code: one pole letter per trait
+   *  dimension, in registry order (ADR 0026). */
+  function profileCode(profile) {
+    var out = '';
+    for (var i = 0; i < profile.length; i++) {
+      out += t('trait.' + profile[i].trait + '.' + profile[i].pole + '.code');
+    }
+    return out;
+  }
+
   /**
-   * The window's first content panel under the menu bar: the participant's
-   * ATTENTION TYPE — the diversity framing that replaced the tier ladder
-   * and the overall percentage. One type card, no grade:
-   *   - the type caption, then the type name and its motto;
-   *   - the two axes that define the type — where attention mostly lives
-   *     (strongest axis) and where it visits least (weakest axis);
-   *   - when AST-level blind spots exist, their localized names as the
-   *     concrete places to look first.
-   * Type/axis names are Chrome Strings resolved at render time; the
-   * classifier only ships stable ids. No number appears anywhere: the
-   * map and the bars below carry the shape.
+   * The window's first content panel under the menu bar: the
+   * participant's ATTENTION PROFILE — five trait dimensions, five pole
+   * picks, composed. The code leads (five letters), then one trait row
+   * per dimension: the letter, the dimension name, and the behavioral
+   * phrase for the pole the participant's answers selected. There is no
+   * nickname and no grade anywhere: the phrases ARE the type, and the
+   * map below carries the continuous shape. AST-level blind spots stay
+   * as the concrete places to look first.
    */
   function buildResultsHeader(report) {
-    var type = report.type || { id: '', weakAxis: '', strongAxis: '' };
-    var typeName = type.id ? t('type.' + type.id + '.name') : t('prompt.typeFallback');
-    var emoji = type.id ? t('type.' + type.id + '.emoji') : '';
-    var motto = type.id ? t('type.' + type.id + '.motto') : '';
-    var typeCode = type.id ? t('type.' + type.id + '.code') : '';
+    var profile = report.profile || [];
 
     var children = [
       el('div', {
@@ -82,34 +85,31 @@
       }, [
         el('div', {
           className: 'results-title-name results-title-caption',
-          textContent: (emoji ? emoji + ' ' : '') +
-            (typeCode ? typeCode + ' · ' : '') + typeName
+          textContent: profileCode(profile)
         }),
-        el('div', { className: 'results-type-caption', textContent: t('results.typeCaption') }),
-        motto ? el('p', { className: 'results-type-motto', textContent: motto }) : null
+        el('div', { className: 'results-type-caption', textContent: t('results.typeCaption') })
       ])
     ];
 
-    if (type.strongAxis) {
-      var strongLetter = t('axis.' + type.strongAxis + '.code');
-      var weakLetter = t('axis.' + type.weakAxis + '.code');
-      children.push(el('div', { className: 'results-axis-block' }, [
-        el('div', { className: 'results-axis-line' }, [
-          el('span', { className: 'results-axis-role', textContent: t('results.attentionStrong') }),
-          document.createTextNode(strongLetter + ' · ' + t('axis.' + type.strongAxis))
-        ]),
-        el('div', { className: 'results-axis-desc', textContent: t('axis.' + type.strongAxis + '.desc') }),
-        el('div', { className: 'results-axis-line' }, [
-          el('span', { className: 'results-axis-role', textContent: t('results.attentionWeak') }),
-          document.createTextNode(weakLetter + ' · ' + t('axis.' + type.weakAxis))
-        ]),
-        el('div', { className: 'results-axis-desc', textContent: t('axis.' + type.weakAxis + '.desc') }),
-        /* The risk note rides the weak axis only: what OWASP rates the
-           family's risks, stated factually for THIS axis. It never
-           compares types — a danger ranking would rebuild the very
-           hierarchy the type system removed. */
-        el('p', { className: 'results-axis-risk', textContent: t('axis.' + type.weakAxis + '.risk') })
-      ]));
+    if (profile.length > 0) {
+      var rows = [];
+      for (var i = 0; i < profile.length; i++) {
+        rows.push(el('div', { className: 'results-trait-row' }, [
+          el('span', {
+            className: 'results-trait-letter',
+            textContent: t('trait.' + profile[i].trait + '.' + profile[i].pole + '.code')
+          }),
+          el('span', {
+            className: 'results-trait-name',
+            textContent: t('trait.' + profile[i].trait + '.name')
+          }),
+          el('span', {
+            className: 'results-trait-text',
+            textContent: t('trait.' + profile[i].trait + '.' + profile[i].pole + '.text')
+          })
+        ]));
+      }
+      children.push(el('div', { className: 'results-trait-list' }, rows));
     }
 
     var blindIds = report.blindSpotIds || [];
@@ -124,8 +124,7 @@
       }));
     }
 
-    var wrap = el('div', { className: 'results-header' }, children);
-    return wrap;
+    return el('div', { className: 'results-header' }, children);
   }
 
   /* ── Attention Map (hand-rolled SVG) ── */
@@ -193,17 +192,21 @@
     var cx = 200, cy = 200;
     var maxR = 140;         // outer ring
     var gridLevels = 4;     // 25%, 50%, 75%, 100%
-    var step = 36;          // 360/10 degrees
+    var step = 72;          // 360/5 degrees — five trait dimensions
     var svg = svgEl || document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', '0 0 400 400');
     svg.setAttribute('class', 'results-radar-svg');
-    var font = headingFont();   // chrome face for the AST-ID labels
+    var font = headingFont();   // chrome face for the dimension labels
 
-    // The AST ids sitting below the 70% internal threshold — marked by
+    // The dimensions sitting below the 70% internal threshold — marked by
     // SHAPE (a ring instead of a dot), never by a judging colour.
     var blindSet = {};
     var blindIds = report.blindSpotIds || [];
-    for (var b = 0; b < blindIds.length; b++) blindSet[blindIds[b]] = true;
+    for (var b = 0; b < blindIds.length; b++) {
+      // A blind-spot AST marks its dimension on the map.
+      var dim = (typeof AST.traitOf === 'object' && AST.traitOf) ? AST.traitOf[blindIds[b]] : null;
+      if (dim) blindSet[dim] = true;
+    }
 
     // background circle
     var bg = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -228,12 +231,12 @@
       svg.appendChild(ring);
     }
 
-    // axis lines and labels
-    var astScores = report.astScores;
-    var astIds = AST.ids;
+    // axis lines and labels — one spoke per trait dimension
+    var traitScores = report.traitScores || {};
+    var traitOrder = (AST.traitOrder) || [];
     var points = [];
 
-    for (var i = 0; i < 10; i++) {
+    for (var i = 0; i < traitOrder.length; i++) {
       var angle = (step * i - 90) * Math.PI / 180;
       var x = cx + maxR * Math.cos(angle);
       var y = cy + maxR * Math.sin(angle);
@@ -249,20 +252,18 @@
       svg.appendChild(line);
 
       // profile point on axis — the same neutral ink everywhere
-      var astId = astIds[i];
-      var pct = (astScores[astId] && astScores[astId].percentage != null) ? astScores[astId].percentage : 0;
+      var traitId = traitOrder[i];
+      var pct = (traitScores[traitId] && traitScores[traitId].percentage != null)
+        ? traitScores[traitId].percentage : 0;
       var valR = (pct / 100) * maxR;
       var px = cx + valR * Math.cos(angle);
       var py = cy + valR * Math.sin(angle);
       points.push({ x: px, y: py });
 
-      // axis label — the AST id only: no number on the map
-      // labelR=125 keeps all text inside 0..400 viewBox
-      // At worst case (angle=18deg, cos=0.951): start-anchored right edge = 125*0.951+200+42 = 358.9 < 400
-      // At left (cos=-0.951): end-anchored left edge = 125*(-0.951)+200-42 = 60.9 > 0
-      // At top (sin=-0.951): y = 125*(-0.951)+200-18 = 83.1 > 10
-      // At bottom (sin=0.951): y = 125*0.951+200+8 = 318.9 < 400
-      var labelR = 125;
+      // axis label — the short dimension name only: no number on the map.
+      // labelR=118 keeps every short label inside 0..400 viewBox at the
+      // five-spoke angles (worst case cos=±0.951, start/end anchored).
+      var labelR = 118;
       var lx = cx + labelR * Math.cos(angle);
       var ly = cy + labelR * Math.sin(angle);
       var anchor = 'middle';
@@ -277,7 +278,7 @@
       tspan.setAttribute('font-family', font);
       tspan.setAttribute('font-weight', '400');
       tspan.setAttribute('fill', '#000000');
-      tspan.textContent = astId;
+      tspan.textContent = t('trait.' + traitId + '.short');
 
       var lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       lbl.appendChild(tspan);
@@ -296,11 +297,11 @@
     svg.appendChild(buildRadarFillPattern(RADAR_DITHER_COLOR));
 
     // re-append the markers on top of the polygon: a solid ink dot on the
-    // profile, an open ring where the AST sits below the internal
+    // profile, an open ring where the dimension sits below the internal
     // attention threshold (shape, not colour — the ring reads as "look
-    // here first", the same message the type card's blind list carries).
+    // here first", the same message the profile card's blind list carries).
     for (var i2 = 0; i2 < points.length; i2++) {
-      var isBlind = !!blindSet[astIds[i2]];
+      var isBlind = !!blindSet[traitOrder[i2]];
       var dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       dot.setAttribute('cx', points[i2].x);
       dot.setAttribute('cy', points[i2].y);
@@ -321,14 +322,27 @@
   }
 
   /* ── Attention Distribution Bars ── */
+
+  /** Length → ink depth, not judgement: a single-hue ramp from pale to
+   *  deep navy. A longer bar only means more of the participant's
+   *  attention lives there — the ramp makes the intensity readable at a
+   *  glance without a single number or a pass/fail colour. */
+  function barLevel(pct) {
+    if (pct < 20) return 1;
+    if (pct < 40) return 2;
+    if (pct < 60) return 3;
+    if (pct < 80) return 4;
+    return 5;
+  }
+
   function buildBars(report) {
     var wrap = el('div', { className: 'results-bars' });
 
     // weakest-first order comes from the report (Scoring Engine owns ranking);
     // labels are the full localized AST display names (Chrome Strings via
     // App.I18n.astName — ADR 0015), never the short IDs used on the map.
-    // No number rides the row and no band colour exists: the bar's width
-    // alone shows where attention sits — a distribution, not a ranking.
+    // No number rides the row: the bar's width AND its ink depth show
+    // where attention sits — a distribution, not a ranking.
     var astRanked = report.astRanked || [];
 
     for (var i = 0; i < astRanked.length; i++) {
@@ -340,7 +354,7 @@
         ]),
         el('div', { className: 'results-bar-track' }, [
           el('div', {
-            className: 'results-bar-fill',
+            className: 'results-bar-fill results-bar-lv' + barLevel(pct),
             style: 'width:' + pct + '%'
           })
         ])
@@ -1242,13 +1256,10 @@
       role: 'menuitem'
     });
     btn.addEventListener('click', function() {
-      var type = report.type || {};
       navigator.share({
         title: t('results.shareTitle'),
         text: t('results.shareText', {
-          emoji: type.id ? t('type.' + type.id + '.emoji') : '',
-          code: type.id ? t('type.' + type.id + '.code') : '',
-          name: type.id ? t('type.' + type.id + '.name') : t('prompt.typeFallback'),
+          code: profileCode(report.profile || []),
           app: t('doc.title')
         })
       }).catch(function() { /* user cancelled */ });
@@ -1719,6 +1730,8 @@
      used by the page. */
   app.resultsInternals = {
     headingFont: headingFont,
+    profileCode: profileCode,
+    barLevel: barLevel,
     buildResultsHeader: buildResultsHeader,
     buildRadar: buildRadar,
     buildBars: buildBars,

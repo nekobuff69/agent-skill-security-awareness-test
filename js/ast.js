@@ -24,32 +24,37 @@
       AST07: 'medium', AST08: 'medium', AST09: 'medium', AST10: 'medium'
     },
     /**
-     * Attention Axes — the three behavioral families the ten AST Risks
-     * group into for the type classifier. Keys are self-describing and
-     * stable; order is load-bearing: it is the deterministic tie-break
-     * for "weakest"/"strongest" axis. Axis display names, single-letter
-     * MBTI-style codes and per-axis risk notes are Chrome Strings
-     * ('axis.INTAKE'…), not literals here.
+     * Trait Dimensions — five fine-grained behavioral families the ten
+     * AST Risks group into (ADR 0026 supersedes ADR 0025's three axes).
+     * Keys are self-describing and stable; order is load-bearing: it is
+     * the position order of the five-letter profile code and the
+     * deterministic tie-break for aggregation. Display names and the
+     * two pole descriptions per dimension are Chrome Strings
+     * ('trait.VETTING'…), not literals here.
      *
-     *   INTAKE   — what you let in: skills, sources, external instructions
-     *   EXPOSURE — what you give out: permissions, metadata, isolation
-     *   UPKEEP   — how you keep up: updates, scans, governance, reuse
+     *   VETTING   — do you check where a skill comes from (AST01, AST02)
+     *   PRIVILEGE — how much you hand a skill (AST03, AST04)
+     *   HYGIENE   — is outside content data or instructions (AST05, AST06)
+     *   CURRENT   — do updates and re-checks actually happen (AST07, AST08)
+     *   MAPPED    — do you know what you installed where (AST09, AST10)
      */
-    axes: {
-      INTAKE:   ['AST01', 'AST02', 'AST05'],
-      EXPOSURE: ['AST03', 'AST04', 'AST06'],
-      UPKEEP:   ['AST07', 'AST08', 'AST09', 'AST10']
+    traits: {
+      VETTING:   ['AST01', 'AST02'],
+      PRIVILEGE: ['AST03', 'AST04'],
+      HYGIENE:   ['AST05', 'AST06'],
+      CURRENT:   ['AST07', 'AST08'],
+      MAPPED:    ['AST09', 'AST10']
     },
-    axisOrder: ['INTAKE', 'EXPOSURE', 'UPKEEP']
+    traitOrder: ['VETTING', 'PRIVILEGE', 'HYGIENE', 'CURRENT', 'MAPPED']
   };
 
-  /** Which axis an AST Risk belongs to — resolved once, after the
-   *  literal above is complete. */
+  /** Which trait dimension an AST Risk belongs to — resolved once, after
+   *  the literal above is complete. */
   (function() {
-    var keys = global.App.AST.axisOrder;
-    var map = global.App.AST.axisOf = {};
+    var keys = global.App.AST.traitOrder;
+    var map = global.App.AST.traitOf = {};
     for (var a = 0; a < keys.length; a++) {
-      var list = global.App.AST.axes[keys[a]];
+      var list = global.App.AST.traits[keys[a]];
       for (var i = 0; i < list.length; i++) map[list[i]] = keys[a];
     }
   })();

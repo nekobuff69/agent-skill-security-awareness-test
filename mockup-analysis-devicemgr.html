@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MOCKUP v3 — Analysis redesign (Surface Scan + Device Manager, no radar / no bars)</title>
+<style>
+  @font-face {
+    font-family: 'W95FA';
+    src: url('fonts/w95fa.woff2') format('woff2');
+  }
+  :root {
+    --bevel-raised: inset -1px -1px #000000, inset 1px 1px #FFFFFF,
+                    inset -2px -2px #808080, inset 2px 2px #DFDFDF;
+    --bevel-sunken: inset -1px -1px #FFFFFF, inset 1px 1px #000000,
+                    inset -2px -2px #DFDFDF, inset 2px 2px #808080;
+    --bevel-field: inset 1px 1px #808080, inset -1px -1px #FFFFFF;
+    --score-green: #008000;
+    --score-amber: #808000;
+    --score-red: #800000;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #008080;
+    font-family: Tahoma, 'Segoe UI', sans-serif;
+    color: #000000;
+    padding: 32px 16px 64px;
+  }
+
+  /* ── Review tooling (NOT part of the design) ── */
+  .review-tools {
+    position: fixed; left: 12px; top: 12px; z-index: 9000;
+    background: #C0C0C0; box-shadow: var(--bevel-raised);
+    padding: 10px 12px; width: 210px; font-size: 12px;
+  }
+  .review-tools h2 { margin: 0 0 6px; font-size: 12px; font-family: 'W95FA', monospace; font-weight: 400; }
+  .review-tools .tag {
+    display: inline-block; background: #000080; color: #fff;
+    padding: 1px 6px; font-size: 10px; letter-spacing: .08em; margin-bottom: 8px;
+  }
+  .review-tools button {
+    display: block; width: 100%; margin: 4px 0; padding: 4px 6px;
+    background: #C0C0C0; border: 0; box-shadow: var(--bevel-raised);
+    font-size: 12px; cursor: pointer; text-align: left;
+  }
+  .review-tools button:active { box-shadow: var(--bevel-sunken); }
+  .review-tools button.on { box-shadow: var(--bevel-sunken); background: #DFDFDF; }
+  .review-tools p { margin: 8px 0 0; line-height: 1.4; color: #404040; }
+
+  /* ── Window chrome ── */
+  .os-window {
+    max-width: 720px; margin: 24px auto 0;
+    background: #C0C0C0; box-shadow: var(--bevel-raised); padding: 3px;
+  }
+  .os-titlebar {
+    display: flex; align-items: center; min-height: 30px;
+    background: linear-gradient(90deg, #000080, #1084D0);
+    color: #FFFFFF; padding: 0 4px 0 8px;
+    font-family: 'W95FA', monospace; font-size: 14px;
+  }
+  .os-titlebar .spacer { flex: 1; }
+  .os-tbtn {
+    width: 16px; height: 14px; margin-left: 2px;
+    background: #C0C0C0; box-shadow: var(--bevel-raised);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10px; color: #000;
+  }
+  .os-body { background: #C0C0C0; padding: 8px; }
+
+  /* ── Menu bar ── */
+  .menu-bar {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    padding: 8px 12px; margin-bottom: 8px;
+    background: #C0C0C0; box-shadow: var(--bevel-raised);
+  }
+  .menu-bar button {
+    border: 0; background: #C0C0C0; box-shadow: var(--bevel-raised);
+    padding: 6px 14px; font-size: 13px; cursor: pointer;
+  }
+  .menu-bar button:active { box-shadow: var(--bevel-sunken); }
+
+  /* ── Header: clearance + LED overall ── */
+  .title-card {
+    background: #FFFFFF; box-shadow: var(--bevel-sunken);
+    padding: 12px 16px; margin-bottom: 8px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  }
+  .clearance-caption {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #404040;
+    margin-bottom: 2px;
+  }
+  .title-name { font-family: 'W95FA', monospace; font-size: 24px; color: #000; }
+  .overall-col { text-align: right; }
+  .overall-caption {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #404040;
+    margin-bottom: 4px;
+  }
+  .led-field {
+    display: inline-flex; gap: 2px; padding: 5px 7px;
+    background: #000000; box-shadow: var(--bevel-sunken);
+  }
+  .led-field svg { display: block; height: 30px; width: auto; }
+
+  /* ── Sections ── */
+  .section-title { font-family: 'W95FA', monospace; font-size: 18px; margin: 12px 0 4px; font-weight: 400; }
+
+  /* ── Surface Scan: one flowing disk-surface field, 100 blocks ──
+     Each AST owns 10 contiguous blocks ("runs"); 2 runs per line.
+     Replaces both the radar and the per-axis bars. */
+  .scan-field {
+    background: #FFFFFF; box-shadow: var(--bevel-sunken);
+    padding: 8px;
+    display: flex; flex-wrap: wrap; gap: 6px;
+  }
+  .scan-run { display: flex; gap: 1px; }
+  .scan-block {
+    width: 24px; height: 24px;
+    background: #FFFFFF;
+    box-shadow: inset 0 0 0 1px #DFDFDF;
+    visibility: hidden;
+  }
+  .scan-block.fill-g { background: var(--score-green); box-shadow: none; }
+  .scan-block.fill-a { background: var(--score-amber); box-shadow: none; }
+  .scan-block.fill-r { background: var(--score-red); box-shadow: none; }
+  @media (max-width: 560px) {
+    .scan-block { width: 18px; height: 18px; }
+  }
+  @media (max-width: 400px) {
+    .scan-block { width: 14px; height: 14px; }
+  }
+
+  .scan-legend {
+    margin-top: 8px; padding: 6px 10px;
+    background: #C0C0C0; box-shadow: var(--bevel-raised);
+    display: flex; flex-wrap: wrap; gap: 6px 18px;
+    font-size: 11px; color: #404040;
+  }
+  .scan-legend .swatch {
+    display: inline-block; width: 9px; height: 9px; margin-right: 5px;
+    vertical-align: -1px; background: #FFFFFF; box-shadow: inset 0 0 0 1px #DFDFDF;
+  }
+  .scan-legend .sw.g { background: var(--score-green); box-shadow: none; }
+  .scan-legend .sw.a { background: var(--score-amber); box-shadow: none; }
+  .scan-legend .sw.r { background: var(--score-red); box-shadow: none; }
+
+  /* ── Device Manager tree ── */
+  .devmgr {
+    background: #FFFFFF; box-shadow: var(--bevel-sunken);
+    padding: 4px 0;
+  }
+  .devmgr-root, .devmgr-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 10px;
+    font-size: 13px;
+    cursor: default;
+    user-select: none;
+  }
+  .devmgr-root { color: #000; font-weight: 600; }
+  .devmgr-root .twist { font-family: ui-monospace, monospace; width: 1em; color: #000; }
+  .devmgr-row { cursor: pointer; padding-left: 34px; }
+  .devmgr-row:hover, .devmgr-row:focus {
+    background: #000080; color: #FFFFFF;
+    outline: none;
+  }
+  .devmgr-row:hover .dev-ast, .devmgr-row:hover .dev-pct,
+  .devmgr-row:focus .dev-ast, .devmgr-row:focus .dev-pct { color: #FFFFFF; }
+  .dev-icon { width: 16px; height: 16px; flex-shrink: 0; display: block; }
+  .dev-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dev-ast {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px; color: #404040;
+  }
+  .dev-pct {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px; min-width: 3.2em; text-align: right;
+  }
+  .dev-pct.g { color: var(--score-green); }
+  .dev-pct.a { color: var(--score-amber); }
+  .dev-pct.r { color: var(--score-red); }
+
+  /* ── Window status bar (ScanDisk verdict) ── */
+  .status-bar {
+    margin-top: 8px; padding: 4px 8px;
+    background: #C0C0C0; box-shadow: var(--bevel-field);
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px; color: #404040;
+    display: flex; justify-content: space-between; gap: 8px;
+  }
+
+  .note { font-size: 11px; color: #004040; text-align: center; margin-top: 20px; }
+
+  /* ── Properties dialog (device drill-down) ── */
+  .dialog-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,.25);
+    display: none; align-items: center; justify-content: center; z-index: 9500;
+  }
+  .dialog-backdrop.open { display: flex; }
+  .os-dialog {
+    width: 400px; max-width: 92vw; background: #C0C0C0; box-shadow: var(--bevel-raised); padding: 3px;
+  }
+  .dialog-tabs {
+    display: flex; gap: 2px; padding: 6px 8px 0;
+  }
+  .dialog-tabs .tab {
+    padding: 4px 14px; font-size: 12px;
+    background: #C0C0C0; box-shadow: var(--bevel-raised);
+  }
+  .dialog-tabs .tab.active { box-shadow: var(--bevel-sunken); background: #DFDFDF; font-weight: 600; }
+  .dialog-body { background: #DFDFDF; box-shadow: var(--bevel-sunken); margin: 0 8px; padding: 12px; }
+  .dialog-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .dialog-head .dev-icon { width: 24px; height: 24px; }
+  .dialog-head-name { font-family: 'W95FA', monospace; font-size: 16px; }
+  .dialog-line { font-size: 12.5px; line-height: 1.5; margin: 0 0 6px; color: #000; }
+  .dialog-line .k { color: #404040; }
+  .dialog-buttons { display: flex; justify-content: center; gap: 8px; padding: 12px 8px; }
+  .dialog-buttons button {
+    min-width: 88px; padding: 5px 12px; border: 0;
+    background: #C0C0C0; box-shadow: var(--bevel-raised); cursor: pointer; font-size: 13px;
+  }
+  .dialog-buttons button:active { box-shadow: var(--bevel-sunken); }
+
+  /* ── Easter egg: "safe to turn off" screen ── */
+  .egg-shutdown {
+    position: fixed; inset: 0; z-index: 9600;
+    background: #000000; display: none;
+    align-items: center; justify-content: center; text-align: center;
+    cursor: pointer; padding: 24px;
+  }
+  .egg-shutdown.open { display: flex; }
+  .egg-shutdown p {
+    color: #FFA500;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 18px; line-height: 1.8; margin: 0; max-width: 34em;
+  }
+  .egg-shutdown .dismiss { font-size: 12px; color: #808080; margin-top: 24px; }
+</style>
+</head>
+<body>
+
+<div class="review-tools">
+  <span class="tag">MOCKUP v3 — REVIEW ONLY</span>
+  <h2>Score band</h2>
+  <button data-band="5">Perfect (100%) + egg</button>
+  <button data-band="0">Sentinel (96%)</button>
+  <button data-band="1">Practitioner (78%)</button>
+  <button data-band="2" class="on">Aware (62%)</button>
+  <button data-band="3">Newcomer (41%)</button>
+  <button data-band="4">Uncharted (18%)</button>
+  <h2 style="margin-top:10px">Controls</h2>
+  <button id="replay-btn">Replay surface scan</button>
+  <button id="egg-btn">Preview "safe to turn off" egg</button>
+  <p>Radar and bars are gone. Surface Scan shows the whole posture as a disk-scan field; Device Manager ranks modules weakest-first and drills into a Properties dialog on click. Everything renders instantly under prefers-reduced-motion.</p>
+</div>
+
+<div class="os-window">
+  <div class="os-titlebar">
+    <span>Agent Security Awareness Quiz</span>
+    <span class="spacer"></span>
+    <span class="os-tbtn">—</span><span class="os-tbtn">□</span><span class="os-tbtn">×</span>
+  </div>
+  <div class="os-body">
+
+    <div class="menu-bar">
+      <button>Download PNG</button><button>Share Results</button>
+      <button>Review your answers →</button><button>Retake Assessment</button>
+    </div>
+
+    <div class="title-card">
+      <div>
+        <div class="clearance-caption">Clearance Level</div>
+        <div class="title-name" id="title-name">🔍 Aware</div>
+      </div>
+      <div class="overall-col">
+        <div class="overall-caption">Overall</div>
+        <div class="led-field" id="led" role="img" aria-label="Overall score 62 percent"></div>
+      </div>
+    </div>
+
+    <h2 class="section-title">Surface Scan</h2>
+    <div class="scan-field" id="scan-field"></div>
+    <div class="scan-legend">
+      <span><span class="swatch sw g"></span>Solid — 70% and above</span>
+      <span><span class="swatch sw a"></span>Fragmented — below 70%</span>
+      <span><span class="swatch sw r"></span>Bad sectors — below 50%</span>
+    </div>
+
+    <h2 class="section-title">Device Manager</h2>
+    <div class="devmgr" id="devmgr"></div>
+
+    <div class="status-bar">
+      <span id="status-left"></span>
+      <span id="status-right"></span>
+    </div>
+
+  </div>
+</div>
+
+<p class="note">Mockup v3 — radar and per-axis bars replaced by a ScanDisk-style Surface Scan field (each module owns 10 contiguous blocks) plus a Device Manager ranked weakest-first with Properties drill-down. Fixtures only; not wired to real data.</p>
+
+<div class="dialog-backdrop" id="props" role="dialog" aria-modal="true">
+  <div class="os-dialog">
+    <div class="os-titlebar"><span id="props-title">Properties</span></div>
+    <div class="dialog-tabs">
+      <span class="tab active">General</span>
+      <span class="tab">Assessment</span>
+    </div>
+    <div class="dialog-body">
+      <div class="dialog-head" id="props-head"></div>
+      <p class="dialog-line"><span class="k">Device status:</span> <span id="props-status"></span></p>
+      <p class="dialog-line"><span class="k">Module score:</span> <span id="props-score"></span></p>
+      <p class="dialog-line"><span class="k">Assessment:</span> your answers in this module are analysed on the Action Plan below.</p>
+    </div>
+    <div class="dialog-buttons"><button id="props-ok">OK</button></div>
+  </div>
+</div>
+
+<div class="egg-shutdown" id="egg" role="dialog" aria-modal="true" aria-label="Easter egg screen">
+  <div>
+    <p>It is now safe to turn off<br>your computer.</p>
+    <p class="dismiss">(Not really — keep it on. Click anywhere to return to your report.)</p>
+  </div>
+</div>
+
+<script>
+var REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ── seven-segment LED ── */
+var SEG = {
+  a: '3,1.5 11,1.5 12.5,3 11,4.5 3,4.5 1.5,3',
+  b: '12.5,3 14,4.5 14,11.5 12.5,13 11,11.5 11,4.5',
+  c: '12.5,13 14,14.5 14,21.5 12.5,23 11,21.5 11,14.5',
+  d: '3,21.5 11,21.5 12.5,23 11,24.5 3,24.5 1.5,23',
+  e: '1.5,13 3,14.5 3,21.5 1.5,23 0,21.5 0,14.5',
+  f: '1.5,3 3,4.5 3,11.5 1.5,13 0,11.5 0,4.5',
+  g: '3,11.5 11,11.5 12.5,13 11,14.5 3,14.5 1.5,13'
+};
+var DIGITS = { '0':'abcdef', '1':'bc', '2':'abged', '3':'abgcd', '4':'fgbc',
+               '5':'afgcd', '6':'afgedc', '7':'abc', '8':'abcdefg', '9':'abcdfg' };
+function segSvg(d) {
+  var lit = DIGITS[d] || '';
+  var s = '<svg viewBox="0 0 14 26">';
+  for (var k in SEG) {
+    s += '<polygon points="' + SEG[k] + '" fill="' + (lit.indexOf(k) >= 0 ? '#FF0000' : '#2A0000') + '"/>';
+  }
+  return s + '</svg>';
+}
+var PCT_GLYPH = '<svg viewBox="0 0 19 31"><rect x="0" y="0" width="5" height="5" fill="#FF0000"/>' +
+  '<rect x="10" y="26" width="5" height="5" fill="#FF0000"/>' +
+  '<polygon points="16,0 19,0 3,31 0,31" fill="#FF0000"/></svg>';
+function renderLed(pct) {
+  var s = String(Math.max(0, Math.min(100, pct))).padStart(3, '0');
+  document.getElementById('led').innerHTML = segSvg(s[0]) + segSvg(s[1]) + segSvg(s[2]) + PCT_GLYPH;
+  document.getElementById('led').setAttribute('aria-label', 'Overall score ' + pct + ' percent');
+}
+
+/* ── era device icons (inline SVG, 16px box) ──
+   OK: navy module card. WARNING: yellow field, black exclamation.
+   ERROR: red circle, white cross. */
+function devIcon(kind) {
+  var card = '<rect x="1" y="3" width="14" height="10" fill="#000080"/>' +
+             '<rect x="1" y="3" width="14" height="2" fill="#1084D0"/>' +
+             '<rect x="3" y="13" width="2" height="2" fill="#808080"/>' +
+             '<rect x="7" y="13" width="2" height="2" fill="#808080"/>' +
+             '<rect x="11" y="13" width="2" height="2" fill="#808080"/>';
+  var warn = '<rect x="2" y="2" width="12" height="12" fill="#FFFF00" stroke="#000" stroke-width="1"/>' +
+             '<rect x="7" y="4.5" width="2" height="5" fill="#000"/>' +
+             '<rect x="7" y="11" width="2" height="2" fill="#000"/>';
+  var err = '<circle cx="8" cy="8" r="7" fill="#FF0000"/>' +
+            '<path d="M4.6,4.6 L11.4,11.4 M11.4,4.6 L4.6,11.4" stroke="#FFF" stroke-width="2"/>';
+  var glyph = kind === 'ok' ? card : (kind === 'warn' ? card + warn : card + err);
+  return '<svg viewBox="0 0 16 16" class="dev-icon" aria-hidden="true">' + glyph + '</svg>';
+}
+
+/* ── fixture data ── */
+var AXES = [
+  { id: 'AST01', name: 'Malicious Skills' },
+  { id: 'AST02', name: 'Supply Chain Compromise' },
+  { id: 'AST03', name: 'Over-Privileged Skills' },
+  { id: 'AST04', name: 'Insecure Metadata' },
+  { id: 'AST05', name: 'Untrusted External Instructions' },
+  { id: 'AST06', name: 'Weak Isolation' },
+  { id: 'AST07', name: 'Update Drift' },
+  { id: 'AST08', name: 'Poor Scanning' },
+  { id: 'AST09', name: 'No Governance' },
+  { id: 'AST10', name: 'Cross-Platform Reuse' }
+];
+var BASE = [33, 50, 62, 70, 74, 81, 88, 92, 96, 100];
+var BANDS = [
+  { name: '🛡️ Sentinel',     pct: 96  },
+  { name: '🛠️ Practitioner', pct: 78  },
+  { name: '🔍 Aware',         pct: 62  },
+  { name: '🌱 Newcomer',      pct: 41  },
+  { name: '🧭 Uncharted',     pct: 18  },
+  { name: '🏆 Perfect',       pct: 100 }
+];
+
+function clamp(v) { return Math.max(0, Math.min(100, v)); }
+function bandOf(p) { return p < 50 ? 'r' : (p < 70 ? 'a' : 'g'); }
+function iconOf(p) { return p < 50 ? 'err' : (p < 70 ? 'warn' : 'ok'); }
+function statusWord(p) {
+  return p < 50 ? 'bad sectors' : (p < 70 ? 'fragmented' : 'solid');
+}
+function axisPcts(pct) {
+  return BASE.map(function(b) { return clamp(Math.round(b * pct / 62)); });
+}
+
+/* ── surface scan field: 10 runs of 10 blocks, scan order reveal ── */
+var scanTimers = [];
+function clearScanTimers() { scanTimers.forEach(clearTimeout); scanTimers = []; }
+function buildScanField(pcts, animate) {
+  var field = document.getElementById('scan-field');
+  var html = '';
+  pcts.forEach(function(p, i) {
+    var cls = bandOf(p);
+    var blocks = '';
+    for (var b = 0; b < 10; b++) {
+      blocks += '<span class="scan-block fill-' + cls + '" title="' +
+        AXES[i].name + ': ' + p + '% (' + statusWord(p) + ')"></span>';
+    }
+    html += '<span class="scan-run" role="img" aria-label="' + AXES[i].name + ': ' + p + ' percent">' + blocks + '</span>';
+  });
+  field.innerHTML = html;
+  var blocks = field.querySelectorAll('.scan-block');
+  if (REDUCED || !animate) {
+    blocks.forEach(function(block) { block.style.visibility = 'visible'; });
+    return;
+  }
+  blocks.forEach(function(block, i) {
+    scanTimers.push(setTimeout(function() { block.style.visibility = 'visible'; }, i * 12));
+  });
+}
+
+/* ── device manager: ranked weakest-first ── */
+function buildDevmgr(pcts) {
+  var rows = pcts.map(function(p, i) {
+    return { i: i, p: p, id: AXES[i].id, name: AXES[i].name };
+  }).sort(function(a, b) { return a.p - b.p; });
+
+  var html = '<div class="devmgr-root"><span class="twist">[-]</span>' + devIcon('ok') +
+             '<span>Agent Security Posture — 10 modules</span></div>';
+  rows.forEach(function(r) {
+    var pctClass = bandOf(r.p);
+    html += '<div class="devmgr-row" tabindex="0" role="button"' +
+      ' data-index="' + r.i + '" data-pct="' + r.p + '"' +
+      ' aria-label="' + r.name + ', ' + r.p + ' percent. Open properties.">' +
+      devIcon(iconOf(r.p)) +
+      '<span class="dev-name">' + r.name + '</span>' +
+      '<span class="dev-ast">' + r.id + '</span>' +
+      '<span class="dev-pct ' + pctClass + '">' + r.p + '%</span></div>';
+  });
+  var root = document.getElementById('devmgr');
+  root.innerHTML = html;
+  root.querySelectorAll('.devmgr-row').forEach(function(row) {
+    function open() { openProps(Number(row.getAttribute('data-index')), Number(row.getAttribute('data-pct'))); }
+    row.addEventListener('click', open);
+    row.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+    });
+  });
+}
+
+/* ── properties dialog ── */
+function openProps(index, pct) {
+  var kind = iconOf(pct);
+  document.getElementById('props-title').textContent = AXES[index].id + ' Properties';
+  document.getElementById('props-head').innerHTML =
+    devIcon(kind) + '<span class="dialog-head-name">' + AXES[index].name + '</span>';
+  var status = kind === 'ok'
+    ? 'This device is working properly.'
+    : (kind === 'warn'
+      ? 'This device has a problem: score below the 70% line.'
+      : 'This device is disabled: score below 50%.');
+  document.getElementById('props-status').textContent = status;
+  document.getElementById('props-score').textContent = pct + '% — ' + statusWord(pct);
+  document.getElementById('props').classList.add('open');
+}
+document.getElementById('props-ok').addEventListener('click', function() {
+  document.getElementById('props').classList.remove('open');
+});
+document.getElementById('props').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('open');
+});
+
+/* ── easter egg ── */
+function openEgg() { document.getElementById('egg').classList.add('open'); }
+document.getElementById('egg').addEventListener('click', function() {
+  document.getElementById('egg').classList.remove('open');
+});
+document.getElementById('egg-btn').addEventListener('click', openEgg);
+
+/* ── band switching ── */
+var currentIdx = 2;
+function setBand(idx, animate) {
+  currentIdx = idx;
+  var b = BANDS[idx];
+  var pcts = axisPcts(b.pct);
+
+  document.getElementById('title-name').textContent = b.name;
+  renderLed(b.pct);
+
+  var below = pcts.filter(function(p) { return p < 70; }).length;
+  var bad = pcts.filter(function(p) { return p < 50; }).length;
+  var best = AXES[pcts.indexOf(Math.max.apply(null, pcts))].name;
+  document.getElementById('status-left').textContent =
+    'Scan complete. ' + below + ' fragmented' + (bad ? ', ' + bad + ' with bad sectors' : '') +
+    '. Strongest module: ' + best + '.';
+  document.getElementById('status-right').textContent = 'Overall: ' + b.pct + '%';
+
+  clearScanTimers();
+  buildScanField(pcts, animate);
+  buildDevmgr(pcts);
+
+  var btns = document.querySelectorAll('.review-tools button[data-band]');
+  btns.forEach(function(btn, i) { btn.classList.toggle('on', i === idx); });
+
+  if (b.pct >= 100) openEgg();
+}
+
+document.getElementById('replay-btn').addEventListener('click', function() {
+  setBand(currentIdx, true);
+});
+document.querySelectorAll('.review-tools button[data-band]').forEach(function(btn) {
+  btn.addEventListener('click', function() { setBand(Number(btn.getAttribute('data-band')), true); });
+});
+
+/* initial paint: no animation on first load */
+setBand(2, false);
+</script>
+</body>
+</html>
