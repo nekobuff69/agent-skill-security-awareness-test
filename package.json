@@ -1,1 +1,1 @@
-{ "type": "commonjs" }
+{ "type": "commonjs", "scripts": { "icons": "python3 scripts/generate-icons.py" } }
